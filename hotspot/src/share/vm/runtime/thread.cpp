@@ -3697,6 +3697,9 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 #ifdef ASSERT
   _vm_complete = true;
 #endif
+  printf("[david] thread#create_vm | _begin_vm_creation_time: %llu\n", Management::_begin_vm_creation_time->get_value());
+  printf("[david] thread#create_vm | _vm_init_done_time: %llu\n", Management::_vm_init_done_time->get_value());
+  printf("[david] thread#create_vm | _end_vm_creation_time: %llu\n", Management::_end_vm_creation_time->get_value());
   return JNI_OK;
 }
 

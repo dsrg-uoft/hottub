@@ -31,6 +31,8 @@
  */
 
 #include "defines.h"
+//david gettimeofday, never forget clock_gettime rip
+#include <sys/time.h>
 
 #ifdef _MSC_VER
 #if _MSC_VER > 1400 && _MSC_VER < 1600
@@ -92,6 +94,10 @@ WinMain(HINSTANCE inst, HINSTANCE previnst, LPSTR cmdline, int cmdshow)
 int
 main(int argc, char **argv)
 {
+    struct timeval _tv;
+    gettimeofday(&_tv, NULL);
+    uint64_t _t = _tv.tv_sec * 1000  +  _tv.tv_usec / 1000;
+    printf("[david] main.c | %llu\n",(long long unsigned int)_t);
     int margc;
     char** margv;
     const jboolean const_javaw = JNI_FALSE;

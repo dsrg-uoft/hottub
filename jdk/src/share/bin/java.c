@@ -52,6 +52,8 @@
 
 
 #include "java.h"
+//david gettimeofday
+#include <sys/time.h>
 
 /*
  * A NOTE TO DEVELOPERS: For performance reasons it is important that
@@ -369,7 +371,14 @@ JavaMain(void * _args)
     int ret = 0;
     jlong start, end;
 
+    //david timing code
+    struct timeval _tv[10];
+    gettimeofday(&_tv[0], NULL);
+
     RegisterThread();
+
+    //david timing code
+    gettimeofday(&_tv[1], NULL);
 
     /* Initialize the virtual machine */
     start = CounterGet();
@@ -377,6 +386,9 @@ JavaMain(void * _args)
         JLI_ReportErrorMessage(JVM_ERROR1);
         exit(1);
     }
+
+    //david timing code
+    gettimeofday(&_tv[2], NULL);
 
     if (showSettings != NULL) {
         ShowSettings(env, showSettings);
@@ -418,6 +430,9 @@ JavaMain(void * _args)
 
     ret = 1;
 
+    //david timing code
+    gettimeofday(&_tv[3], NULL);
+
     /*
      * Get the application's main class.
      *
@@ -443,6 +458,10 @@ JavaMain(void * _args)
      */
     mainClass = LoadMainClass(env, mode, what);
     CHECK_EXCEPTION_NULL_LEAVE(mainClass);
+
+    //david timing code
+    gettimeofday(&_tv[4], NULL);
+
     /*
      * In some cases when launching an application that needs a helper, e.g., a
      * JavaFX application with no main method, the mainClass will not be the
@@ -451,6 +470,10 @@ JavaMain(void * _args)
      */
     appClass = GetApplicationClass(env);
     NULL_CHECK_RETURN_VALUE(appClass, -1);
+
+    //david timing code
+    gettimeofday(&_tv[5], NULL);
+
     /*
      * PostJVMInit uses the class name as the application name for GUI purposes,
      * for example, on OSX this sets the application name in the menu bar for
@@ -460,6 +483,9 @@ JavaMain(void * _args)
      */
     PostJVMInit(env, appClass, vm);
     CHECK_EXCEPTION_LEAVE(1);
+
+    //david timing code
+    gettimeofday(&_tv[6], NULL);
     /*
      * The LoadMainClass not only loads the main class, it will also ensure
      * that the main method's signature is correct, therefore further checking
@@ -470,12 +496,27 @@ JavaMain(void * _args)
                                        "([Ljava/lang/String;)V");
     CHECK_EXCEPTION_NULL_LEAVE(mainID);
 
+    //david timing code
+    gettimeofday(&_tv[7], NULL);
+
     /* Build platform specific argument array */
     mainArgs = CreateApplicationArgs(env, argv, argc);
     CHECK_EXCEPTION_NULL_LEAVE(mainArgs);
 
+    //david timing code
+    gettimeofday(&_tv[8], NULL);
+
     /* Invoke main method. */
     (*env)->CallStaticVoidMethod(env, mainClass, mainID, mainArgs);
+
+    //david timing code
+    gettimeofday(&_tv[9], NULL);
+    int _i;
+    for (_i = 1; _i < 10; _i++) {
+        uint64_t _tstart = _tv[_i-1].tv_sec * 1000  +  _tv[_i-1].tv_usec / 1000;
+        uint64_t _tend = _tv[_i].tv_sec * 1000  +  _tv[_i].tv_usec / 1000;
+        printf("[david] java.c#JavaMain | %d - %d: %llu\n",_i,_i-1,(long long unsigned int)(_tend-_tstart));
+    }
 
     /*
      * The launcher's exit code (in the absence of calls to

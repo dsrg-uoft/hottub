@@ -35,9 +35,10 @@ class ThreadSnapshot;
 
 class Management : public AllStatic {
 private:
-  static PerfVariable*      _begin_vm_creation_time;
-  static PerfVariable*      _end_vm_creation_time;
-  static PerfVariable*      _vm_init_done_time;
+  //david: moved these to public rather than add functions
+  //static PerfVariable*      _begin_vm_creation_time;
+  //static PerfVariable*      _end_vm_creation_time;
+  //static PerfVariable*      _vm_init_done_time;
   static jmmOptionalSupport _optional_support;
   static TimeStamp          _stamp; // Timestamp since vm init done time
 
@@ -57,6 +58,11 @@ private:
   static Klass* load_and_initialize_klass(Symbol* sh, TRAPS);
 
 public:
+  //david: moved these to public rather than add functions
+  static PerfVariable*      _begin_vm_creation_time;
+  static PerfVariable*      _end_vm_creation_time;
+  static PerfVariable*      _vm_init_done_time;
+
   static void init();
   static void initialize(TRAPS);
 
