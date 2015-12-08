@@ -991,6 +991,9 @@ JRT_LEAF(int, SharedRuntime::dtrace_method_entry(
   Symbol* kname = method->klass_name();
   Symbol* name = method->name();
   Symbol* sig = method->signature();
+
+  tty->print_cr("_HOTSPOT: method entry %s#%s?", kname->as_C_string(), name->as_C_string());
+
 #ifndef USDT2
   HS_DTRACE_PROBE7(hotspot, method__entry, get_java_tid(thread),
       kname->bytes(), kname->utf8_length(),
@@ -1012,6 +1015,9 @@ JRT_LEAF(int, SharedRuntime::dtrace_method_exit(
   Symbol* kname = method->klass_name();
   Symbol* name = method->name();
   Symbol* sig = method->signature();
+
+  tty->print_cr("_HOTSPOT: method exit %s#%s?", kname->as_C_string(), name->as_C_string());
+
 #ifndef USDT2
   HS_DTRACE_PROBE7(hotspot, method__return, get_java_tid(thread),
       kname->bytes(), kname->utf8_length(),
@@ -1027,6 +1033,25 @@ JRT_LEAF(int, SharedRuntime::dtrace_method_exit(
   return 0;
 JRT_END
 
+JRT_LEAF(int, SharedRuntime::_method_entry(
+    JavaThread* thread, Method* method))
+  Symbol* kname = method->klass_name();
+  Symbol* name = method->name();
+  Symbol* sig = method->signature();
+
+  tty->print_cr("_HOTSPOT: method entry %s#%s?", kname->as_C_string(), name->as_C_string());
+  return 0;
+JRT_END
+
+JRT_LEAF(int, SharedRuntime::_method_exit(
+    JavaThread* thread, Method* method))
+  Symbol* kname = method->klass_name();
+  Symbol* name = method->name();
+  Symbol* sig = method->signature();
+
+  tty->print_cr("_HOTSPOT: method exit %s#%s?", kname->as_C_string(), name->as_C_string());
+  return 0;
+JRT_END;
 
 // Finds receiver, CallInfo (i.e. receiver method), and calling bytecode)
 // for a call current in progress, i.e., arguments has been pushed on stack
@@ -2970,6 +2995,8 @@ JRT_LEAF(intptr_t*, SharedRuntime::OSR_migration_begin( JavaThread *thread) )
     }
   }
   assert( i - max_locals == active_monitor_count*2, "found the expected number of monitors" );
+
+  tty->print_cr("_HOTSPOT: entering OSR");
 
   return buf;
 JRT_END

@@ -452,6 +452,9 @@ void InterpreterMacroAssembler::jump_from_interpreted(Register method, Register 
     bind(run_compiled_code);
   }
 
+  // this doesn't seem accurate
+  //tty->print_cr("_HOTSPOT: entering interpreter?");
+
   jmp(Address(method, Method::from_interpreted_offset()));
 
 }
@@ -1446,6 +1449,11 @@ void InterpreterMacroAssembler::notify_method_entry() {
     call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dtrace_method_entry),
                  r15_thread, c_rarg1);
   }
+  {
+    get_method(c_rarg1);
+    call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::_method_entry),
+                 r15_thread, c_rarg1);
+  }
 
   // RedefineClasses() tracing support for obsolete method entry
   if (RC_TRACE_IN_RANGE(0x00001000, 0x00002000)) {
@@ -1481,11 +1489,20 @@ void InterpreterMacroAssembler::notify_method_exit(
     NOT_CC_INTERP(pop(state));
   }
 
+  //tty->print_cr("_HOTSPOT: method exit?");
+
   {
     SkipIfEqual skip(this, &DTraceMethodProbes, false);
     NOT_CC_INTERP(push(state));
     get_method(c_rarg1);
     call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dtrace_method_exit),
+                 r15_thread, c_rarg1);
+    NOT_CC_INTERP(pop(state));
+  }
+  {
+    NOT_CC_INTERP(push(state));
+    get_method(c_rarg1);
+    call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::_method_exit),
                  r15_thread, c_rarg1);
     NOT_CC_INTERP(pop(state));
   }

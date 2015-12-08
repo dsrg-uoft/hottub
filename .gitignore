@@ -4,3 +4,5 @@
 /build/
 /j2sdk-image.*
 cscope.*
+
+/old/
