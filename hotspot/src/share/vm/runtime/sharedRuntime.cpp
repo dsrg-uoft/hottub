@@ -102,129 +102,121 @@ UncommonTrapBlob*   SharedRuntime::_uncommon_trap_blob;
 #endif // COMPILER2
 
 #include "runtime/_bdel.hpp"
-#include <sys/syscall.h>
-#define _STACK_BUF_SIZE 8
-/*
-struct _stack_cell {
-    _stack_cell(_stack_cell* prev, uint64_t val) : prev(prev), val(val) {
-        return;
-    }
-    _stack_cell* prev;
+
+#define _BDEL_C2I2C_STACK_BUF_SIZE 8
+
+struct _bdel_c2i2c_stack {
+  struct cell {
+    cell* prev;
+    cell* next;
     uint64_t val;
+    cell(cell* prev, cell* next, uint64_t val) : prev(prev), next(next), val(val) {
+      return;
+    }
+  };
+  int32_t size;
+  uint64_t buf[_BDEL_C2I2C_STACK_BUF_SIZE];
+  cell* head;
+  int32_t overshoot;
+  _bdel_c2i2c_stack();
+  ~_bdel_c2i2c_stack();
+  void push(uint64_t);
+  uint64_t pop();
 };
-
-__thread uint64_t _stack_buf[_STACK_BUF_SIZE];
-__thread int32_t _stack_pos = 0;
-__thread _stack_cell* _stack_head = NULL;
-
-void _stack_push(uint64_t x) {
-    if (__builtin_expect(_stack_pos >= _STACK_BUF_SIZE, 0)) {
-        _stack_head = new _stack_cell(_stack_head, x);
-    } else {
-        _stack_buf[_stack_pos] = x;
-    }
-    _stack_pos++;
-}
-uint64_t _stack_pop() {
-    _stack_pos--;
-    if (__builtin_expect(_stack_pos >= _STACK_BUF_SIZE, 0)) {
-        _stack_cell* c = this->head->prev;
-        int x = this->head->val;
-        free(this->head);
-        this->head = c;
-        return x;
-    } else {
-        return this->buf[i];
-    }
-}
-
-class _stack {
-    struct _cell {
-        _cell(_cell* prev, uint64_t val) : prev(prev), val(val) {
-            return;
-        }
-        _cell* prev;
-        uint64_t val;
-    };
-    uint64_t buf[8];
-    int32_t i;
-    _cell* head;
-    _stack() {
-        this->i = 0;
-        this->head = new _cell(NULL, 0);
-    }
-    ~_stack() {
-        while (this->head != NULL) {
-            _cell* c = this->head->prev;
-            free(this->head);
-            this->head = c;
-        }
-    }
-    void push(uint64_t x) {
-        if (__builtin_expect(i >= 8, 0)) {
-            this->head = new _cell(this->head, x);
-        } else {
-            this->buf[i] = x;
-        }
-        i++;
-    }
-    uint64_t pop() {
-        i--;
-        if (__builtin_expect(i >= 8, 0)) {
-            _cell* c = this->head->prev;
-            int x = this->head->val;
-            free(this->head);
-            this->head = c;
-            return x;
-        } else {
-            return this->buf[i];
-        }
-    }
-};
-
-thread_local _stack _hmm;
-*/
-
-int64_t _bdel_sys_gettid() {
-    return syscall(SYS_gettid);
-}
-void _bdel_knell(const char* str) {
-    if (WildTurtle) {
-        __sync_fetch_and_add(&_i_total, _i_counter);
-        __sync_fetch_and_add(&_c_total, _c_counter);
-        tty->print_cr(
-            "_BDEL: %s tolls for %ld"
-            " - %.3f interpreted"
-            " - %.3f compiled"
-            " - %.3f sum"
-            " - %.3f accumulated i"
-            " - %.3f accumulated c"
-            , str, _bdel_sys_gettid()
-            , _i_counter / 1e9, _c_counter / 1e9, (_i_counter + _c_counter) / 1e9
-            , _i_total / 1e9, _c_total / 1e9
-        );
-        _i_counter = 0;
-        _c_counter = 0;
-    }
-}
-
-uint64_t _now() {
-    struct timespec ts;
-    int status = clock_gettime(CLOCK_MONOTONIC, &ts);
-    assert(status == 0, "gettime error");
-    return (uint64_t) ts.tv_sec * (1000 * 1000 * 1000) + (uint64_t) ts.tv_nsec;
-}
 
 volatile uint64_t _i_total;
 volatile uint64_t _c_total;
+
 __thread uint8_t _jvm_state = 0;
-__thread uint8_t _i_from_c = 0;
-__thread uint32_t _i_levels = 0;
+
 __thread uint64_t _i_timestamp = 0;
 __thread uint64_t _c_timestamp = 0;
 __thread uint64_t _i_counter = 0;
 __thread uint64_t _c_counter = 0;
-__thread uint64_t _n_counter = 0;
+
+// local
+/*
+ * Scenario:
+ * - in compiled code
+ * - call interpreted method
+ * - `_jvm_state` set to interpreted
+ * - method exits, need to set `_jvm_state` back to compiled
+ * - but suppose interpreted method calls compiled method
+ * - that compiled method may call another interpreted method
+ * - hmmm...
+ */
+__thread uint8_t _i_from_c = 0;
+__thread _bdel_c2i2c_stack* _bdel_c2i2c_levels = NULL;
+
+_bdel_c2i2c_stack::_bdel_c2i2c_stack() : size(0), head(new cell(NULL, NULL, 0)), overshoot(0) {
+  return;
+}
+_bdel_c2i2c_stack::~_bdel_c2i2c_stack() {
+  if (this->size != 0) {
+    fprintf(stderr, "_HOTSPOT: freeing _bdel_c2i2c_stack, size was %d\n", this->size);
+  }
+  while (this->head != NULL) {
+    cell* c = this->head->next;
+    delete this->head;
+    this->head = c;
+  }
+}
+void _bdel_c2i2c_stack::push(uint64_t x) {
+  if (this->size < _BDEL_C2I2C_STACK_BUF_SIZE) {
+    this->buf[this->size] = x;
+  } else {
+    if (this->head->next == NULL) {
+      this->head->next = new cell(this->head, NULL, x);
+      this->head = this->head->next;
+      this->overshoot++;
+    } else {
+      this->head = this->head->next;
+      this->head->val = x;
+    }
+  }
+  this->size++;
+}
+uint64_t _bdel_c2i2c_stack::pop() {
+  this->size--;
+  if (this->size < _BDEL_C2I2C_STACK_BUF_SIZE) {
+    return this->buf[this->size];
+  } else {
+    uint64_t ret = this->head->val;
+    this->head = this->head->prev;
+    return ret;
+  }
+}
+
+uint64_t _now() {
+  struct timespec ts;
+  int status = clock_gettime(CLOCK_MONOTONIC, &ts);
+  assert(status == 0, "gettime error");
+  return (uint64_t) ts.tv_sec * (1000 * 1000 * 1000) + (uint64_t) ts.tv_nsec;
+}
+void _bdel_knell(const char* str) {
+  if (WildTurtle) {
+    __sync_fetch_and_add(&_i_total, _i_counter);
+    __sync_fetch_and_add(&_c_total, _c_counter);
+    tty->print_cr(
+      "_BDEL: %s tolls for %ld"
+      " - %.3f interpreted"
+      " - %.3f compiled"
+      " - %.3f sum"
+      " - %.3f accumulated i"
+      " - %.3f accumulated c"
+      " - %d _bdel_c2i2c_stack overshoot"
+      , str, _bdel_sys_gettid()
+      , _i_counter / 1e9, _c_counter / 1e9, (_i_counter + _c_counter) / 1e9
+      , _i_total / 1e9, _c_total / 1e9
+      , _bdel_c2i2c_levels == NULL ? -1 : _bdel_c2i2c_levels->overshoot
+    );
+    _i_counter = 0;
+    _c_counter = 0;
+  }
+  if (_bdel_c2i2c_levels != NULL) {
+    delete _bdel_c2i2c_levels;
+  }
+}
 
 
 //----------------------------generate_stubs-----------------------------------
@@ -1163,38 +1155,53 @@ JRT_LEAF(void, SharedRuntime::_i2c(JavaThread* thread))
 JRT_END
 
 JRT_LEAF(void, SharedRuntime::_c2i(JavaThread* thread))
-  // doesn't seem to work
+  // doesn't seem to work (`where called from gen_c2i_adapter`)
   tty->print_cr("_HOTSPOT: transition in SharedRuntime::_c2i");
 JRT_END
 
-JRT_LEAF(int, SharedRuntime::_method_entry(
-    JavaThread* thread, Method* method))
+JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
   uint64_t _t = _now();
   if (_jvm_state == 1) {
+    _i_from_c = 1;
     if (_i_timestamp > 0) {
       _i_counter += _c_timestamp - _i_timestamp;
     }
     _c_counter += _t - _c_timestamp;
     _i_timestamp = _t;
   }
+  if (_i_from_c) {
+    if (_unlikely(_bdel_c2i2c_levels == NULL)) {
+      _bdel_c2i2c_levels = new _bdel_c2i2c_stack;
+    }
+    _bdel_c2i2c_levels->push(_jvm_state);
+  }
   _jvm_state = 0;
 
-  Symbol* kname = method->klass_name();
-  Symbol* name = method->name();
-
   if (Dyrus) {
-      tty->print_cr("_HOTSPOT %ld (%ld): method entry %s#%s?", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string());
+    Symbol* kname = method->klass_name();
+    Symbol* name = method->name();
+    tty->print_cr("_HOTSPOT %ld (%ld): method entry %s#%s?", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string());
   }
   return 0;
 JRT_END
 
-JRT_LEAF(int, SharedRuntime::_method_exit(
-    JavaThread* thread, Method* method))
-  Symbol* kname = method->klass_name();
-  Symbol* name = method->name();
+JRT_LEAF(int, SharedRuntime::_method_exit(JavaThread* thread, Method* method))
+  if (_i_from_c) {
+    uint64_t _t = _now();
+    uint64_t b = _bdel_c2i2c_levels->pop();
+    if (b) {
+      _jvm_state = 1;
+      _c_timestamp = _t;
+    }
+    if (_bdel_c2i2c_levels->size == 0) {
+      _i_from_c = 0;
+    }
+  }
 
   if (Dyrus) {
-      tty->print_cr("_HOTSPOT %ld (%ld): method exit %s#%s?", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string());
+    Symbol* kname = method->klass_name();
+    Symbol* name = method->name();
+    tty->print_cr("_HOTSPOT %ld (%ld): method exit %s#%s?", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string());
   }
   return 0;
 JRT_END;

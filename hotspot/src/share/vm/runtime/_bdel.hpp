@@ -7,8 +7,14 @@
  * Cpp source will be in `share/vm/sharedRuntime.cpp`
  */
 
-#include <sys/time.h>
 #include <stdint.h>
+#include <sys/time.h>
+#include <sys/syscall.h>
+
+#define _likely(x) __builtin_expect((x), 1)
+#define _unlikely(x) __builtin_expect((x), 0)
+
+#define _bdel_sys_gettid() ((int64_t) syscall(SYS_gettid))
 
 extern volatile uint64_t _i_total;
 extern volatile uint64_t _c_total;
@@ -18,23 +24,12 @@ extern volatile uint64_t _c_total;
  * - 2 for native (jni) TODO
  */
 extern __thread uint8_t _jvm_state;
-/*
- * Scenario:
- * - in compiled code
- * - call interpreted method
- * - `_jvm_state` set to interpreted
- * - method exits, need to set `_jvm_state` back to compiled
- * - suppose interpreted method calls compiled method
- * - hmmm...
- */
-extern __thread uint8_t _i_from_c;
-extern __thread uint32_t _i_levels;
+
 extern __thread uint64_t _i_timestamp;
 extern __thread uint64_t _c_timestamp;
 extern __thread uint64_t _i_counter;
 extern __thread uint64_t _c_counter;
 
-int64_t _bdel_sys_gettid();
 uint64_t _now();
 void _bdel_knell(const char*);
 
