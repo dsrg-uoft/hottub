@@ -1450,6 +1450,7 @@ void InterpreterMacroAssembler::notify_method_entry() {
                  r15_thread, c_rarg1);
   }
   {
+    SkipIfEqual _skip(this, &WildTurtle, false);
     get_method(c_rarg1);
     call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::_method_entry),
                  r15_thread, c_rarg1);
@@ -1500,6 +1501,7 @@ void InterpreterMacroAssembler::notify_method_exit(
     NOT_CC_INTERP(pop(state));
   }
   {
+    SkipIfEqual _skip(this, &WildTurtle, false);
     NOT_CC_INTERP(push(state));
     get_method(c_rarg1);
     call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::_method_exit),

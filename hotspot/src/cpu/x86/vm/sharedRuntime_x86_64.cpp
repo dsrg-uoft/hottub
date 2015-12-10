@@ -503,6 +503,8 @@ static void gen_c2i_adapter(MacroAssembler *masm,
   // compiled target.  If there is one, we need to patch the caller's call.
   patch_callers_callsite(masm);
 
+  //__ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_c2i));
+
   __ bind(skip_fixup);
 
   // Since all args are passed on the stack, total_args_passed *
@@ -669,6 +671,11 @@ static void gen_i2c_adapter(MacroAssembler *masm,
   // clean up the stack pointer changes performed by the two adapters.
   // If this happens, control eventually transfers back to the compiled
   // caller, but with an uncorrected stack, causing delayed havoc.
+
+  {
+    SkipIfEqual _skip(masm, &WildTurtle, false);
+    __ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_i2c));
+  }
 
   // Pick up the return address
   __ movptr(rax, Address(rsp, 0));

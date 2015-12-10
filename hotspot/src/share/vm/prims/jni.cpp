@@ -93,6 +93,8 @@
 # include "os_bsd.inline.hpp"
 #endif
 
+#include "runtime/_bdel.hpp"
+
 static jint CurrentVersion = JNI_VERSION_1_8;
 
 
@@ -5475,6 +5477,8 @@ jint JNICALL jni_AttachCurrentThread(JavaVM *vm, void **penv, void *_args) {
 
 
 jint JNICALL jni_DetachCurrentThread(JavaVM *vm)  {
+  _bdel_knell("DetachCurrentThread");
+
 #ifndef USDT2
   DTRACE_PROBE1(hotspot_jni, DetachCurrentThread__entry, vm);
 #else /* USDT2 */

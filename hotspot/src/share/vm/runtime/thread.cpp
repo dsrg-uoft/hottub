@@ -165,6 +165,7 @@ HS_DTRACE_PROBE_DECL5(hotspot, thread__stop, char*, intptr_t,
 
 #endif // ndef DTRACE_ENABLED
 
+#include "runtime/_bdel.hpp"
 
 // Class hierarchy
 // - Thread
@@ -1696,7 +1697,14 @@ void JavaThread::thread_main_inner() {
       this->set_native_thread_name(this->get_thread_name());
     }
     HandleMark hm(this);
+    if (WildTurtle) {
+        tty->print_cr("_HOTSPOT: java thread live tid %ld", _bdel_sys_gettid());
+    }
     this->entry_point()(this, this);
+    if (WildTurtle) {
+        tty->print_cr("_HOTSPOT: java thread so it goes tid %ld", _bdel_sys_gettid());
+        _bdel_knell("JavaThread");
+    }
   }
 
   DTRACE_THREAD_PROBE(stop, this);

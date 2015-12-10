@@ -951,6 +951,13 @@ class CommandLineFlags {
   product(bool, PrintCompilation, false,                                    \
           "Print compilations")                                             \
                                                                             \
+  product(bool, WildTurtle, false,                                          \
+          "BibleThump")                                                     \
+                                                                            \
+  product(bool, Dyrus, false,                                               \
+          "Shoutout to David for CSGO - 2015 December 8, R8 Revolver; "     \
+          "Never forget")                                                   \
+                                                                            \
   diagnostic(bool, TraceNMethodInstalls, false,                             \
           "Trace nmethod installation")                                     \
                                                                             \
