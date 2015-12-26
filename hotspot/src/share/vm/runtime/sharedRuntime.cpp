@@ -103,31 +103,12 @@ UncommonTrapBlob*   SharedRuntime::_uncommon_trap_blob;
 
 #include "runtime/_bdel.hpp"
 
-#define _BDEL_C2I2C_STACK_BUF_SIZE 8
-
-struct _bdel_c2i2c_stack {
-  struct cell {
-    cell* prev;
-    cell* next;
-    uint64_t val;
-    cell(cell* prev, cell* next, uint64_t val) : prev(prev), next(next), val(val) {
-      return;
-    }
-  };
-  int32_t size;
-  uint64_t buf[_BDEL_C2I2C_STACK_BUF_SIZE];
-  cell* head;
-  int32_t overshoot;
-  _bdel_c2i2c_stack();
-  ~_bdel_c2i2c_stack();
-  void push(uint64_t);
-  uint64_t pop();
-};
+#define _BDEL_C2I2C_SIZE 96
 
 volatile uint64_t _i_total;
 volatile uint64_t _c_total;
 
-__thread uint8_t _jvm_state = 0;
+__thread int8_t _jvm_state = 0;
 
 __thread uint64_t _i_timestamp = 0;
 __thread uint64_t _c_timestamp = 0;
@@ -146,45 +127,30 @@ __thread uint64_t _c_counter = 0;
  * - hmmm...
  */
 __thread uint8_t _i_from_c = 0;
-__thread _bdel_c2i2c_stack* _bdel_c2i2c_levels = NULL;
+__thread int8_t _i_from_c_levels[_BDEL_C2I2C_SIZE];
+__thread uint8_t _i_from_c_max = 0;
 
-_bdel_c2i2c_stack::_bdel_c2i2c_stack() : size(0), head(new cell(NULL, NULL, 0)), overshoot(0) {
-  return;
-}
-_bdel_c2i2c_stack::~_bdel_c2i2c_stack() {
-  if (this->size != 0) {
-    fprintf(stderr, "_HOTSPOT: freeing _bdel_c2i2c_stack, size was %d\n", this->size);
+static void _bdel_c2i2c_push(int8_t x) {
+  if (_likely(_i_from_c < _BDEL_C2I2C_SIZE)) {
+    _i_from_c_levels[_i_from_c] = x;
   }
-  while (this->head != NULL) {
-    cell* c = this->head->next;
-    delete this->head;
-    this->head = c;
+  _i_from_c++;
+  if (_unlikely(_i_from_c > _i_from_c_max)) {
+    _i_from_c_max = _i_from_c;
   }
 }
-void _bdel_c2i2c_stack::push(uint64_t x) {
-  if (this->size < _BDEL_C2I2C_STACK_BUF_SIZE) {
-    this->buf[this->size] = x;
-  } else {
-    if (this->head->next == NULL) {
-      this->head->next = new cell(this->head, NULL, x);
-      this->head = this->head->next;
-      this->overshoot++;
-    } else {
-      this->head = this->head->next;
-      this->head->val = x;
-    }
+static int8_t _bdel_c2i2c_pop() {
+  _i_from_c--;
+  if (_likely(_i_from_c < _BDEL_C2I2C_SIZE)) {
+    return _i_from_c_levels[_i_from_c];
   }
-  this->size++;
+  return 0;
 }
-uint64_t _bdel_c2i2c_stack::pop() {
-  this->size--;
-  if (this->size < _BDEL_C2I2C_STACK_BUF_SIZE) {
-    return this->buf[this->size];
-  } else {
-    uint64_t ret = this->head->val;
-    this->head = this->head->prev;
-    return ret;
-  }
+static void _bdel_c2i() {
+  uint64_t _t = _now();
+  _i_counter += _c_timestamp - _i_timestamp;
+  _c_counter += _t - _c_timestamp;
+  _i_timestamp = _t;
 }
 
 uint64_t _now() {
@@ -204,17 +170,13 @@ void _bdel_knell(const char* str) {
       " - %.3f sum"
       " - %.3f accumulated i"
       " - %.3f accumulated c"
-      " - %d _bdel_c2i2c_stack overshoot"
+      " - %d c2i2c levels"
+      " - %d c2i2c max"
       , str, _bdel_sys_gettid()
       , _i_counter / 1e9, _c_counter / 1e9, (_i_counter + _c_counter) / 1e9
       , _i_total / 1e9, _c_total / 1e9
-      , _bdel_c2i2c_levels == NULL ? -1 : _bdel_c2i2c_levels->overshoot
+      , (int) _i_from_c, (int) _i_from_c_max
     );
-    _i_counter = 0;
-    _c_counter = 0;
-  }
-  if (_bdel_c2i2c_levels != NULL) {
-    delete _bdel_c2i2c_levels;
   }
 }
 
@@ -1147,61 +1109,60 @@ JRT_LEAF(int, SharedRuntime::dtrace_method_exit(
 JRT_END
 
 JRT_LEAF(void, SharedRuntime::_i2c(JavaThread* thread))
-  _jvm_state = 1;
-  _c_timestamp = _now();
+  if (_jvm_state == 0) {
+    _jvm_state = 1;
+    _c_timestamp = _now();
+  }
   if (Dyrus) {
-      tty->print_cr("_HOTSPOT %ld (%ld): transition in SharedRuntime::_i2c", _bdel_sys_gettid(), _now());
+    tty->print_cr("_HOTSPOT %ld (%ld): transition in SharedRuntime::_i2c", _bdel_sys_gettid(), _now());
   }
 JRT_END
 
 JRT_LEAF(void, SharedRuntime::_c2i(JavaThread* thread))
   // doesn't seem to work (`where called from gen_c2i_adapter`)
-  tty->print_cr("_HOTSPOT: transition in SharedRuntime::_c2i");
+  _bdel_c2i();
+  if (Dyrus) {
+    tty->print_cr("_HOTSPOT %ld (%ld): transition in SharedRuntime::_c2i", _bdel_sys_gettid(), _now());
+  }
 JRT_END
 
 JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
   uint64_t _t = _now();
-  if (_jvm_state == 1) {
-    _i_from_c = 1;
-    if (_i_timestamp > 0) {
-      _i_counter += _c_timestamp - _i_timestamp;
-    }
-    _c_counter += _t - _c_timestamp;
+  if (_unlikely(_i_timestamp == 0)) {
     _i_timestamp = _t;
   }
-  if (_i_from_c) {
-    if (_unlikely(_bdel_c2i2c_levels == NULL)) {
-      _bdel_c2i2c_levels = new _bdel_c2i2c_stack;
-    }
-    _bdel_c2i2c_levels->push(_jvm_state);
+  if (_jvm_state == 1) {
+    _bdel_c2i2c_push(1);
+    _i_counter += _c_timestamp - _i_timestamp;
+    _c_counter += _t - _c_timestamp;
+    _i_timestamp = _t;
+  } else if (_i_from_c) {
+    _bdel_c2i2c_push(0);
   }
-  _jvm_state = 0;
 
   if (Dyrus) {
     Symbol* kname = method->klass_name();
     Symbol* name = method->name();
-    tty->print_cr("_HOTSPOT %ld (%ld): method entry %s#%s?", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string());
+    tty->print_cr("_HOTSPOT %ld (%ld): method entry %s#%s (from %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
   }
+
+  _jvm_state = 0;
   return 0;
 JRT_END
 
 JRT_LEAF(int, SharedRuntime::_method_exit(JavaThread* thread, Method* method))
   if (_i_from_c) {
-    uint64_t _t = _now();
-    uint64_t b = _bdel_c2i2c_levels->pop();
+    int8_t b = _bdel_c2i2c_pop();
     if (b) {
       _jvm_state = 1;
-      _c_timestamp = _t;
-    }
-    if (_bdel_c2i2c_levels->size == 0) {
-      _i_from_c = 0;
+      _c_timestamp = _now();
     }
   }
 
   if (Dyrus) {
     Symbol* kname = method->klass_name();
     Symbol* name = method->name();
-    tty->print_cr("_HOTSPOT %ld (%ld): method exit %s#%s?", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string());
+    tty->print_cr("_HOTSPOT %ld (%ld): method exit %s#%s (to %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
   }
   return 0;
 JRT_END;
@@ -3164,7 +3125,7 @@ JRT_LEAF(intptr_t*, SharedRuntime::OSR_migration_begin( JavaThread *thread) )
   _jvm_state = 1;
   _c_timestamp = _now();
   if (Dyrus) {
-      tty->print_cr("_HOTSPOT %ld (%ld): entering OSR", _bdel_sys_gettid(), _now());
+      tty->print_cr("_HOTSPOT %ld (%ld): entering OSR", _bdel_sys_gettid(), _c_timestamp);
   }
 
   return buf;
@@ -3172,6 +3133,12 @@ JRT_END
 
 JRT_LEAF(void, SharedRuntime::OSR_migration_end( intptr_t* buf) )
   FREE_C_HEAP_ARRAY(intptr_t,buf, mtCode);
+
+  _bdel_c2i();
+  if (Dyrus) {
+    tty->print_cr("_HOTSPOT %ld (%ld): exiting OSR", _bdel_sys_gettid(), _now());
+  }
+  _jvm_state = 0;
 JRT_END
 
 bool AdapterHandlerLibrary::contains(CodeBlob* b) {

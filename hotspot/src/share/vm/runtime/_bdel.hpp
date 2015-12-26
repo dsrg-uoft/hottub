@@ -8,7 +8,7 @@
  */
 
 #include <stdint.h>
-#include <sys/time.h>
+#include <time.h>
 #include <sys/syscall.h>
 
 #define _likely(x) __builtin_expect((x), 1)
@@ -23,7 +23,7 @@ extern volatile uint64_t _c_total;
  * - 1 for compiled
  * - 2 for native (jni) TODO
  */
-extern __thread uint8_t _jvm_state;
+extern __thread int8_t _jvm_state;
 
 extern __thread uint64_t _i_timestamp;
 extern __thread uint64_t _c_timestamp;

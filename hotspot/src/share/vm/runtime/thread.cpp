@@ -1701,10 +1701,7 @@ void JavaThread::thread_main_inner() {
         tty->print_cr("_HOTSPOT: java thread live tid %ld", _bdel_sys_gettid());
     }
     this->entry_point()(this, this);
-    if (WildTurtle) {
-        tty->print_cr("_HOTSPOT: java thread so it goes tid %ld", _bdel_sys_gettid());
-        _bdel_knell("JavaThread");
-    }
+    _bdel_knell("JavaThread");
   }
 
   DTRACE_THREAD_PROBE(stop, this);

@@ -503,8 +503,6 @@ static void gen_c2i_adapter(MacroAssembler *masm,
   // compiled target.  If there is one, we need to patch the caller's call.
   patch_callers_callsite(masm);
 
-  //__ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_c2i));
-
   __ bind(skip_fixup);
 
   // Since all args are passed on the stack, total_args_passed *
@@ -620,6 +618,11 @@ static void gen_c2i_adapter(MacroAssembler *masm,
         __ movdbl(Address(rsp, next_off), r_1->as_XMMRegister());
       }
     }
+  }
+
+  {
+    SkipIfEqual _skip(masm, &WildTurtle, false);
+    __ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_c2i));
   }
 
   // Schedule the branch target address early.
