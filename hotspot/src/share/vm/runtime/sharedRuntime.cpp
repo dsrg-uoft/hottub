@@ -180,6 +180,19 @@ void _bdel_knell(const char* str) {
   }
 }
 
+void _i_from_i2c(JavaThread* thread) {
+  //_bdel_c2i();
+  /*
+  if (Dyrus) {
+    tty->print_cr("_HOTSPOT %ld (%ld): transition in _i_from_i2c", _bdel_sys_gettid(), _now());
+  }
+  */
+  tty->print("i am here\n");
+}
+
+void _print_value(JavaThread* thread, void* ptr) {
+  tty->print_cr("hmmsauce is %p", ptr);
+}
 
 //----------------------------generate_stubs-----------------------------------
 void SharedRuntime::generate_stubs() {

@@ -207,6 +207,7 @@ class AbstractAssembler : public ResourceObj  {
  public:
   // Code emission & accessing
   address addr_at(int pos) const { return code_section()->start() + pos; }
+  address _address_from_label(Label& L) { return code_section()->target(L, pc()); }
 
  protected:
   // This routine is called with a label is used for an address.

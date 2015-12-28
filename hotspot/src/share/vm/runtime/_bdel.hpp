@@ -33,4 +33,8 @@ extern __thread uint64_t _c_counter;
 uint64_t _now();
 void _bdel_knell(const char*);
 
+void _i_from_i2c(JavaThread*);
+
+void _print_value(JavaThread*, void*);
+
 #endif // SHARE_VM_RUNTIME__BDEL_HPP

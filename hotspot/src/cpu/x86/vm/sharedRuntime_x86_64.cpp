@@ -41,6 +41,8 @@
 #include "opto/runtime.hpp"
 #endif
 
+#include "runtime/_bdel.hpp"
+
 #define __ masm->
 
 const int StackAlignmentInSlots = StackAlignmentInBytes / VMRegImpl::stack_slot_size;
@@ -736,6 +738,65 @@ static void gen_i2c_adapter(MacroAssembler *masm,
   // push the return address and misalign the stack that youngest frame always sees
   // as far as the placement of the call instruction
   __ push(rax);
+
+  /*
+  __ lea(rax, RuntimeAddress((address) 0x00000001cafebabe));
+  __ push(rax);
+  __ lea(rax, RuntimeAddress((address) 0x00000001deadbeaf));
+  __ push(rax);
+  //*/
+
+  // inject
+  if (false) {
+    _inject_me:
+    //_i_from_i2c();
+    asm(
+      "lea 8(%rsp), %rsp\n"
+      "\tret\n"
+    );
+  }
+  Label _inject_before;
+  Label _inject_after;
+  Label _i_from_i2c_label;
+  __ jmp(_inject_before);
+  {
+    // code section handling i2c return
+    __ bind(_i_from_i2c_label);
+    //__ addptr(rsp, 8);
+    /*
+    __ push(rax);
+    __ push(rcx);
+    __ push(rdx);
+    __ push(rsi);
+    __ push(rdi);
+    __ call_VM(noreg, CAST_FROM_FN_PTR(address, _i_from_i2c));
+    __ call_VM(noreg, CAST_FROM_FN_PTR(address, _i_from_i2c));
+    __ call_VM(noreg, CAST_FROM_FN_PTR(address, _i_from_i2c));
+    __ pop(rdi);
+    __ pop(rsi);
+    __ pop(rdx);
+    __ pop(rcx);
+    __ pop(rax);
+    //*/
+    __ pop(rscratch1);
+    __ pop(rscratch1);
+    __ jmp(rscratch1);
+  }
+  __ bind(_inject_before);
+  {
+    // code section injecting i2c return handler
+    SkipIfEqual _skip(masm, &WildTurtle, false);
+    //__ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, _i_from_i2c)));
+    //__ push(rax);
+    __ andptr(rsp, -16);
+    //__ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, &&_inject_me)));
+    __ lea(rax, RuntimeAddress(__ _address_from_label(_i_from_i2c_label)));
+    __ push(rax);
+    //__ call_VM(noreg, CAST_FROM_FN_PTR(address, _print_value), rsp);
+    //__ call_VM(noreg, CAST_FROM_FN_PTR(address, _print_value), rbp);
+    __ jmp(_inject_after);
+  }
+  __ bind(_inject_after);
 
   // Put saved SP in another register
   const Register saved_sp = rax;
