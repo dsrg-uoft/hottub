@@ -745,16 +745,12 @@ static void gen_i2c_adapter(MacroAssembler *masm,
   __ lea(rax, RuntimeAddress((address) 0x00000001deadbeaf));
   __ push(rax);
   //*/
+  __ lea(rax, RuntimeAddress((address) 0x00000001cafebabe));
+  __ push(rax);
+  __ lea(rax, RuntimeAddress((address) 0x0bae0420));
+  __ push(rax);
 
   // inject
-  if (false) {
-    _inject_me:
-    //_i_from_i2c();
-    asm(
-      "lea 8(%rsp), %rsp\n"
-      "\tret\n"
-    );
-  }
   Label _inject_before;
   Label _inject_after;
   Label _i_from_i2c_label;
@@ -789,8 +785,8 @@ static void gen_i2c_adapter(MacroAssembler *masm,
     //__ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, _i_from_i2c)));
     //__ push(rax);
     __ andptr(rsp, -16);
-    //__ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, &&_inject_me)));
-    __ lea(rax, RuntimeAddress(__ _address_from_label(_i_from_i2c_label)));
+    //__ lea(rax, RuntimeAddress(__ _address_from_label(_i_from_i2c_label)));
+    __ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, _i_from_i2c)));
     __ push(rax);
     //__ call_VM(noreg, CAST_FROM_FN_PTR(address, _print_value), rsp);
     //__ call_VM(noreg, CAST_FROM_FN_PTR(address, _print_value), rbp);

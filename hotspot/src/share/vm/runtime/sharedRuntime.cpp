@@ -181,13 +181,30 @@ void _bdel_knell(const char* str) {
 }
 
 void _i_from_i2c(JavaThread* thread) {
+  asm(
+    "push %r12\n"
+    "\tpush %r13\n"
+    "\tmovq 32(%rsp), %r12\n"
+    "\tmov $0x0bae0420, %r13\n"
+    "\tcmp %r12, %r13\n"
+    "\tje good\n"
+    "\tmov $0x0deadbabe, %r13\n"
+    "\tjmp *%r13\n"
+    "good:\n"
+    "\tpop %r13\n"
+    "\tpop %r12\n"
+    "\tpop %rbp\n"
+    "\tlea 8(%rsp), %rsp\n"
+    "\tlea 16(%rsp), %rsp\n"
+    "\tret\n"
+  );
   //_bdel_c2i();
   /*
   if (Dyrus) {
     tty->print_cr("_HOTSPOT %ld (%ld): transition in _i_from_i2c", _bdel_sys_gettid(), _now());
   }
   */
-  tty->print("i am here\n");
+  //tty->print("i am here\n");
 }
 
 void _print_value(JavaThread* thread, void* ptr) {
