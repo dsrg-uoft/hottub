@@ -622,8 +622,7 @@ static void gen_c2i_adapter(MacroAssembler *masm,
     }
   }
 
-  {
-    SkipIfEqual _skip(masm, &WildTurtle, false);
+  if (WildTurtle) {
     __ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_c2i));
   }
 
@@ -677,8 +676,7 @@ static void gen_i2c_adapter(MacroAssembler *masm,
   // If this happens, control eventually transfers back to the compiled
   // caller, but with an uncorrected stack, causing delayed havoc.
 
-  {
-    SkipIfEqual _skip(masm, &WildTurtle, false);
+  if (WildTurtle) {
     __ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_i2c));
   }
 
@@ -732,67 +730,31 @@ static void gen_i2c_adapter(MacroAssembler *masm,
   }
 
 
+  Label _i2c_ret_label;
+  if (WildTurtle) {
+    Label _i2c_ret_handler_skip;
+    __ jmp(_i2c_ret_handler_skip);
+    __ bind(_i2c_ret_label);
+    __ push(rax);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_pop)));
+    __ pop(rscratch1);
+    __ push(rax);
+    __ movptr(rax, rscratch1);
+    __ ret(0);
+    __ bind(_i2c_ret_handler_skip);
+  }
+
   // Ensure compiled code always sees stack at proper alignment
   __ andptr(rsp, -16);
 
   // push the return address and misalign the stack that youngest frame always sees
   // as far as the placement of the call instruction
-  __ push(rax);
-
-  /*
-  __ lea(rax, RuntimeAddress((address) 0x00000001cafebabe));
-  __ push(rax);
-  __ lea(rax, RuntimeAddress((address) 0x00000001deadbeaf));
-  __ push(rax);
-  //*/
-  __ lea(rax, RuntimeAddress((address) 0x00000001cafebabe));
-  __ push(rax);
-  __ lea(rax, RuntimeAddress((address) 0x0bae0420));
-  __ push(rax);
-
-  // inject
-  Label _inject_before;
-  Label _inject_after;
-  Label _i_from_i2c_label;
-  __ jmp(_inject_before);
-  {
-    // code section handling i2c return
-    __ bind(_i_from_i2c_label);
-    //__ addptr(rsp, 8);
-    /*
-    __ push(rax);
-    __ push(rcx);
-    __ push(rdx);
-    __ push(rsi);
-    __ push(rdi);
-    __ call_VM(noreg, CAST_FROM_FN_PTR(address, _i_from_i2c));
-    __ call_VM(noreg, CAST_FROM_FN_PTR(address, _i_from_i2c));
-    __ call_VM(noreg, CAST_FROM_FN_PTR(address, _i_from_i2c));
-    __ pop(rdi);
-    __ pop(rsi);
-    __ pop(rdx);
-    __ pop(rcx);
-    __ pop(rax);
-    //*/
-    __ pop(rscratch1);
-    __ pop(rscratch1);
-    __ jmp(rscratch1);
+  if (WildTurtle) {
+    __ movptr(c_rarg0, rax);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_push)));
+    __ lea(rax, RuntimeAddress(__ _address_from_label(_i2c_ret_label)));
   }
-  __ bind(_inject_before);
-  {
-    // code section injecting i2c return handler
-    SkipIfEqual _skip(masm, &WildTurtle, false);
-    //__ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, _i_from_i2c)));
-    //__ push(rax);
-    __ andptr(rsp, -16);
-    //__ lea(rax, RuntimeAddress(__ _address_from_label(_i_from_i2c_label)));
-    __ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, _i_from_i2c)));
-    __ push(rax);
-    //__ call_VM(noreg, CAST_FROM_FN_PTR(address, _print_value), rsp);
-    //__ call_VM(noreg, CAST_FROM_FN_PTR(address, _print_value), rbp);
-    __ jmp(_inject_after);
-  }
-  __ bind(_inject_after);
+  __ push(rax);
 
   // Put saved SP in another register
   const Register saved_sp = rax;

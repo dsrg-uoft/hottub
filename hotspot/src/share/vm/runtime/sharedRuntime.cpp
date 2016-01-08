@@ -104,6 +104,7 @@ UncommonTrapBlob*   SharedRuntime::_uncommon_trap_blob;
 #include "runtime/_bdel.hpp"
 
 #define _BDEL_C2I2C_SIZE 96
+#define _BDEL_I2C_RET_STACK_SIZE 128
 
 volatile uint64_t _i_total;
 volatile uint64_t _c_total;
@@ -180,7 +181,44 @@ void _bdel_knell(const char* str) {
   }
 }
 
-void _i_from_i2c(JavaThread* thread) {
+__thread void* _i2c_ret_stack[_BDEL_I2C_RET_STACK_SIZE];
+__thread int _i2c_ret_stack_pos = 0;
+void _i2c_ret_push(void* ret) {
+  if (_unlikely(_i2c_ret_stack_pos >= _BDEL_I2C_RET_STACK_SIZE)) {
+    // badness
+    ((void (*)(void)) 0x0bad0bad)();
+  } else {
+    _i2c_ret_stack[_i2c_ret_stack_pos++] = ret;
+  }
+}
+void* _i2c_ret_pop() {
+  if (_unlikely(_i2c_ret_stack_pos <= 0)) {
+    // badness
+    ((void (*)(void)) 0x0bad0bad)();
+  }
+  return _i2c_ret_stack[--_i2c_ret_stack_pos];
+}
+void _i2c_ret_handler(JavaThread* thread) {
+  asm(
+    "mov %rax, 40(%rsp)\n"
+  );
+  //tty->print_cr("_HOTSPOT %ld (%ld): transition in _i2c_ret_handler", _bdel_sys_gettid(), _now());
+  if (_unlikely(_i2c_ret_stack_pos <= 0)) {
+    // badness
+    ((void (*)(void)) 0x0bad0bad)();
+  }
+  void* ret = _i2c_ret_stack[--_i2c_ret_stack_pos];
+  asm(
+    "mov 40(%%rsp), %%rax\n"
+    "\tmov %0, 40(%%rsp)\n"
+    "\tlea -24(%%rsp), %%rsp\n"
+    :
+    : "D" (ret)
+  );
+  // pop self frame
+  // goto address
+
+  /*
   asm(
     "push %r12\n"
     "\tpush %r13\n"
@@ -198,6 +236,7 @@ void _i_from_i2c(JavaThread* thread) {
     "\tlea 16(%rsp), %rsp\n"
     "\tret\n"
   );
+  */
   //_bdel_c2i();
   /*
   if (Dyrus) {

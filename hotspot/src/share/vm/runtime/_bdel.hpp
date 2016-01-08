@@ -1,5 +1,3 @@
-
-
 #ifndef SHARE_VM_RUNTIME__BDEL_HPP
 #define SHARE_VM_RUNTIME__BDEL_HPP
 
@@ -33,8 +31,11 @@ extern __thread uint64_t _c_counter;
 uint64_t _now();
 void _bdel_knell(const char*);
 
-void _i_from_i2c(JavaThread*);
+void _i2c_ret_push(void*);
+void* _i2c_ret_pop();
+void _i2c_ret_handler(JavaThread*);
 
 void _print_value(JavaThread*, void*);
+
 
 #endif // SHARE_VM_RUNTIME__BDEL_HPP

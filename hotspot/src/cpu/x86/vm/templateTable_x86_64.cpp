@@ -1764,7 +1764,7 @@ void TemplateTable::branch(bool is_jsr, bool is_wide) {
 
       __ mov(r13, rax);                             // save the nmethod
 
-      call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::OSR_migration_begin));
+      __ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::OSR_migration_begin));
 
       // eax is OSR buffer, move it to expected parameter location
       __ mov(j_rarg0, rax);
