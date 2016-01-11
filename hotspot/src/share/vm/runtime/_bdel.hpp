@@ -14,6 +14,8 @@
 
 #define _bdel_sys_gettid() ((int64_t) syscall(SYS_gettid))
 
+class Method;
+
 extern volatile uint64_t _i_total;
 extern volatile uint64_t _c_total;
 /*
@@ -31,7 +33,9 @@ extern __thread uint64_t _c_counter;
 uint64_t _now();
 void _bdel_knell(const char*);
 
-void _i2c_ret_push(void*);
+void _i2c_entry(JavaThread*, Method*);
+
+void _i2c_ret_push(void*, Method*);
 void* _i2c_ret_pop();
 void _i2c_ret_handler(JavaThread*);
 

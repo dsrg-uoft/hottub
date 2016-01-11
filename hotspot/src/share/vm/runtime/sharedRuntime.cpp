@@ -181,14 +181,32 @@ void _bdel_knell(const char* str) {
   }
 }
 
+void _i2c_entry(JavaThread* thread, Method* method) {
+  if (Dyrus) {
+    Symbol* kname = method->klass_name();
+    Symbol* name = method->name();
+    tty->print_cr("_HOTSPOT %ld (%ld): i2c adapter %s#%s (from %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
+  }
+}
+
 __thread void* _i2c_ret_stack[_BDEL_I2C_RET_STACK_SIZE];
 __thread int _i2c_ret_stack_pos = 0;
-void _i2c_ret_push(void* ret) {
+//void* _i2c_ret_stack[_BDEL_I2C_RET_STACK_SIZE];
+//int _i2c_ret_stack_pos = 0;
+int _foobar = 0;
+void _i2c_ret_push(void* ret, Method*) {
   if (_unlikely(_i2c_ret_stack_pos >= _BDEL_I2C_RET_STACK_SIZE)) {
     // badness
-    ((void (*)(void)) 0x0bad0bad)();
+    //((void (*)(void)) 0x0bad0bad)();
+    _i2c_ret_stack_pos = 0;
   } else {
     _i2c_ret_stack[_i2c_ret_stack_pos++] = ret;
+  }
+  _foobar = _i2c_ret_stack_pos;
+  if (Dyrus) {
+    Symbol* kname = method->klass_name();
+    Symbol* name = method->name();
+    tty->print_cr("_HOTSPOT %ld (%ld): i2c adapter %s#%s (from %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
   }
 }
 void* _i2c_ret_pop() {
@@ -199,6 +217,19 @@ void* _i2c_ret_pop() {
   return _i2c_ret_stack[--_i2c_ret_stack_pos];
 }
 void _i2c_ret_handler(JavaThread* thread) {
+  /*
+  asm(
+    "pop %rbp\n"
+    "\tpush %rax\n"
+    "\tpush %rdx\n"
+    "\tcallq _i2c_ret_pop\n"
+    "\tmovq %rax, %r11\n"
+    "\tpop %rdx\n"
+    "\tpop %rax\n"
+    "\tpush %r11\n"
+    "\tpush %rbp\n"
+  );
+  */
   asm(
     "mov %rax, 40(%rsp)\n"
   );

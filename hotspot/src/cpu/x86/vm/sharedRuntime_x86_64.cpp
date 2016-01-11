@@ -677,7 +677,10 @@ static void gen_i2c_adapter(MacroAssembler *masm,
   // caller, but with an uncorrected stack, causing delayed havoc.
 
   if (WildTurtle) {
-    __ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_i2c));
+    //__ get_method(c_rarg1);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _i2c_entry), r15_thread, rbx);
+    //__ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_i2c));
+    //__ call(RuntimeAddress(CAST_FROM_FN_PTR(address, SharedRuntime::_i2c)));
   }
 
   // Pick up the return address
@@ -731,16 +734,47 @@ static void gen_i2c_adapter(MacroAssembler *masm,
 
 
   Label _i2c_ret_label;
-  if (WildTurtle) {
+  if (true || WildTurtle) {
     Label _i2c_ret_handler_skip;
     __ jmp(_i2c_ret_handler_skip);
     __ bind(_i2c_ret_label);
+
+    __ addptr(rsp, -64);
+
     __ push(rax);
+    __ push(rdx);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_pop)));
-    __ pop(rscratch1);
+
+    __ movptr(rax, r11);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ pop(rdx);
+    __ pop(rax);
+    __ addptr(rsp, 64);
+    __ jmp(r11);
+
+    __ pop(rdx);
+    __ pop(r11);
+
+    //__ movptr(rax, rdi);
+    //__ movptr(rscratch1, rdi);
+    //__ jmp(rscratch1);
+
     __ push(rax);
-    __ movptr(rax, rscratch1);
+    __ movptr(rax, r11);
     __ ret(0);
+
     __ bind(_i2c_ret_handler_skip);
   }
 
@@ -749,10 +783,35 @@ static void gen_i2c_adapter(MacroAssembler *masm,
 
   // push the return address and misalign the stack that youngest frame always sees
   // as far as the placement of the call instruction
-  if (WildTurtle) {
+  if (true || WildTurtle) {
+    __ push(rax);
+
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+
+    //__ lea(rax, RuntimeAddress((address) 0xdeadc0de));
     __ movptr(c_rarg0, rax);
+    __ movptr(c_rarg1, rbx);
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_push)));
+
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+
+    __ pop(rax);
     __ lea(rax, RuntimeAddress(__ _address_from_label(_i2c_ret_label)));
+    __ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
   }
   __ push(rax);
 
