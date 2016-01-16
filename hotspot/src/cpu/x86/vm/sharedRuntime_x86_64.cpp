@@ -623,7 +623,7 @@ static void gen_c2i_adapter(MacroAssembler *masm,
   }
 
   if (WildTurtle) {
-    __ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_c2i));
+    //__ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_c2i));
   }
 
   // Schedule the branch target address early.
@@ -676,13 +676,6 @@ static void gen_i2c_adapter(MacroAssembler *masm,
   // If this happens, control eventually transfers back to the compiled
   // caller, but with an uncorrected stack, causing delayed havoc.
 
-  if (WildTurtle) {
-    //__ get_method(c_rarg1);
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _i2c_entry), r15_thread, rbx);
-    //__ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_i2c));
-    //__ call(RuntimeAddress(CAST_FROM_FN_PTR(address, SharedRuntime::_i2c)));
-  }
-
   // Pick up the return address
   __ movptr(rax, Address(rsp, 0));
 
@@ -733,6 +726,7 @@ static void gen_i2c_adapter(MacroAssembler *masm,
   }
 
 
+  /*
   Label _i2c_ret_label;
   if (true || WildTurtle) {
     Label _i2c_ret_handler_skip;
@@ -777,13 +771,14 @@ static void gen_i2c_adapter(MacroAssembler *masm,
 
     __ bind(_i2c_ret_handler_skip);
   }
+  */
 
   // Ensure compiled code always sees stack at proper alignment
   __ andptr(rsp, -16);
 
   // push the return address and misalign the stack that youngest frame always sees
   // as far as the placement of the call instruction
-  if (true || WildTurtle) {
+  if (WildTurtle) {
     __ push(rax);
 
     __ push(c_rarg0);
@@ -810,7 +805,7 @@ static void gen_i2c_adapter(MacroAssembler *masm,
     __ pop(c_rarg0);
 
     __ pop(rax);
-    __ lea(rax, RuntimeAddress(__ _address_from_label(_i2c_ret_label)));
+    //__ lea(rax, RuntimeAddress(__ _address_from_label(_i2c_ret_label)));
     __ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
   }
   __ push(rax);
@@ -3985,6 +3980,11 @@ RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const cha
 
   CodeBuffer buffer(name, 1000, 512);
   MacroAssembler* masm                = new MacroAssembler(&buffer);
+
+  if (destination == CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method)) {
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _print_value)));
+    //__ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_pop)));
+  }
 
   int frame_size_in_words;
 

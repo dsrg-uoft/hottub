@@ -33,11 +33,11 @@ extern __thread uint64_t _c_counter;
 uint64_t _now();
 void _bdel_knell(const char*);
 
-void _i2c_entry(JavaThread*, Method*);
-
-void _i2c_ret_push(void*, Method*);
-void* _i2c_ret_pop();
-void _i2c_ret_handler(JavaThread*);
+extern "C" {
+  void _i2c_ret_push(void*, Method*);
+  void* _i2c_ret_pop();
+  void _i2c_ret_handler();
+}
 
 void _print_value(JavaThread*, void*);
 

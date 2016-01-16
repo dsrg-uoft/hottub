@@ -1545,7 +1545,27 @@ void LinkResolver::resolve_invokevirtual(CallInfo& result, Handle recv,
   Symbol* method_signature = NULL;
   KlassHandle  current_klass;
   resolve_pool(resolved_klass, method_name,  method_signature, current_klass, pool, index, CHECK);
+  /*
+  tty->print_cr("_HOTSPOT: in resolve invokevirtual for method %s, recv is null %s", method_name == NULL ? "null" : method_name->as_C_string(), recv.is_null() ? "yes" : "no");
+  if (!recv.is_null()) {
+    tty->print_cr("_HOTSPOT: trying to get klass");
+    Klass* _ = recv->klass();
+    if (_ != NULL) {
+      tty->print_cr("_HOTSPOT: klass not null");
+      recv->print();
+      Symbol* __ = _->name();
+      if (__ != NULL) {
+        tty->print_cr("_HOTSPOT: klass name not null, is %s", __->as_C_string());
+      } else {
+        tty->print_cr("_HOTSPOT: klass name is null");
+      }
+    } else {
+      tty->print_cr("_HOTSPOT: klass is null");
+    }
+  }
+  */
   KlassHandle recvrKlass (THREAD, recv.is_null() ? (Klass*)NULL : recv->klass());
+  //tty->print_cr("_HOTSPOT: in resolve invokevirtual for method %s, here", method_name == NULL ? "null" : method_name->as_C_string());
   resolve_virtual_call(result, recv, recvrKlass, resolved_klass, method_name, method_signature, current_klass, true, true, CHECK);
 }
 

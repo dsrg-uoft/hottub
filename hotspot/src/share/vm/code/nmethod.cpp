@@ -1463,6 +1463,8 @@ bool nmethod::make_not_entrant_or_zombie(unsigned int state) {
     // The caller can be calling the method statically or through an inline
     // cache call.
     if (!is_osr_method() && !is_not_entrant()) {
+      Symbol* _ = _method->name();
+      tty->print_cr("_HOTSPOT: setting entry to handle wrong method stub for %s, to %s", _->as_C_string(), state == zombie ? "zombie" : "not entrant");
       NativeJump::patch_verified_entry(entry_point(), verified_entry_point(),
                   SharedRuntime::get_handle_wrong_method_stub());
     }

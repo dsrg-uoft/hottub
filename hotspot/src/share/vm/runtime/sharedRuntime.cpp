@@ -181,100 +181,54 @@ void _bdel_knell(const char* str) {
   }
 }
 
-void _i2c_entry(JavaThread* thread, Method* method) {
-  if (Dyrus) {
-    Symbol* kname = method->klass_name();
-    Symbol* name = method->name();
-    tty->print_cr("_HOTSPOT %ld (%ld): i2c adapter %s#%s (from %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
-  }
-}
-
 __thread void* _i2c_ret_stack[_BDEL_I2C_RET_STACK_SIZE];
 __thread int _i2c_ret_stack_pos = 0;
 //void* _i2c_ret_stack[_BDEL_I2C_RET_STACK_SIZE];
 //int _i2c_ret_stack_pos = 0;
 int _foobar = 0;
-void _i2c_ret_push(void* ret, Method*) {
-  if (_unlikely(_i2c_ret_stack_pos >= _BDEL_I2C_RET_STACK_SIZE)) {
-    // badness
-    //((void (*)(void)) 0x0bad0bad)();
-    _i2c_ret_stack_pos = 0;
-  } else {
-    _i2c_ret_stack[_i2c_ret_stack_pos++] = ret;
+extern "C" {
+  void _i2c_ret_push(void* ret, Method* method) {
+    if (_unlikely(_i2c_ret_stack_pos >= _BDEL_I2C_RET_STACK_SIZE)) {
+      // badness
+      //((void (*)(void)) 0x0bad0bad)();
+      _i2c_ret_stack_pos = 0;
+    } else {
+      _i2c_ret_stack[_i2c_ret_stack_pos++] = ret;
+    }
+    _foobar = _i2c_ret_stack_pos;
+    if (Dyrus) {
+      Symbol* kname = method->klass_name();
+      Symbol* name = method->name();
+      tty->print_cr("_HOTSPOT %ld (%ld): i2c adapter %s#%s (from %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
+    }
   }
-  _foobar = _i2c_ret_stack_pos;
-  if (Dyrus) {
-    Symbol* kname = method->klass_name();
-    Symbol* name = method->name();
-    tty->print_cr("_HOTSPOT %ld (%ld): i2c adapter %s#%s (from %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
+  void* _i2c_ret_pop() {
+    if (_unlikely(_i2c_ret_stack_pos <= 0)) {
+      // badness
+      ((void (*)(void)) 0x0bad0bad)();
+    }
+    return _i2c_ret_stack[--_i2c_ret_stack_pos];
   }
-}
-void* _i2c_ret_pop() {
-  if (_unlikely(_i2c_ret_stack_pos <= 0)) {
-    // badness
-    ((void (*)(void)) 0x0bad0bad)();
+  void _i2c_ret_handler() {
+    asm(
+      "pop %rbp\n"
+      "\tlea -16(%rsp), %rsp\n"
+      "\tpush %rax\n"
+      "\tpush %rdx\n"
+    );
+    /*
+    if (Dyrus) {
+      tty->print_cr("_HOTSPOT: %ld (%ld): i2c return handler", _bdel_sys_gettid(), _now());
+    }
+    */
+    asm(
+      "callq _i2c_ret_pop\n"
+      "\tmovq %rax, %r11\n"
+      "\tpop %rdx\n"
+      "\tpop %rax\n"
+      "\tmovq %r11, 8(%rsp)"
+    );
   }
-  return _i2c_ret_stack[--_i2c_ret_stack_pos];
-}
-void _i2c_ret_handler(JavaThread* thread) {
-  /*
-  asm(
-    "pop %rbp\n"
-    "\tpush %rax\n"
-    "\tpush %rdx\n"
-    "\tcallq _i2c_ret_pop\n"
-    "\tmovq %rax, %r11\n"
-    "\tpop %rdx\n"
-    "\tpop %rax\n"
-    "\tpush %r11\n"
-    "\tpush %rbp\n"
-  );
-  */
-  asm(
-    "mov %rax, 40(%rsp)\n"
-  );
-  //tty->print_cr("_HOTSPOT %ld (%ld): transition in _i2c_ret_handler", _bdel_sys_gettid(), _now());
-  if (_unlikely(_i2c_ret_stack_pos <= 0)) {
-    // badness
-    ((void (*)(void)) 0x0bad0bad)();
-  }
-  void* ret = _i2c_ret_stack[--_i2c_ret_stack_pos];
-  asm(
-    "mov 40(%%rsp), %%rax\n"
-    "\tmov %0, 40(%%rsp)\n"
-    "\tlea -24(%%rsp), %%rsp\n"
-    :
-    : "D" (ret)
-  );
-  // pop self frame
-  // goto address
-
-  /*
-  asm(
-    "push %r12\n"
-    "\tpush %r13\n"
-    "\tmovq 32(%rsp), %r12\n"
-    "\tmov $0x0bae0420, %r13\n"
-    "\tcmp %r12, %r13\n"
-    "\tje good\n"
-    "\tmov $0x0deadbabe, %r13\n"
-    "\tjmp *%r13\n"
-    "good:\n"
-    "\tpop %r13\n"
-    "\tpop %r12\n"
-    "\tpop %rbp\n"
-    "\tlea 8(%rsp), %rsp\n"
-    "\tlea 16(%rsp), %rsp\n"
-    "\tret\n"
-  );
-  */
-  //_bdel_c2i();
-  /*
-  if (Dyrus) {
-    tty->print_cr("_HOTSPOT %ld (%ld): transition in _i_from_i2c", _bdel_sys_gettid(), _now());
-  }
-  */
-  //tty->print("i am here\n");
 }
 
 void _print_value(JavaThread* thread, void* ptr) {
@@ -1590,9 +1544,12 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method(JavaThread* thread))
   assert(stub_frame.is_runtime_frame(), "sanity check");
   frame caller_frame = stub_frame.sender(&reg_map);
 
+  tty->print_cr("_HOTSPOT: in handle wrong method");
+
   if (caller_frame.is_interpreted_frame() ||
       caller_frame.is_entry_frame()) {
     Method* callee = thread->callee_target();
+    tty->print_cr("_HOTSPOT: in handle wrong method, first block, for %s", callee->name()->as_C_string());
     guarantee(callee != NULL && callee->is_method(), "bad handshake");
     thread->set_vm_result_2(callee);
     thread->set_callee_target(NULL);
@@ -1603,7 +1560,9 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method(JavaThread* thread))
   methodHandle callee_method;
   JRT_BLOCK
     // Force resolving of caller (if we called from compiled frame)
+    tty->print_cr("_HOTSPOT: in handle wrong method, second block, about to reresolve call site");
     callee_method = SharedRuntime::reresolve_call_site(thread, CHECK_NULL);
+    tty->print_cr("_HOTSPOT: in handle wrong method, second block, got method");
     thread->set_vm_result_2(callee_method());
   JRT_BLOCK_END
   // return compiled code entry point after potential safepoints

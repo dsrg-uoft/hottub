@@ -720,7 +720,7 @@ class CommandLineFlags {
   product(bool, UseCRC32Intrinsics, false,                                  \
           "use intrinsics for java.util.zip.CRC32")                         \
                                                                             \
-  develop(bool, TraceCallFixup, false,                                      \
+  product(bool, TraceCallFixup, false,                                      \
           "Trace all call fixups")                                          \
                                                                             \
   develop(bool, DeoptimizeALot, false,                                      \
