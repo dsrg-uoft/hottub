@@ -42,4 +42,7 @@ extern "C" {
 void _print_value(JavaThread*, void*);
 
 
+void _noop();
+
+
 #endif // SHARE_VM_RUNTIME__BDEL_HPP

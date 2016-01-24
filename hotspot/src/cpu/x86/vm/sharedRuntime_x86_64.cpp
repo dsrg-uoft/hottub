@@ -3975,16 +3975,13 @@ SafepointBlob* SharedRuntime::generate_handler_blob(address call_ptr, int poll_t
 RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const char* name) {
   assert (StubRoutines::forward_exception_entry() != NULL, "must be generated before");
 
+  tty->print_cr("_HOTSPOT: in SharedRuntime::generate_resolve_blob for %s", name);
+
   // allocate space for the code
   ResourceMark rm;
 
   CodeBuffer buffer(name, 1000, 512);
   MacroAssembler* masm                = new MacroAssembler(&buffer);
-
-  if (destination == CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method)) {
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _print_value)));
-    //__ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_pop)));
-  }
 
   int frame_size_in_words;
 
@@ -3992,6 +3989,35 @@ RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const cha
   OopMap* map = NULL;
 
   int start = __ offset();
+
+  if (WildTurtle && destination == CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method)) {
+    __ push(rax);
+
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_pop)));
+
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+
+    __ movptr(Address(rsp, 8), rax);
+
+    __ pop(rax);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop)));
+  }
 
   map = RegisterSaver::save_live_registers(masm, 0, &frame_size_in_words);
 

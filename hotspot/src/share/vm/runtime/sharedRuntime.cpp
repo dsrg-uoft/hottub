@@ -160,6 +160,10 @@ uint64_t _now() {
   assert(status == 0, "gettime error");
   return (uint64_t) ts.tv_sec * (1000 * 1000 * 1000) + (uint64_t) ts.tv_nsec;
 }
+__thread void* _i2c_ret_stack[_BDEL_I2C_RET_STACK_SIZE];
+__thread int _i2c_ret_stack_pos = 0;
+//void* _i2c_ret_stack[_BDEL_I2C_RET_STACK_SIZE];
+//int _i2c_ret_stack_pos = 0;
 void _bdel_knell(const char* str) {
   if (WildTurtle) {
     __sync_fetch_and_add(&_i_total, _i_counter);
@@ -173,18 +177,16 @@ void _bdel_knell(const char* str) {
       " - %.3f accumulated c"
       " - %d c2i2c levels"
       " - %d c2i2c max"
+      " - %d i2c ret stack pos"
       , str, _bdel_sys_gettid()
       , _i_counter / 1e9, _c_counter / 1e9, (_i_counter + _c_counter) / 1e9
       , _i_total / 1e9, _c_total / 1e9
       , (int) _i_from_c, (int) _i_from_c_max
+      , _i2c_ret_stack_pos
     );
   }
 }
 
-__thread void* _i2c_ret_stack[_BDEL_I2C_RET_STACK_SIZE];
-__thread int _i2c_ret_stack_pos = 0;
-//void* _i2c_ret_stack[_BDEL_I2C_RET_STACK_SIZE];
-//int _i2c_ret_stack_pos = 0;
 int _foobar = 0;
 extern "C" {
   void _i2c_ret_push(void* ret, Method* method) {
@@ -233,6 +235,9 @@ extern "C" {
 
 void _print_value(JavaThread* thread, void* ptr) {
   tty->print_cr("hmmsauce is %p", ptr);
+}
+void _noop() {
+  return;
 }
 
 //----------------------------generate_stubs-----------------------------------
@@ -1524,6 +1529,7 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method_ic_miss(JavaThread* 
   JRT_BLOCK_END
   // return compiled code entry point after potential safepoints
   assert(callee_method->verified_code_entry() != NULL, " Jump to zero!");
+  tty->print_cr("_HOTSPOT: in SharedRuntime::handle_wrong_method_ic_miss_helper for %s", callee_method->name()->as_C_string());
   return callee_method->verified_code_entry();
 JRT_END
 
@@ -1572,6 +1578,7 @@ JRT_END
 
 // Handle abstract method call
 JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method_abstract(JavaThread* thread))
+  tty->print_cr("_HOTSPOT: in SharedRuntime::handle_wrong_method_abstract");
   return StubRoutines::throw_AbstractMethodError_entry();
 JRT_END
 
