@@ -625,6 +625,32 @@ static void gen_c2i_adapter(MacroAssembler *masm,
   if (WildTurtle) {
     //__ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_c2i));
   }
+  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop14)));
+  __ push(rax);
+
+  __ push(c_rarg0);
+  __ push(c_rarg1);
+  __ push(c_rarg2);
+  __ push(c_rarg3);
+  __ push(c_rarg4);
+  __ push(c_rarg5);
+  __ push(rscratch1);
+  __ push(rscratch2);
+
+  //__ lea(rax, RuntimeAddress((address) 0xdeadc0de));
+  __ movptr(c_rarg0, rbx);
+  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _print_method)));
+
+  __ pop(rscratch2);
+  __ pop(rscratch1);
+  __ pop(c_rarg5);
+  __ pop(c_rarg4);
+  __ pop(c_rarg3);
+  __ pop(c_rarg2);
+  __ pop(c_rarg1);
+  __ pop(c_rarg0);
+
+  __ pop(rax);
 
   // Schedule the branch target address early.
   __ movptr(rcx, Address(rbx, in_bytes(Method::interpreter_entry_offset())));
@@ -724,54 +750,6 @@ static void gen_i2c_adapter(MacroAssembler *masm,
     comp_words_on_stack = round_to(comp_words_on_stack, 2);
     __ subptr(rsp, comp_words_on_stack * wordSize);
   }
-
-
-  /*
-  Label _i2c_ret_label;
-  if (true || WildTurtle) {
-    Label _i2c_ret_handler_skip;
-    __ jmp(_i2c_ret_handler_skip);
-    __ bind(_i2c_ret_label);
-
-    __ addptr(rsp, -64);
-
-    __ push(rax);
-    __ push(rdx);
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_pop)));
-
-    __ movptr(rax, r11);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-    __ pop(rdx);
-    __ pop(rax);
-    __ addptr(rsp, 64);
-    __ jmp(r11);
-
-    __ pop(rdx);
-    __ pop(r11);
-
-    //__ movptr(rax, rdi);
-    //__ movptr(rscratch1, rdi);
-    //__ jmp(rscratch1);
-
-    __ push(rax);
-    __ movptr(rax, r11);
-    __ ret(0);
-
-    __ bind(_i2c_ret_handler_skip);
-  }
-  */
 
   // Ensure compiled code always sees stack at proper alignment
   __ andptr(rsp, -16);
@@ -3705,6 +3683,7 @@ void SharedRuntime::generate_uncommon_trap_blob() {
   assert(SimpleRuntimeFrame::framesize % 4 == 0, "sp not 16-byte aligned");
 
   address start = __ pc();
+  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop2)));
 
   if (UseRTMLocking) {
     // Abort RTM transaction before possible nmethod deoptimization.
@@ -3991,6 +3970,7 @@ RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const cha
   int start = __ offset();
 
   if (WildTurtle && destination == CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method)) {
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop15)));
     __ push(rax);
 
     __ push(c_rarg0);

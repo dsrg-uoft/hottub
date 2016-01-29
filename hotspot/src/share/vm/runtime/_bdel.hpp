@@ -43,6 +43,19 @@ void _print_value(JavaThread*, void*);
 
 
 void _noop();
+void _noop2();
+void _noop3();
+void _noop4();
+void _noop5();
+void _noop10();
+
+extern "C" void _noop11();
+extern "C" void _noop12();
+extern "C" void _noop13();
+extern "C" void _noop14();
+extern "C" void _noop15();
+
+extern "C" void _print_method(Method*);
 
 
 #endif // SHARE_VM_RUNTIME__BDEL_HPP

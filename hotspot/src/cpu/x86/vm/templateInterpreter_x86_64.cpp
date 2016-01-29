@@ -46,6 +46,8 @@
 #include "utilities/debug.hpp"
 #include "utilities/macros.hpp"
 
+#include "runtime/_bdel.hpp"
+
 #define __ _masm->
 
 #ifndef CC_INTERP
@@ -1892,6 +1894,34 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
   // rsp: expression stack of caller
   // rbp: ebp of caller
   __ push(rax);                                  // save exception
+  if (WildTurtle) {
+    Label _after;
+    __ lea(c_rarg0, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
+    __ cmpptr(c_rarg0, rdx);
+    __ jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    // no rdx
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_pop)));
+    __ movptr(rdx, rax);
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    // no rdx
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    // my isle; chu chu
+    __ bind(_after);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop3)));
+  }
   __ push(rdx);                                  // save return address
   __ super_call_VM_leaf(CAST_FROM_FN_PTR(address,
                           SharedRuntime::exception_handler_for_return_address),

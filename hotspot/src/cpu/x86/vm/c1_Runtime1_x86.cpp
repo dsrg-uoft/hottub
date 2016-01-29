@@ -42,6 +42,8 @@
 #include "gc_implementation/g1/g1SATBCardTableModRefBS.hpp"
 #endif
 
+#include "runtime/_bdel.hpp"
+
 
 // Implementation of StubAssembler
 
@@ -807,6 +809,7 @@ void Runtime1::generate_unwind_exception(StubAssembler *sasm) {
   __ movptr(exception_pc, Address(rsp, 0));
 
   // search the exception handler address of the caller (using the return address)
+  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop5)));
   __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address), thread, exception_pc);
   // rax: exception handler address of the caller
 

@@ -38,6 +38,8 @@
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/thread.inline.hpp"
 
+#include "runtime/_bdel.hpp"
+
 
 // Implementation of InterpreterMacroAssembler
 
@@ -674,6 +676,9 @@ void InterpreterMacroAssembler::remove_activation(
          Address(rbp, frame::interpreter_frame_sender_sp_offset * wordSize));
   leave();                           // remove frame anchor
   pop(ret_addr);                     // get return address
+  push(ret_addr);
+  call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop10)));
+  pop(ret_addr);
   mov(rsp, rbx);                     // set sp to sender sp
 }
 

@@ -2940,10 +2940,10 @@ class CommandLineFlags {
           "Prefetch instruction to prefetch ahead of allocation pointer")   \
                                                                             \
   /* deoptimization */                                                      \
-  develop(bool, TraceDeoptimization, false,                                 \
+  product(bool, TraceDeoptimization, false,                                 \
           "Trace deoptimization")                                           \
                                                                             \
-  develop(bool, DebugDeoptimization, false,                                 \
+  product(bool, DebugDeoptimization, false,                                 \
           "Tracing various information while debugging deoptimization")     \
                                                                             \
   product(intx, SelfDestructTimer, 0,                                       \

@@ -187,17 +187,19 @@ void _bdel_knell(const char* str) {
   }
 }
 
-int _foobar = 0;
+__thread int _kiwikid = 0;
 extern "C" {
   void _i2c_ret_push(void* ret, Method* method) {
     if (_unlikely(_i2c_ret_stack_pos >= _BDEL_I2C_RET_STACK_SIZE)) {
       // badness
-      //((void (*)(void)) 0x0bad0bad)();
+      ((void (*)(void)) 0x0bad0bad)();
       _i2c_ret_stack_pos = 0;
     } else {
+      if (_kiwikid++ >= 42) {
+        //ret = (void*) 0xdeadc0de;
+      }
       _i2c_ret_stack[_i2c_ret_stack_pos++] = ret;
     }
-    _foobar = _i2c_ret_stack_pos;
     if (Dyrus) {
       Symbol* kname = method->klass_name();
       Symbol* name = method->name();
@@ -238,6 +240,41 @@ void _print_value(JavaThread* thread, void* ptr) {
 }
 void _noop() {
   return;
+}
+void _noop2() {
+  return;
+}
+void _noop3() {
+  return;
+}
+void _noop4() {
+  return;
+}
+void _noop5() {
+  return;
+}
+void _noop10() {
+  return;
+}
+extern "C" void _noop11() {
+  return;
+}
+extern "C" void _noop12() {
+  return;
+}
+extern "C" void _noop13() {
+  return;
+}
+extern "C" void _noop14() {
+  return;
+}
+extern "C" void _noop15() {
+  return;
+}
+extern "C" void _print_method(Method* method) {
+    Symbol* kname = method->klass_name();
+    Symbol* name = method->name();
+    tty->print_cr("_HOTSPOT %ld (%ld): print method for %s#%s (from %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
 }
 
 //----------------------------generate_stubs-----------------------------------
@@ -1559,7 +1596,13 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method(JavaThread* thread))
     guarantee(callee != NULL && callee->is_method(), "bad handshake");
     thread->set_vm_result_2(callee);
     thread->set_callee_target(NULL);
-    return callee->get_c2i_entry();
+    //return callee->get_c2i_entry();
+    address _ret = callee->get_c2i_entry();
+    tty->print_cr("_HOTSPOT: in handle wrong method, first block, for %s, return value is %p", callee->name()->as_C_string(), (void*) _ret);
+    asm(
+      "call _noop11\n"
+    );
+    return _ret;
   }
 
   // Must be compiled to compiled path which is safe to stackwalk
@@ -1926,9 +1969,16 @@ IRT_LEAF(void, SharedRuntime::fixup_callers_callsite(Method* method, address cal
   // ask me how I know this...
 
   CodeBlob* cb = CodeCache::find_blob(caller_pc);
+  tty->print_cr("_HOTSPOT: in SharedRuntime::fixup_callers_callsite for %s#%s, address is %p, cb is nmethod %d, entry point is c2i entry %d", method->klass_name()->as_C_string(), method->name()->as_C_string(), (void*) caller_pc, cb->is_nmethod(), entry_point == moop->get_c2i_entry());
   if (!cb->is_nmethod() || entry_point == moop->get_c2i_entry()) {
+    asm(
+      "call _noop12\n"
+    );
     return;
   }
+  asm(
+    "call _noop13\n"
+  );
 
   // The check above makes sure this is a nmethod.
   nmethod* nm = cb->as_nmethod_or_null();

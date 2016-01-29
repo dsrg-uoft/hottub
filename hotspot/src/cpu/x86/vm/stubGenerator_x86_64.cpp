@@ -43,6 +43,8 @@
 #include "opto/runtime.hpp"
 #endif
 
+#include  "runtime/_bdel.hpp"
+
 // Declaration and definition of StubGenerator (no .hpp file).
 // For a more detailed description of the stub routine structure
 // see the comment in stubRoutines.hpp
@@ -498,6 +500,7 @@ class StubGenerator: public StubCodeGenerator {
 
     // compute exception handler into rbx
     __ movptr(c_rarg0, Address(rsp, 0));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop4)));
     BLOCK_COMMENT("call exception_handler_for_return_address");
     __ call_VM_leaf(CAST_FROM_FN_PTR(address,
                          SharedRuntime::exception_handler_for_return_address),
