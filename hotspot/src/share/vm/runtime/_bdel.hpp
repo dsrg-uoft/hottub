@@ -33,9 +33,15 @@ extern __thread uint64_t _c_counter;
 uint64_t _now();
 void _bdel_knell(const char*);
 
+typedef struct {
+  void* rax;
+  void* rdx;
+} _rax_rdx;
+
 extern "C" {
   void _i2c_ret_push(void*, Method*);
-  void* _i2c_ret_pop();
+  _rax_rdx _i2c_ret_pop();
+  _rax_rdx _i2c_ret_verify_and_pop();
   void _i2c_ret_handler();
 }
 
@@ -54,6 +60,7 @@ extern "C" void _noop12();
 extern "C" void _noop13();
 extern "C" void _noop14();
 extern "C" void _noop15();
+extern "C" void _noop16();
 
 extern "C" void _print_method(Method*);
 

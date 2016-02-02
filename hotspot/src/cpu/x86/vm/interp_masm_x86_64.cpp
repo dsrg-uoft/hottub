@@ -675,10 +675,39 @@ void InterpreterMacroAssembler::remove_activation(
   movptr(rbx,
          Address(rbp, frame::interpreter_frame_sender_sp_offset * wordSize));
   leave();                           // remove frame anchor
-  pop(ret_addr);                     // get return address
-  push(ret_addr);
   call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop10)));
-  pop(ret_addr);
+  pop(ret_addr);                     // get return address
+  if (WildTurtle) {
+    push(rscratch1);
+    Label _after;
+    lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
+    cmpptr(rscratch1, ret_addr);
+    jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    push(rax);
+    push(c_rarg0);
+    push(c_rarg1);
+    push(c_rarg2);
+    push(c_rarg3);
+    push(c_rarg4);
+    push(c_rarg5);
+    //push(rscratch1);
+    push(rscratch2);
+    call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_pop)));
+    pop(rscratch2);
+    //pop(rscratch1);
+    pop(c_rarg5);
+    pop(c_rarg4);
+    pop(c_rarg3);
+    pop(c_rarg2);
+    pop(c_rarg1);
+    pop(c_rarg0);
+    movptr(ret_addr, rax);
+    pop(rax);
+    // my isle; chu chu
+    bind(_after);
+    pop(rscratch1);
+  }
   mov(rsp, rbx);                     // set sp to sender sp
 }
 

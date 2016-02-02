@@ -1896,8 +1896,9 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
   __ push(rax);                                  // save exception
   if (WildTurtle) {
     Label _after;
-    __ lea(c_rarg0, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
-    __ cmpptr(c_rarg0, rdx);
+    __ push(rscratch1);
+    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
+    __ cmpptr(rscratch1, rdx);
     __ jcc(Assembler::notEqual, _after);
     // my isle; hajimemashou
     __ push(c_rarg0);
@@ -1918,9 +1919,11 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
     // no rdx
     __ pop(c_rarg1);
     __ pop(c_rarg0);
+    __ movptr(rax, Address(rsp, 0));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop3)));
     // my isle; chu chu
     __ bind(_after);
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop3)));
+    __ pop(rscratch1);
   }
   __ push(rdx);                                  // save return address
   __ super_call_VM_leaf(CAST_FROM_FN_PTR(address,

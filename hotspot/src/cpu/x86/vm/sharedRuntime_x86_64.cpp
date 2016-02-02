@@ -625,6 +625,7 @@ static void gen_c2i_adapter(MacroAssembler *masm,
   if (WildTurtle) {
     //__ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_c2i));
   }
+  /*
   __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop14)));
   __ push(rax);
 
@@ -651,6 +652,7 @@ static void gen_c2i_adapter(MacroAssembler *masm,
   __ pop(c_rarg0);
 
   __ pop(rax);
+  */
 
   // Schedule the branch target address early.
   __ movptr(rcx, Address(rbx, in_bytes(Method::interpreter_entry_offset())));
@@ -3969,8 +3971,10 @@ RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const cha
 
   int start = __ offset();
 
-  if (WildTurtle && destination == CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method)) {
+  if (destination == CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method)) {
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop15)));
+  }
+  if (WildTurtle && destination == CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method)) {
     __ push(rax);
 
     __ push(c_rarg0);
@@ -3982,7 +3986,8 @@ RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const cha
     __ push(rscratch1);
     __ push(rscratch2);
 
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_pop)));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_and_pop)));
+    __ movptr(Address(rdx, 0), rax);
 
     __ pop(rscratch2);
     __ pop(rscratch1);
@@ -3992,8 +3997,6 @@ RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const cha
     __ pop(c_rarg2);
     __ pop(c_rarg1);
     __ pop(c_rarg0);
-
-    __ movptr(Address(rsp, 8), rax);
 
     __ pop(rax);
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop)));

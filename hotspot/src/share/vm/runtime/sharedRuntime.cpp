@@ -161,6 +161,7 @@ uint64_t _now() {
   return (uint64_t) ts.tv_sec * (1000 * 1000 * 1000) + (uint64_t) ts.tv_nsec;
 }
 __thread void* _i2c_ret_stack[_BDEL_I2C_RET_STACK_SIZE];
+__thread void* _i2c_rbp_stack[_BDEL_I2C_RET_STACK_SIZE];
 __thread int _i2c_ret_stack_pos = 0;
 //void* _i2c_ret_stack[_BDEL_I2C_RET_STACK_SIZE];
 //int _i2c_ret_stack_pos = 0;
@@ -198,6 +199,9 @@ extern "C" {
       if (_kiwikid++ >= 42) {
         //ret = (void*) 0xdeadc0de;
       }
+      register void** rbp asm("rbp");
+
+      _i2c_rbp_stack[_i2c_ret_stack_pos] = rbp + 10; // 8 callee saved registers + return address + rbp
       _i2c_ret_stack[_i2c_ret_stack_pos++] = ret;
     }
     if (Dyrus) {
@@ -206,12 +210,23 @@ extern "C" {
       tty->print_cr("_HOTSPOT %ld (%ld): i2c adapter %s#%s (from %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
     }
   }
-  void* _i2c_ret_pop() {
+  _rax_rdx _i2c_ret_pop() {
     if (_unlikely(_i2c_ret_stack_pos <= 0)) {
       // badness
       ((void (*)(void)) 0x0bad0bad)();
     }
-    return _i2c_ret_stack[--_i2c_ret_stack_pos];
+    _rax_rdx ret;
+    ret.rdx = _i2c_rbp_stack[--_i2c_ret_stack_pos];
+    ret.rax = _i2c_ret_stack[_i2c_ret_stack_pos];
+    return ret;
+  }
+  _rax_rdx _i2c_ret_verify_and_pop() {
+    tty->print_cr("_HOTSPOT: in verify and pop, levels is %d", _i2c_ret_stack_pos);
+    _rax_rdx ret = _i2c_ret_pop();
+    if (*((void**) ret.rdx) != &_i2c_ret_handler) {
+      ((void (*)(void)) 0x2bad2bad)();
+    }
+    return ret;
   }
   void _i2c_ret_handler() {
     asm(
@@ -271,6 +286,7 @@ extern "C" void _noop14() {
 extern "C" void _noop15() {
   return;
 }
+extern "C" void _noop16() { return; }
 extern "C" void _print_method(Method* method) {
     Symbol* kname = method->klass_name();
     Symbol* name = method->name();
@@ -1616,6 +1632,7 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method(JavaThread* thread))
   JRT_BLOCK_END
   // return compiled code entry point after potential safepoints
   assert(callee_method->verified_code_entry() != NULL, " Jump to zero!");
+  tty->print_cr("_HOTSPOT: in handle wrong method, second block, for %s, return value is %p", callee_method->name()->as_C_string(), (void*) callee_method->verified_code_entry());
   return callee_method->verified_code_entry();
 JRT_END
 
