@@ -42,7 +42,9 @@ extern "C" {
   void _i2c_ret_push(void*, Method*);
   _rax_rdx _i2c_ret_pop();
   _rax_rdx _i2c_ret_verify_and_pop();
+  _rax_rdx _i2c_ret_verify_location_and_pop(void*);
   void _i2c_ret_handler();
+  void _i2c_ret_badness();
 }
 
 void _print_value(JavaThread*, void*);

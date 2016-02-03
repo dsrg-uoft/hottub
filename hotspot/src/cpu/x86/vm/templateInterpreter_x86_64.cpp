@@ -1894,6 +1894,7 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
   // rsp: expression stack of caller
   // rbp: ebp of caller
   __ push(rax);                                  // save exception
+  /*
   if (WildTurtle) {
     Label _after;
     __ push(rscratch1);
@@ -1925,6 +1926,7 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
     __ bind(_after);
     __ pop(rscratch1);
   }
+  */
   __ push(rdx);                                  // save return address
   __ super_call_VM_leaf(CAST_FROM_FN_PTR(address,
                           SharedRuntime::exception_handler_for_return_address),

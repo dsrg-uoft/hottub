@@ -693,7 +693,8 @@ void InterpreterMacroAssembler::remove_activation(
     push(c_rarg5);
     //push(rscratch1);
     push(rscratch2);
-    call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_pop)));
+    lea(c_rarg0, Address(rsp, 8 * sizeof(void*)));
+    call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop)));
     pop(rscratch2);
     //pop(rscratch1);
     pop(c_rarg5);

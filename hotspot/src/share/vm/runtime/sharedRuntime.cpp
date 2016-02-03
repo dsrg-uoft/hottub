@@ -201,7 +201,17 @@ extern "C" {
       }
       register void** rbp asm("rbp");
 
-      _i2c_rbp_stack[_i2c_ret_stack_pos] = rbp + 10; // 8 callee saved registers + return address + rbp
+      // ===============================
+      // | bottom of stack/top address |
+      // | ...
+      // | return address for i2c callee
+      // | 8 caller saved registers, done in i2c
+      // | return address for call to this
+      // | saved rbp                   | _<- current rbp
+      // | ...
+      // | top of stack                |
+      // ===============================
+      _i2c_rbp_stack[_i2c_ret_stack_pos] = rbp + 10; // 8 caller saved registers + return address + rbp
       _i2c_ret_stack[_i2c_ret_stack_pos++] = ret;
     }
     if (Dyrus) {
@@ -223,16 +233,31 @@ extern "C" {
   _rax_rdx _i2c_ret_verify_and_pop() {
     tty->print_cr("_HOTSPOT: in verify and pop, levels is %d", _i2c_ret_stack_pos);
     _rax_rdx ret = _i2c_ret_pop();
-    if (*((void**) ret.rdx) != &_i2c_ret_handler) {
+    if (_unlikely(*((void**) ret.rdx) != &_i2c_ret_handler)) {
       ((void (*)(void)) 0x2bad2bad)();
     }
     return ret;
   }
+  _rax_rdx _i2c_ret_verify_location_and_pop(void* rbp) {
+    _rax_rdx ret = _i2c_ret_pop();
+    if (_unlikely(rbp != ret.rdx)) {
+      asm(
+        "callq _i2c_ret_badness\n"
+      );
+    }
+    return ret;
+  }
   void _i2c_ret_handler() {
+    // ===============================
+    // | bottom of stack/top address |
+    // | ...                         | _<- rsp entering this
+    // | rbp pushed by gcc (was callee's return address, this's address) | _<- current rbp
+    // | (was callee's rbp)
+    // | ...
+    // | top of stack                |
+    // ===============================
     asm(
-      "pop %rbp\n"
-      "\tlea -16(%rsp), %rsp\n"
-      "\tpush %rax\n"
+      "push %rax\n"
       "\tpush %rdx\n"
     );
     /*
@@ -241,12 +266,18 @@ extern "C" {
     }
     */
     asm(
-      "callq _i2c_ret_pop\n"
-      "\tmovq %rax, %r11\n"
+      "mov %rbp, %rdi\n"
+      "\tcallq _i2c_ret_verify_location_and_pop\n"
+      "\tmov %rax, %r11\n"
       "\tpop %rdx\n"
       "\tpop %rax\n"
-      "\tmovq %r11, 8(%rsp)"
+      "\tpop %rbp\n"
+      "\tpush %r11\n"
+      "\tpush %rbp\n"
     );
+  }
+  void _i2c_ret_badness() {
+    ((void (*)(void)) 0x3bad3bad)();
   }
 }
 
