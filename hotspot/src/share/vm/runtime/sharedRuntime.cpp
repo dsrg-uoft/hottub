@@ -131,6 +131,8 @@ __thread uint8_t _i_from_c = 0;
 __thread int8_t _i_from_c_levels[_BDEL_C2I2C_SIZE];
 __thread uint8_t _i_from_c_max = 0;
 
+__thread uint8_t _native_levels = 0;
+
 static void _bdel_c2i2c_push(int8_t x) {
   if (_likely(_i_from_c < _BDEL_C2I2C_SIZE)) {
     _i_from_c_levels[_i_from_c] = x;
@@ -191,6 +193,7 @@ void _bdel_knell(const char* str) {
 __thread int _kiwikid = 0;
 extern "C" {
   void _i2c_ret_push(void* ret, Method* method) {
+    _i2c_verify_stack();
     if (_unlikely(_i2c_ret_stack_pos >= _BDEL_I2C_RET_STACK_SIZE)) {
       // badness
       ((void (*)(void)) 0x0bad0bad)();
@@ -222,8 +225,9 @@ extern "C" {
   }
   _rax_rdx _i2c_ret_pop() {
     if (_unlikely(_i2c_ret_stack_pos <= 0)) {
-      // badness
-      ((void (*)(void)) 0x0bad0bad)();
+      asm(
+        "call _i2c_pop_nil\n"
+      );
     }
     _rax_rdx ret;
     ret.rdx = _i2c_rbp_stack[--_i2c_ret_stack_pos];
@@ -231,20 +235,24 @@ extern "C" {
     return ret;
   }
   _rax_rdx _i2c_ret_verify_and_pop() {
-    tty->print_cr("_HOTSPOT: in verify and pop, levels is %d", _i2c_ret_stack_pos);
+    //tty->print_cr("_HOTSPOT: in verify and pop, levels is %d", _i2c_ret_stack_pos);
     _rax_rdx ret = _i2c_ret_pop();
     if (_unlikely(*((void**) ret.rdx) != &_i2c_ret_handler)) {
       ((void (*)(void)) 0x2bad2bad)();
     }
+    _i2c_verify_stack();
     return ret;
   }
   _rax_rdx _i2c_ret_verify_location_and_pop(void* rbp) {
     _rax_rdx ret = _i2c_ret_pop();
     if (_unlikely(rbp != ret.rdx)) {
+      tty->print_cr("_HOTSPOT: i2c ret badness, rbp is %p, expected is %p", rbp, ret.rdx);
+      _dump_i2c_stack();
       asm(
         "callq _i2c_ret_badness\n"
       );
     }
+    _i2c_verify_stack();
     return ret;
   }
   void _i2c_ret_handler() {
@@ -276,8 +284,45 @@ extern "C" {
       "\tpush %rbp\n"
     );
   }
+  void _dump_i2c_stack() {
+    tty->print_cr("=== i2c ret stack (handler is at %p) ===", (void*) &_i2c_ret_handler);
+    for (int i = _i2c_ret_stack_pos - 1; i >= 0; i--) {
+      tty->print_cr(" %d. %p: %p", i, _i2c_ret_stack[i], _i2c_rbp_stack[i]);
+    }
+  }
+  void _i2c_verify_stack() {
+    for (int i = _i2c_ret_stack_pos - 1; i >= 0; i--) {
+      void* ret_addr = *((void**) _i2c_rbp_stack[i]);
+      if (ret_addr != (void*) &_i2c_ret_handler) {
+        tty->print_cr("_HOTSPOT: failed check at position %d", i);
+        _dump_i2c_stack();
+        asm(
+          "call _i2c_ret_badness\n"
+        );
+      }
+    }
+    //tty->print_cr("_HOTSPOT: i2c verify stack passed of %d items", _i2c_ret_stack_pos);
+  }
   void _i2c_ret_badness() {
     ((void (*)(void)) 0x3bad3bad)();
+  }
+  void _i2c_pop_nil() {
+    tty->print_cr("_HOTSPOT: in i2c pop nil");
+    ((void (*)(void)) 0x1bad1bad)();
+  }
+  void _native_call_begin() {
+    _c_timestamp = _now();
+    _jvm_state = 1;
+    if (Dyrus) {
+      tty->print_cr("_HOTSPOT %ld: going into native, from %d levels", _bdel_sys_gettid(), _native_levels++);
+    }
+  }
+  void _native_call_end() {
+    _bdel_c2i();
+    _jvm_state = 0;
+    if (Dyrus) {
+      tty->print_cr("_HOTSPOT %ld: leaving native, to %d levels", _bdel_sys_gettid(), --_native_levels);
+    }
   }
 }
 
@@ -318,6 +363,11 @@ extern "C" void _noop15() {
   return;
 }
 extern "C" void _noop16() { return; }
+extern "C" void _noop20() { return; }
+extern "C" void _noop21() { return; }
+extern "C" void _saw_uncommon_trap() {
+  tty->print_cr("_HOTSPOT: saw uncommon trap");
+}
 extern "C" void _print_method(Method* method) {
     Symbol* kname = method->klass_name();
     Symbol* name = method->name();

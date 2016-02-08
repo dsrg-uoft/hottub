@@ -45,6 +45,8 @@
 
 PRAGMA_FORMAT_MUTE_WARNINGS_FOR_GCC
 
+#include "runtime/_bdel.hpp"
+
 int vframeArrayElement:: bci(void) const { return (_bci == SynchronizationEntryBCI ? 0 : _bci); }
 
 void vframeArrayElement::free_monitors(JavaThread* jt) {
@@ -291,6 +293,7 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
   // we placed in the skeletal frame now that we finally know the
   // exact interpreter address we should use.
 
+  //tty->print_cr("_HOTSPOT: in vframeArrayElement#unpack_on_stack");
   _frame.patch_pc(thread, pc);
 
   assert (!method()->is_synchronized() || locks > 0 || _removed_monitors, "synchronized methods must have monitors");
@@ -340,12 +343,20 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
         ShouldNotReachHere();
     }
   }
+  //_i2c_verify_stack();
 
 
   // Unpack the locals
+  //tty->print_cr("_HOTSPOT: locals is %d", locals()->size());
   for(i = 0; i < locals()->size(); i++) {
     StackValue *value = locals()->at(i);
     intptr_t* addr  = iframe()->interpreter_frame_local_at(i);
+    //tty->print_cr("_HOTSPOT: i is %d, location is %p, value is %p", i, addr, (void*) *addr);
+    if (_unlikely((void*) *addr == (void*) *_i2c_ret_handler)) {
+      asm(
+        "call _noop21\n"
+      );
+    }
     switch(value->type()) {
       case T_INT:
         *addr = value->get_int();
@@ -360,6 +371,8 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
       default:
         ShouldNotReachHere();
     }
+    //_i2c_verify_stack();
+    //tty->print_cr("_HOTSPOT: still good after %d", i);
   }
 
   if (is_top_frame && JvmtiExport::can_pop_frame() && thread->popframe_forcing_deopt_reexecution()) {
@@ -549,6 +562,7 @@ void vframeArray::unpack_to_stack(frame &unpack_frame, int exec_mode, int caller
       callee_parameters = callee->size_of_parameters() + (has_member_arg ? 1 : 0);
       callee_locals     = callee->max_locals();
     }
+    //tty->print_cr("_HOTSPOT: in vFrameArray#unpack_to_stack");
     elem->unpack_on_stack(caller_actual_parameters,
                           callee_parameters,
                           callee_locals,

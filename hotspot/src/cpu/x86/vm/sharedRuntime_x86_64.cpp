@@ -2396,7 +2396,36 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   // Now set thread in native
   __ movl(Address(r15_thread, JavaThread::thread_state_offset()), _thread_in_native);
 
+  // WILDTURTLE: native call
+  if (WildTurtle) {
+    __ push(rax);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _native_call_begin)));
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ pop(rax);
+  }
   __ call(RuntimeAddress(native_func));
+  if (WildTurtle) {
+    __ push(rax);
+    __ push(rdx);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _native_call_end)));
+    __ pop(rdx);
+    __ pop(rax);
+  }
 
   // Verify or restore cpu control state after JNI call
   __ restore_cpu_control_state_after_jni();
@@ -3390,6 +3419,32 @@ void SharedRuntime::generate_deopt_blob() {
   // already been captured in the vframeArray at the time the return PC was
   // patched.
   address start = __ pc();
+  if (WildTurtle) {
+    __ push(rax);
+
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_and_pop)));
+    __ movptr(Address(rdx, 0), rax);
+
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+
+    __ pop(rax);
+  }
   Label cont;
 
   // Prolog for non exception case!
@@ -3685,7 +3740,32 @@ void SharedRuntime::generate_uncommon_trap_blob() {
   assert(SimpleRuntimeFrame::framesize % 4 == 0, "sp not 16-byte aligned");
 
   address start = __ pc();
-  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop2)));
+  //__ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop2)));
+  if (WildTurtle) {
+    __ push(rax);
+
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _saw_uncommon_trap)));
+
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+
+    __ pop(rax);
+  }
 
   if (UseRTMLocking) {
     // Abort RTM transaction before possible nmethod deoptimization.

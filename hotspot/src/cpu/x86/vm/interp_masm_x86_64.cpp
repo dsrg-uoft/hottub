@@ -166,6 +166,7 @@ void InterpreterMacroAssembler::load_earlyret_value(TosState state) {
 
 
 void InterpreterMacroAssembler::check_and_handle_earlyret(Register java_thread) {
+  //tty->print_cr("_HOTSPOT: in InterpreterMacroAssembler#check_and_handle_earlyret, can force early return is %d", (int) JvmtiExport::can_force_early_return());
   if (JvmtiExport::can_force_early_return()) {
     Label L;
     movptr(c_rarg0, Address(r15_thread, JavaThread::jvmti_thread_state_offset()));
@@ -691,12 +692,12 @@ void InterpreterMacroAssembler::remove_activation(
     push(c_rarg3);
     push(c_rarg4);
     push(c_rarg5);
-    //push(rscratch1);
+    // no rscratch1
     push(rscratch2);
     lea(c_rarg0, Address(rsp, 8 * sizeof(void*)));
     call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop)));
     pop(rscratch2);
-    //pop(rscratch1);
+    // no rscratch1
     pop(c_rarg5);
     pop(c_rarg4);
     pop(c_rarg3);

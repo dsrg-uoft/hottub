@@ -1304,8 +1304,12 @@ static void jni_invoke_static(JNIEnv *env, JavaValue* result, jobject receiver, 
   // Initialize result type
   result->set_type(args->get_ret_type());
 
+  _native_call_end();
+
   // Invoke the method. Result is returned as oop.
   JavaCalls::call(result, method, &java_args, CHECK);
+
+  _native_call_begin();
 
   // Convert result
   if (result->get_type() == T_OBJECT || result->get_type() == T_ARRAY) {
@@ -1373,8 +1377,10 @@ static void jni_invoke_nonstatic(JNIEnv *env, JavaValue* result, jobject receive
   // Initialize result type
   result->set_type(args->get_ret_type());
 
+  _native_call_end();
   // Invoke the method. Result is returned as oop.
   JavaCalls::call(result, method, &java_args, CHECK);
+  _native_call_begin();
 
   // Convert result
   if (result->get_type() == T_OBJECT || result->get_type() == T_ARRAY) {

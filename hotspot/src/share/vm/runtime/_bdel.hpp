@@ -21,8 +21,13 @@ extern volatile uint64_t _c_total;
 /*
  * - 0 for interpreted
  * - 1 for compiled
- * - 2 for native (jni) TODO
+ * - 2 for native/JNI
  */
+enum _JVM_State : int8_t {
+  _JVM_STATE_I = 0, // interpreter
+  _JVM_STATE_C = 1, // jitted/compiled
+  _JVM_STATE_N = 2, // JNI/native
+};
 extern __thread int8_t _jvm_state;
 
 extern __thread uint64_t _i_timestamp;
@@ -44,7 +49,15 @@ extern "C" {
   _rax_rdx _i2c_ret_verify_and_pop();
   _rax_rdx _i2c_ret_verify_location_and_pop(void*);
   void _i2c_ret_handler();
+
   void _i2c_ret_badness();
+  void _dump_i2c_stack();
+  void _i2c_verify_stack();
+
+  void _i2c_pop_nil();
+
+  void _native_call_begin();
+  void _native_call_end();
 }
 
 void _print_value(JavaThread*, void*);
@@ -63,8 +76,11 @@ extern "C" void _noop13();
 extern "C" void _noop14();
 extern "C" void _noop15();
 extern "C" void _noop16();
+extern "C" void _noop20();
+extern "C" void _noop21();
 
 extern "C" void _print_method(Method*);
 
+extern "C" void _saw_uncommon_trap();
 
 #endif // SHARE_VM_RUNTIME__BDEL_HPP

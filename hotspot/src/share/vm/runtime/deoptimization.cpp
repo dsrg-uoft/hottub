@@ -83,6 +83,8 @@
 
 PRAGMA_FORMAT_MUTE_WARNINGS_FOR_GCC
 
+#include "runtime/_bdel.hpp"
+
 bool DeoptimizationMarker::_is_active = false;
 
 Deoptimization::UnrollBlock::UnrollBlock(int  size_of_deoptimized_frame,

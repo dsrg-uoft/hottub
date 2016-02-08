@@ -335,6 +335,7 @@ void frame::deoptimize(JavaThread* thread) {
     nm->deopt_handler_begin();
 
   // Save the original pc before we patch in the new one
+  //tty->print_cr("_HOTSPOT: in frame#deoptimize, original pc is %p for method %s", (void*) pc(), nm->method()->name());
   nm->set_original_pc(this, pc());
   patch_pc(thread, deopt);
 

@@ -614,7 +614,7 @@ class CommandLineFlags {
   develop(bool, TraceItables, false,                                        \
           "Trace initialization and use of itables")                        \
                                                                             \
-  develop(bool, TracePcPatching, false,                                     \
+  product(bool, TracePcPatching, false,                                     \
           "Trace usage of frame::patch_pc")                                 \
                                                                             \
   develop(bool, TraceJumps, false,                                          \

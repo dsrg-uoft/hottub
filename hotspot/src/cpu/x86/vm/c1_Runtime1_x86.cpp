@@ -1094,6 +1094,7 @@ OopMapSet* Runtime1::generate_code_for(StubID id, StubAssembler* sasm) {
 
     case counter_overflow_id:
       {
+        __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop20)));
         Register bci = rax, method = rbx;
         __ enter();
         OopMap* map = save_live_registers(sasm, 3);
