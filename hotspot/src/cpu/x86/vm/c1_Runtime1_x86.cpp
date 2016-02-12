@@ -807,9 +807,66 @@ void Runtime1::generate_unwind_exception(StubAssembler *sasm) {
   NOT_LP64(__ get_thread(thread);)
   // Get return address (is on top of stack after leave).
   __ movptr(exception_pc, Address(rsp, 0));
+  if (WildTurtle) {
+    __ push(rscratch1);
+    Label _after;
+    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
+    __ cmpptr(rscratch1, exception_pc);
+    __ jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    __ push(rax);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    // no rscratch1
+    __ push(rscratch2);
+
+    __ lea(c_rarg0, Address(rsp, 9 * sizeof(void*)));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop)));
+    __ pop(rscratch2);
+    // no rscratch1
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ movptr(exception_pc, rax);
+    __ pop(rax);
+    // my isle; chu chu
+    __ bind(_after);
+    __ pop(rscratch1);
+  }
 
   // search the exception handler address of the caller (using the return address)
   __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop5)));
+  /*
+  if (WildTurtle) {
+    __ push(rax);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+    __ movptr(c_rarg0, exception_pc);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop33)));
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ pop(rax);
+  }
+  */
   __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address), thread, exception_pc);
   // rax: exception handler address of the caller
 

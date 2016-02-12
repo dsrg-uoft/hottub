@@ -3419,6 +3419,7 @@ void SharedRuntime::generate_deopt_blob() {
   // already been captured in the vframeArray at the time the return PC was
   // patched.
   address start = __ pc();
+  //*
   if (WildTurtle) {
     __ push(rax);
 
@@ -3431,8 +3432,9 @@ void SharedRuntime::generate_deopt_blob() {
     __ push(rscratch1);
     __ push(rscratch2);
 
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_and_pop)));
-    __ movptr(Address(rdx, 0), rax);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_blob_start)));
+    //__ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_and_pop)));
+    //__ movptr(Address(rdx, 0), rax);
 
     __ pop(rscratch2);
     __ pop(rscratch1);
@@ -3445,6 +3447,7 @@ void SharedRuntime::generate_deopt_blob() {
 
     __ pop(rax);
   }
+  //*/
   Label cont;
 
   // Prolog for non exception case!
@@ -3453,6 +3456,33 @@ void SharedRuntime::generate_deopt_blob() {
   map = RegisterSaver::save_live_registers(masm, 0, &frame_size_in_words);
 
   // Normal deoptimization.  Save exec mode for unpack_frames.
+  /*
+  if (WildTurtle) {
+    __ push(rax);
+
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_blob_normal)));
+
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+
+    __ pop(rax);
+  }
+  */
   __ movl(r14, Deoptimization::Unpack_deopt); // callee-saved
   __ jmp(cont);
 
@@ -3475,6 +3505,31 @@ void SharedRuntime::generate_deopt_blob() {
   // rdx which contain the exception oop and exception pc
   // respectively.  Set them in TLS and fall thru to the
   // unpack_with_exception_in_tls entry point.
+  if (WildTurtle) {
+    __ push(rax);
+
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_blob_exception_case)));
+
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+
+    __ pop(rax);
+  }
 
   __ movptr(Address(r15_thread, JavaThread::exception_pc_offset()), rdx);
   __ movptr(Address(r15_thread, JavaThread::exception_oop_offset()), rax);
@@ -3597,6 +3652,41 @@ void SharedRuntime::generate_deopt_blob() {
   __ addptr(rsp, rcx);
 
   // rsp should be pointing at the return address to the caller (3)
+  if (WildTurtle) {
+    __ push(rscratch1);
+    Label _after;
+    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
+    __ cmpptr(rscratch1, Address(rsp, 1 * sizeof(void*)));
+    __ jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    __ push(rax);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    // no rscratch1
+    __ push(rscratch2);
+
+    __ movptr(c_rarg0, Address(rsp, 9 * sizeof(void*)));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_verified)));
+    __ lea(c_rarg0, Address(rsp, 9 * sizeof(void*)));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop)));
+    __ pop(rscratch2);
+    // no rscratch1
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ movptr(Address(rsp, 2 * sizeof(void*)), rax);
+    __ pop(rax);
+    // my isle; chu chu
+    __ bind(_after);
+    __ pop(rscratch1);
+  }
 
   // Pick up the initial fp we should save
   // restore rbp before stack bang because if stack overflow is thrown it needs to be pushed (and preserved)
@@ -3670,6 +3760,35 @@ void SharedRuntime::generate_deopt_blob() {
   __ decrementl(rdx);                   // Decrement counter
   __ jcc(Assembler::notZero, loop);
   __ pushptr(Address(rcx, 0));          // Save final return address
+  /*
+  if (WildTurtle) {
+    __ push(rax);
+
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+
+
+    __ movptr(c_rarg0, Address(rcx, 0));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_blob_test)));
+
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+
+    __ pop(rax);
+  }
+  */
 
   // Re-push self-frame
   __ enter();                           // Save old & set new ebp
@@ -3719,6 +3838,32 @@ void SharedRuntime::generate_deopt_blob() {
   __ leave();                           // Epilog
 
   // Jump to interpreter
+  if (WildTurtle) {
+    __ push(rax);
+
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+
+    __ movptr(c_rarg0, Address(rsp, 9 * sizeof(void*)));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_blob_test)));
+
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+
+    __ pop(rax);
+  }
   __ ret(0);
 
   // Make sure all code is generated
@@ -3754,6 +3899,8 @@ void SharedRuntime::generate_uncommon_trap_blob() {
     __ push(rscratch2);
 
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _saw_uncommon_trap)));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_and_pop)));
+    __ movptr(Address(rdx, 0), rax);
 
     __ pop(rscratch2);
     __ pop(rscratch1);
@@ -4066,6 +4213,7 @@ RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const cha
     __ push(rscratch1);
     __ push(rscratch2);
 
+    __ lea(c_rarg0, Address(rsp, 9 * sizeof(void*)));
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_and_pop)));
     __ movptr(Address(rdx, 0), rax);
 

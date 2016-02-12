@@ -1704,6 +1704,27 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
   // Entry point in previous activation (i.e., if the caller was
   // interpreted)
   Interpreter::_rethrow_exception_entry = __ pc();
+  if (WildTurtle) {
+    __ push(rax);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop32)));
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ pop(rax);
+  }
   // Restore sp to interpreter_frame_last_sp even though we are going
   // to empty the expression stack for the exception processing.
   __ movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
@@ -1778,6 +1799,28 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
                                InterpreterRuntime::interpreter_contains), c_rarg1);
     __ testl(rax, rax);
     __ jcc(Assembler::notZero, caller_not_deoptimized);
+
+    if (WildTurtle) {
+      __ push(rax);
+      __ push(c_rarg0);
+      __ push(c_rarg1);
+      __ push(c_rarg2);
+      __ push(c_rarg3);
+      __ push(c_rarg4);
+      __ push(c_rarg5);
+      __ push(rscratch1);
+      __ push(rscratch2);
+      __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop30)));
+      __ pop(rscratch2);
+      __ pop(rscratch1);
+      __ pop(c_rarg5);
+      __ pop(c_rarg4);
+      __ pop(c_rarg3);
+      __ pop(c_rarg2);
+      __ pop(c_rarg1);
+      __ pop(c_rarg0);
+      __ pop(rax);
+    }
 
     // Compute size of arguments for saving when returning to
     // deoptimized caller

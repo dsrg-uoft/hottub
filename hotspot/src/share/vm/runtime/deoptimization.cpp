@@ -479,6 +479,10 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
   // and we'd undo the deopt.
 
   frame_pcs[0] = deopt_sender.raw_pc();
+  if ((void*) frame_pcs[0] == (void*) _i2c_ret_handler) {
+    frame_pcs[0] = (address) _i2c_ret_peek();
+    tty->print_cr("_HOTSPOT: aww, they changed our hours AGAIN %p, handler is %p", frame_pcs[0], (void*) _i2c_ret_handler);
+  }
 
 #ifndef SHARK
   assert(CodeCache::find_blob_unsafe(frame_pcs[0]) != NULL, "bad pc");

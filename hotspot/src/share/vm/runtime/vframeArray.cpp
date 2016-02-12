@@ -173,6 +173,7 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
                                          bool is_bottom_frame,
                                          int exec_mode) {
   JavaThread* thread = (JavaThread*) Thread::current();
+  //tty->print_cr("_HOTSPOT: in vframeArrayElement#unpack_on_stack");
 
   // Look at bci and decide on bcp and continuation pc
   address bcp;
@@ -293,7 +294,6 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
   // we placed in the skeletal frame now that we finally know the
   // exact interpreter address we should use.
 
-  //tty->print_cr("_HOTSPOT: in vframeArrayElement#unpack_on_stack");
   _frame.patch_pc(thread, pc);
 
   assert (!method()->is_synchronized() || locks > 0 || _removed_monitors, "synchronized methods must have monitors");

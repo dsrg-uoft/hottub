@@ -216,12 +216,21 @@ extern "C" {
       // ===============================
       _i2c_rbp_stack[_i2c_ret_stack_pos] = rbp + 10; // 8 caller saved registers + return address + rbp
       _i2c_ret_stack[_i2c_ret_stack_pos++] = ret;
+      //tty->print_cr("_HOTSPOT: pushing %p", ret);
     }
     if (Dyrus) {
       Symbol* kname = method->klass_name();
       Symbol* name = method->name();
       tty->print_cr("_HOTSPOT %ld (%ld): i2c adapter %s#%s (from %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
     }
+  }
+  void* _i2c_ret_peek() {
+    if (_unlikely(_i2c_ret_stack_pos <= 0)) {
+      asm(
+        "call _i2c_pop_nil\n"
+      );
+    }
+    return _i2c_ret_stack[_i2c_ret_stack_pos - 1];
   }
   _rax_rdx _i2c_ret_pop() {
     if (_unlikely(_i2c_ret_stack_pos <= 0)) {
@@ -232,6 +241,7 @@ extern "C" {
     _rax_rdx ret;
     ret.rdx = _i2c_rbp_stack[--_i2c_ret_stack_pos];
     ret.rax = _i2c_ret_stack[_i2c_ret_stack_pos];
+    //tty->print_cr("_HOTSPOT: popping %p", ret.rax);
     return ret;
   }
   _rax_rdx _i2c_ret_verify_and_pop() {
@@ -248,9 +258,11 @@ extern "C" {
     if (_unlikely(rbp != ret.rdx)) {
       tty->print_cr("_HOTSPOT: i2c ret badness, rbp is %p, expected is %p", rbp, ret.rdx);
       _dump_i2c_stack();
+      /*
       asm(
         "callq _i2c_ret_badness\n"
       );
+      */
     }
     _i2c_verify_stack();
     return ret;
@@ -365,8 +377,37 @@ extern "C" void _noop15() {
 extern "C" void _noop16() { return; }
 extern "C" void _noop20() { return; }
 extern "C" void _noop21() { return; }
+
+extern "C" void _noop30() {
+  tty->print_cr("_HOTSPOT: in TemplateInterpreterGenerator::generate_throw_exception, handling deopt frame");
+}
+extern "C" void _noop31() {
+  tty->print_cr("_HOTSPOT: removing activation");
+}
+extern "C" void _noop32() {
+  //tty->print_cr("_HOTSPOT: start of throw exception");
+}
+extern "C" void _noop33(void* return_address) {
+  tty->print_cr("_HOTSPOT: in c1_Runtime1_x86, generate unwind, return address is %p, handler is %p", return_address, (void*) &_i2c_ret_handler);
+}
+
 extern "C" void _saw_uncommon_trap() {
   tty->print_cr("_HOTSPOT: saw uncommon trap");
+}
+extern "C" void _deopt_blob_start() {
+  tty->print_cr("_HOTSPOT: deopt blob start");
+}
+extern "C" void _deopt_blob_exception_case() {
+  tty->print_cr("_HOTSPOT: deopt blob exception case");
+}
+extern "C" void _deopt_blob_normal() {
+  tty->print_cr("_HOTSPOT: deopt blob normal");
+}
+extern "C" void _deopt_verified(void* return_address) {
+  tty->print_cr("_HOTSPOT: deopt verified %p, handler is %p, levels is %d", return_address, (void*) &_i2c_ret_handler, _i2c_ret_stack_pos);
+}
+extern "C" void _deopt_blob_test(void* return_address) {
+  tty->print_cr("_HOTSPOT: in deopt blob test %p, handler is %p, levels is %d", return_address, (void*) &_i2c_ret_handler, _i2c_ret_stack_pos);
 }
 extern "C" void _print_method(Method* method) {
     Symbol* kname = method->klass_name();
