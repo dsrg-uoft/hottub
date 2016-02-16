@@ -132,7 +132,7 @@ __thread uint8_t _i_from_c = 0;
 __thread int8_t _i_from_c_levels[_BDEL_C2I2C_SIZE];
 __thread uint8_t _i_from_c_max = 0;
 
-__thread uint8_t _native_levels = 0;
+__thread int8_t _native_levels = 0;
 
 static void _bdel_c2i2c_push(int8_t x) {
   if (_likely(_i_from_c < _BDEL_C2I2C_SIZE)) {
@@ -188,6 +188,14 @@ void _bdel_knell(const char* str) {
       , (int) _i_from_c, (int) _i_from_c_max
       , _i2c_ret_stack_pos
     );
+    if (_i2c_ret_stack_pos != 0) {
+      tty->print_cr("_HOTSPOT: i2c ret stack not 0, is %d", _i2c_ret_stack_pos);
+      ShouldNotReachHere();
+    }
+    if (_native_levels != 0) {
+      tty->print_cr("_HOTSPOT: native levels not 0, is %d", _native_levels);
+      ShouldNotReachHere();
+    }
   }
 }
 
@@ -1720,7 +1728,7 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method_ic_miss(JavaThread* 
   JRT_BLOCK_END
   // return compiled code entry point after potential safepoints
   assert(callee_method->verified_code_entry() != NULL, " Jump to zero!");
-  tty->print_cr("_HOTSPOT: in SharedRuntime::handle_wrong_method_ic_miss_helper for %s", callee_method->name()->as_C_string());
+  //tty->print_cr("_HOTSPOT: in SharedRuntime::handle_wrong_method_ic_miss_helper for %s", callee_method->name()->as_C_string());
   return callee_method->verified_code_entry();
 JRT_END
 
@@ -1752,13 +1760,13 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method(JavaThread* thread))
   if (caller_frame.is_interpreted_frame() ||
       caller_frame.is_entry_frame()) {
     Method* callee = thread->callee_target();
-    tty->print_cr("_HOTSPOT: in handle wrong method, first block, for %s", callee->name()->as_C_string());
+    //tty->print_cr("_HOTSPOT: in handle wrong method, first block, for %s", callee->name()->as_C_string());
     guarantee(callee != NULL && callee->is_method(), "bad handshake");
     thread->set_vm_result_2(callee);
     thread->set_callee_target(NULL);
     //return callee->get_c2i_entry();
     address _ret = callee->get_c2i_entry();
-    tty->print_cr("_HOTSPOT: in handle wrong method, first block, for %s, return value is %p", callee->name()->as_C_string(), (void*) _ret);
+    //tty->print_cr("_HOTSPOT: in handle wrong method, first block, for %s, return value is %p", callee->name()->as_C_string(), (void*) _ret);
     asm(
       "call _noop11\n"
     );
@@ -1769,20 +1777,20 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method(JavaThread* thread))
   methodHandle callee_method;
   JRT_BLOCK
     // Force resolving of caller (if we called from compiled frame)
-    tty->print_cr("_HOTSPOT: in handle wrong method, second block, about to reresolve call site");
+    //tty->print_cr("_HOTSPOT: in handle wrong method, second block, about to reresolve call site");
     callee_method = SharedRuntime::reresolve_call_site(thread, CHECK_NULL);
-    tty->print_cr("_HOTSPOT: in handle wrong method, second block, got method");
+    //tty->print_cr("_HOTSPOT: in handle wrong method, second block, got method");
     thread->set_vm_result_2(callee_method());
   JRT_BLOCK_END
   // return compiled code entry point after potential safepoints
   assert(callee_method->verified_code_entry() != NULL, " Jump to zero!");
-  tty->print_cr("_HOTSPOT: in handle wrong method, second block, for %s, return value is %p", callee_method->name()->as_C_string(), (void*) callee_method->verified_code_entry());
+  //tty->print_cr("_HOTSPOT: in handle wrong method, second block, for %s, return value is %p", callee_method->name()->as_C_string(), (void*) callee_method->verified_code_entry());
   return callee_method->verified_code_entry();
 JRT_END
 
 // Handle abstract method call
 JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method_abstract(JavaThread* thread))
-  tty->print_cr("_HOTSPOT: in SharedRuntime::handle_wrong_method_abstract");
+  //tty->print_cr("_HOTSPOT: in SharedRuntime::handle_wrong_method_abstract");
   return StubRoutines::throw_AbstractMethodError_entry();
 JRT_END
 
@@ -2131,7 +2139,7 @@ IRT_LEAF(void, SharedRuntime::fixup_callers_callsite(Method* method, address cal
 
   CodeBlob* cb = CodeCache::find_blob(caller_pc);
   //tty->print_cr("_HOTSPOT: in SharedRuntime::fixup_callers_callsite for %s#%s, address is %p, cb is nmethod %d, entry point is c2i entry %d", method->klass_name()->as_C_string(), method->name()->as_C_string(), (void*) caller_pc, cb->is_nmethod(), entry_point == moop->get_c2i_entry());
-  tty->print_cr("_HOTSPOT: in SharedRuntime::fixup_callers_callsite for %s#%s, caller_pc is %p, cb is %p, handler is %p", method->klass_name()->as_C_string(), method->name()->as_C_string(), (void*) caller_pc, cb, (void*) _i2c_ret_handler);
+  //tty->print_cr("_HOTSPOT: in SharedRuntime::fixup_callers_callsite for %s#%s, caller_pc is %p, cb is %p, handler is %p", method->klass_name()->as_C_string(), method->name()->as_C_string(), (void*) caller_pc, cb, (void*) _i2c_ret_handler);
   if (!cb->is_nmethod() || entry_point == moop->get_c2i_entry()) {
     asm(
       "call _noop12\n"

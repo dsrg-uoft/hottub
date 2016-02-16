@@ -1698,7 +1698,7 @@ void JavaThread::thread_main_inner() {
     }
     HandleMark hm(this);
     if (WildTurtle) {
-        tty->print_cr("_HOTSPOT: java thread live tid %ld", _bdel_sys_gettid());
+        //tty->print_cr("_HOTSPOT: java thread live tid %ld", _bdel_sys_gettid());
     }
     this->entry_point()(this, this);
     _bdel_knell("JavaThread");

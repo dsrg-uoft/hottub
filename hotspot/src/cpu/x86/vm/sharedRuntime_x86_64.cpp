@@ -3479,7 +3479,7 @@ void SharedRuntime::generate_deopt_blob() {
   // already been captured in the vframeArray at the time the return PC was
   // patched.
   address start = __ pc();
-  //*
+  /*
   if (WildTurtle) {
     __ push(rax);
 
@@ -3900,6 +3900,7 @@ void SharedRuntime::generate_deopt_blob() {
   __ leave();                           // Epilog
 
   // Jump to interpreter
+  /*
   if (WildTurtle) {
     __ push(rax);
 
@@ -3926,6 +3927,7 @@ void SharedRuntime::generate_deopt_blob() {
 
     __ pop(rax);
   }
+  */
   __ ret(0);
 
   // Make sure all code is generated
@@ -4249,7 +4251,7 @@ SafepointBlob* SharedRuntime::generate_handler_blob(address call_ptr, int poll_t
 RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const char* name) {
   assert (StubRoutines::forward_exception_entry() != NULL, "must be generated before");
 
-  tty->print_cr("_HOTSPOT: in SharedRuntime::generate_resolve_blob for %s", name);
+  //tty->print_cr("_HOTSPOT: in SharedRuntime::generate_resolve_blob for %s", name);
 
   // allocate space for the code
   ResourceMark rm;

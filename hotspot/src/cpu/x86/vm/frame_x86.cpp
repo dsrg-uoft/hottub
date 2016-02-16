@@ -479,7 +479,7 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
     _rax_rdx _ret = _i2c_ret_verify_location_and_pop((void*) (sender_sp - 1));
     sender_pc = (address) _ret.rax;
     *((void**) (sender_sp - 1)) = _ret.rax;
-    tty->print_cr("_HOTSPOT: in frame#sender_for_compiled_frame, patched return address");
+    //tty->print_cr("_HOTSPOT: in frame#sender_for_compiled_frame, patched return address");
   }
   //tty->print_cr("_HOTSPOT: in frame#sender_for_compiled_frame, return address is %p, handler is %p", (void*) sender_pc, (void*) _i2c_ret_handler);
 
