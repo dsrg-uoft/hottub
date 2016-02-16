@@ -24,6 +24,7 @@ extern volatile uint64_t _c_total;
  * - 2 for native/JNI
  */
 extern __thread int8_t _jvm_state;
+extern __thread int8_t _bdel_is_java_thread;
 
 extern __thread uint64_t _i_timestamp;
 extern __thread uint64_t _c_timestamp;
@@ -78,6 +79,8 @@ extern "C" void _noop30();
 extern "C" void _noop31();
 extern "C" void _noop32();
 extern "C" void _noop33(void*);
+extern "C" void _noop40();
+extern "C" void _noop41();
 
 extern "C" void _print_method(Method*);
 
@@ -87,5 +90,9 @@ extern "C" void _deopt_blob_exception_case();
 extern "C" void _deopt_blob_normal();
 extern "C" void _deopt_blob_test(void*);
 extern "C" void _deopt_verified(void*);
+
+extern "C" void _saw_safepoint_return_handler();
+extern "C" void _saw_call_stub();
+extern "C" void _saw_call_stub2();
 
 #endif // SHARE_VM_RUNTIME__BDEL_HPP

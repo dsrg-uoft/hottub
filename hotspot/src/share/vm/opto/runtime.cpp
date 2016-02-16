@@ -1227,7 +1227,9 @@ address OptoRuntime::rethrow_C(oopDesc* exception, JavaThread* thread, address r
   if ((void*) ret_pc == (void*) _i2c_ret_handler) {
     _rax_rdx _ret = _i2c_ret_pop();
     ret_pc = (address) _ret.rax;
+    tty->print_cr("_HOTSPOT: in OptoRuntime#rethrow_c");
   }
+  ShouldNotReachHere();
 #ifndef PRODUCT
   SharedRuntime::_rethrow_ctr++;               // count rethrows
 #endif

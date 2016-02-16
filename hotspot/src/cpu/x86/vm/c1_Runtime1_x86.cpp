@@ -808,6 +808,9 @@ void Runtime1::generate_unwind_exception(StubAssembler *sasm) {
   // Get return address (is on top of stack after leave).
   __ movptr(exception_pc, Address(rsp, 0));
   if (WildTurtle) {
+    if (exception_pc == rax) {
+      ShouldNotReachHere();
+    }
     __ push(rscratch1);
     Label _after;
     __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
@@ -836,9 +839,11 @@ void Runtime1::generate_unwind_exception(StubAssembler *sasm) {
     __ pop(c_rarg0);
     __ movptr(exception_pc, rax);
     __ pop(rax);
+    __ movptr(Address(rsp, wordSize), exception_pc);
     // my isle; chu chu
     __ bind(_after);
     __ pop(rscratch1);
+
   }
 
   // search the exception handler address of the caller (using the return address)

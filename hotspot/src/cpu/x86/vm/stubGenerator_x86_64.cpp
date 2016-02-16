@@ -327,7 +327,57 @@ class StubGenerator: public StubCodeGenerator {
     __ movptr(c_rarg1, entry_point);    // get entry_point
     __ mov(r13, rsp);                   // set sender sp
     BLOCK_COMMENT("call Java function");
+    /*
+    if (WildTurtle) {
+      __ push(rax);
+      __ push(c_rarg0);
+      __ push(c_rarg1);
+      __ push(c_rarg2);
+      __ push(c_rarg3);
+      __ push(c_rarg4);
+      __ push(c_rarg5);
+      __ push(rscratch1);
+      __ push(rscratch2);
+
+      __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _saw_call_stub)));
+
+      __ pop(rscratch2);
+      __ pop(rscratch1);
+      __ pop(c_rarg5);
+      __ pop(c_rarg4);
+      __ pop(c_rarg3);
+      __ pop(c_rarg2);
+      __ pop(c_rarg1);
+      __ pop(c_rarg0);
+      __ pop(rax);
+    }
+    */
     __ call(c_rarg1);
+    /*
+    if (WildTurtle) {
+      __ push(rax);
+      __ push(c_rarg0);
+      __ push(c_rarg1);
+      __ push(c_rarg2);
+      __ push(c_rarg3);
+      __ push(c_rarg4);
+      __ push(c_rarg5);
+      __ push(rscratch1);
+      __ push(rscratch2);
+
+      __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _saw_call_stub2)));
+
+      __ pop(rscratch2);
+      __ pop(rscratch1);
+      __ pop(c_rarg5);
+      __ pop(c_rarg4);
+      __ pop(c_rarg3);
+      __ pop(c_rarg2);
+      __ pop(c_rarg1);
+      __ pop(c_rarg0);
+      __ pop(rax);
+    }
+    */
 
     BLOCK_COMMENT("call_stub_return_address:");
     return_address = __ pc();

@@ -1367,7 +1367,7 @@ class CommandLineFlags {
   develop(bool, TraceOopMapRewrites, false,                                 \
           "Trace rewriting of method oops during oop map generation")       \
                                                                             \
-  develop(bool, TraceSafepoint, false,                                      \
+  product(bool, TraceSafepoint, false,                                      \
           "Trace safepoint operations")                                     \
                                                                             \
   develop(bool, TraceICBuffer, false,                                       \

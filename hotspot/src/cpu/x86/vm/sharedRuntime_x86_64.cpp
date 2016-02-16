@@ -45,6 +45,32 @@
 
 #define __ masm->
 
+/*
+static void _gen_call(MacroAssembler* masm, void* fn) {
+  __ push(rax);
+  __ push(c_rarg0);
+  __ push(c_rarg1);
+  __ push(c_rarg2);
+  __ push(c_rarg3);
+  __ push(c_rarg4);
+  __ push(c_rarg5);
+  __ push(rscratch1);
+  __ push(rscratch2);
+
+  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, fn)));
+
+  __ pop(rscratch2);
+  __ pop(rscratch1);
+  __ pop(c_rarg5);
+  __ pop(c_rarg4);
+  __ pop(c_rarg3);
+  __ pop(c_rarg2);
+  __ pop(c_rarg1);
+  __ pop(c_rarg0);
+  __ pop(rax);
+}
+//*/
+
 const int StackAlignmentInSlots = StackAlignmentInBytes / VMRegImpl::stack_slot_size;
 
 class SimpleRuntimeFrame {
@@ -462,6 +488,40 @@ static void patch_callers_callsite(MacroAssembler *masm) {
   // Call into the VM to patch the caller, then jump to compiled callee
   // rax isn't live so capture return address while we easily can
   __ movptr(rax, Address(rsp, 0));
+  if (WildTurtle) {
+    __ push(rscratch1);
+    Label _after;
+    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
+    __ cmpptr(rscratch1, rax);
+    __ jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    // no rax
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    // no rscratch1
+    __ push(rscratch2);
+
+    __ lea(c_rarg0, Address(rsp, 8 * sizeof(void*)));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop)));
+    __ pop(rscratch2);
+    // no rscratch1
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ movptr(Address(rsp, wordSize), rax);
+    // no rax
+    // my isle; chu chu
+    __ bind(_after);
+    __ pop(rscratch1);
+
+  }
 
   // align stack so push_CPU_state doesn't fault
   __ andptr(rsp, -(StackAlignmentInBytes));
@@ -3652,6 +3712,7 @@ void SharedRuntime::generate_deopt_blob() {
   __ addptr(rsp, rcx);
 
   // rsp should be pointing at the return address to the caller (3)
+  /*
   if (WildTurtle) {
     __ push(rscratch1);
     Label _after;
@@ -3687,6 +3748,7 @@ void SharedRuntime::generate_deopt_blob() {
     __ bind(_after);
     __ pop(rscratch1);
   }
+  */
 
   // Pick up the initial fp we should save
   // restore rbp before stack bang because if stack overflow is thrown it needs to be pushed (and preserved)
@@ -3886,7 +3948,7 @@ void SharedRuntime::generate_uncommon_trap_blob() {
 
   address start = __ pc();
   //__ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop2)));
-  if (WildTurtle) {
+  if (false && WildTurtle) {
     __ push(rax);
 
     __ push(c_rarg0);
@@ -4103,6 +4165,10 @@ SafepointBlob* SharedRuntime::generate_handler_blob(address call_ptr, int poll_t
   bool cause_return = (poll_type == POLL_AT_RETURN);
   bool save_vectors = (poll_type == POLL_AT_VECTOR_LOOP);
 
+  if (cause_return) {
+    //_gen_call(masm, (void*) &_saw_safepoint_return_handler);
+  }
+
   if (UseRTMLocking) {
     // Abort RTM transaction before calling runtime
     // because critical section will be large and will be
@@ -4201,7 +4267,7 @@ RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const cha
   if (destination == CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method)) {
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop15)));
   }
-  if (WildTurtle && destination == CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method)) {
+  if (false && WildTurtle && destination == CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method)) {
     __ push(rax);
 
     __ push(c_rarg0);

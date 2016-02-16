@@ -110,6 +110,7 @@ volatile uint64_t _i_total;
 volatile uint64_t _c_total;
 
 __thread int8_t _jvm_state = 0;
+__thread int8_t _bdel_is_java_thread = 0;
 
 __thread uint64_t _i_timestamp = 0;
 __thread uint64_t _c_timestamp = 0;
@@ -193,6 +194,7 @@ void _bdel_knell(const char* str) {
 __thread int _kiwikid = 0;
 extern "C" {
   void _i2c_ret_push(void* ret, Method* method) {
+    _bdel_is_java_thread = 1;
     _i2c_verify_stack();
     if (_unlikely(_i2c_ret_stack_pos >= _BDEL_I2C_RET_STACK_SIZE)) {
       // badness
@@ -303,6 +305,7 @@ extern "C" {
     }
   }
   void _i2c_verify_stack() {
+    /*
     for (int i = _i2c_ret_stack_pos - 1; i >= 0; i--) {
       void* ret_addr = *((void**) _i2c_rbp_stack[i]);
       if (ret_addr != (void*) &_i2c_ret_handler) {
@@ -313,13 +316,15 @@ extern "C" {
         );
       }
     }
+
+    */
     //tty->print_cr("_HOTSPOT: i2c verify stack passed of %d items", _i2c_ret_stack_pos);
   }
   void _i2c_ret_badness() {
     ((void (*)(void)) 0x3bad3bad)();
   }
   void _i2c_pop_nil() {
-    tty->print_cr("_HOTSPOT: in i2c pop nil");
+    tty->print_cr("_HOTSPOT: in i2c pop nil, have is %d, i time is %lu", _bdel_is_java_thread, _i_timestamp);
     ((void (*)(void)) 0x1bad1bad)();
   }
   void _native_call_begin() {
@@ -390,9 +395,20 @@ extern "C" void _noop32() {
 extern "C" void _noop33(void* return_address) {
   tty->print_cr("_HOTSPOT: in c1_Runtime1_x86, generate unwind, return address is %p, handler is %p", return_address, (void*) &_i2c_ret_handler);
 }
+extern "C" void _noop40() { return; }
+extern "C" void _noop41() { return; }
 
 extern "C" void _saw_uncommon_trap() {
   tty->print_cr("_HOTSPOT: saw uncommon trap");
+}
+extern "C" void _saw_safepoint_return_handler() {
+  tty->print_cr("_HOTSPOT: saw safepoint return handler");
+}
+extern "C" void _saw_call_stub() {
+  tty->print_cr("_HOTSPOT: saw call stub");
+}
+extern "C" void _saw_call_stub2() {
+  tty->print_cr("_HOTSPOT: saw call stub2");
 }
 extern "C" void _deopt_blob_start() {
   tty->print_cr("_HOTSPOT: deopt blob start");
@@ -1723,9 +1739,15 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method(JavaThread* thread))
   RegisterMap reg_map(thread, false);
   frame stub_frame = thread->last_frame();
   assert(stub_frame.is_runtime_frame(), "sanity check");
+  //tty->print_cr("_HOTSPOT: in handle wrong method a");
   frame caller_frame = stub_frame.sender(&reg_map);
 
-  tty->print_cr("_HOTSPOT: in handle wrong method");
+  //tty->print_cr("_HOTSPOT: in handle wrong method b");
+  /*
+  asm(
+    "call _noop40\n"
+  );
+  */
 
   if (caller_frame.is_interpreted_frame() ||
       caller_frame.is_entry_frame()) {
@@ -2108,7 +2130,8 @@ IRT_LEAF(void, SharedRuntime::fixup_callers_callsite(Method* method, address cal
   // ask me how I know this...
 
   CodeBlob* cb = CodeCache::find_blob(caller_pc);
-  tty->print_cr("_HOTSPOT: in SharedRuntime::fixup_callers_callsite for %s#%s, address is %p, cb is nmethod %d, entry point is c2i entry %d", method->klass_name()->as_C_string(), method->name()->as_C_string(), (void*) caller_pc, cb->is_nmethod(), entry_point == moop->get_c2i_entry());
+  //tty->print_cr("_HOTSPOT: in SharedRuntime::fixup_callers_callsite for %s#%s, address is %p, cb is nmethod %d, entry point is c2i entry %d", method->klass_name()->as_C_string(), method->name()->as_C_string(), (void*) caller_pc, cb->is_nmethod(), entry_point == moop->get_c2i_entry());
+  tty->print_cr("_HOTSPOT: in SharedRuntime::fixup_callers_callsite for %s#%s, caller_pc is %p, cb is %p, handler is %p", method->klass_name()->as_C_string(), method->name()->as_C_string(), (void*) caller_pc, cb, (void*) _i2c_ret_handler);
   if (!cb->is_nmethod() || entry_point == moop->get_c2i_entry()) {
     asm(
       "call _noop12\n"

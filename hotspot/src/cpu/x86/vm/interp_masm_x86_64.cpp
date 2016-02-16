@@ -679,6 +679,9 @@ void InterpreterMacroAssembler::remove_activation(
   call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop10)));
   pop(ret_addr);                     // get return address
   if (WildTurtle) {
+    if (ret_addr == rax) {
+      ShouldNotReachHere();
+    }
     push(rscratch1);
     Label _after;
     lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
