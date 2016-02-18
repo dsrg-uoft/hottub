@@ -1223,13 +1223,10 @@ address OptoRuntime::handle_exception_C(JavaThread* thread) {
 // *THIS IS NOT RECOMMENDED PROGRAMMING STYLE*
 //
 address OptoRuntime::rethrow_C(oopDesc* exception, JavaThread* thread, address ret_pc) {
-  //tty->print_cr("_HOTSPOT: in OptoRuntime#rethrow_C, ret pc is %p", (void*) ret_pc);
   if ((void*) ret_pc == (void*) _i2c_ret_handler) {
-    _rax_rdx _ret = _i2c_ret_pop();
-    ret_pc = (address) _ret.rax;
-    //tty->print_cr("_HOTSPOT: in OptoRuntime#rethrow_c, patched address");
+    _rax_rdx ret = _i2c_ret_pop(thread);
+    ret_pc = (address) ret.rax;
   }
-  //tty->print_cr("_HOTSPOT: in OptoRuntime#rethrow_c, patched address");
 #ifndef PRODUCT
   SharedRuntime::_rethrow_ctr++;               // count rethrows
 #endif

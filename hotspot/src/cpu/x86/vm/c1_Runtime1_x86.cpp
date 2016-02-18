@@ -827,7 +827,9 @@ void Runtime1::generate_unwind_exception(StubAssembler *sasm) {
     // no rscratch1
     __ push(rscratch2);
 
-    __ lea(c_rarg0, Address(rsp, 9 * sizeof(void*)));
+    // 8 caller saved registers + rax
+    __ movptr(c_rarg0, r15_thread);
+    __ lea(c_rarg1, Address(rsp, 9 * wordSize));
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop)));
     __ pop(rscratch2);
     // no rscratch1
@@ -847,31 +849,6 @@ void Runtime1::generate_unwind_exception(StubAssembler *sasm) {
   }
 
   // search the exception handler address of the caller (using the return address)
-  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop5)));
-  /*
-  if (WildTurtle) {
-    __ push(rax);
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    __ push(rscratch1);
-    __ push(rscratch2);
-    __ movptr(c_rarg0, exception_pc);
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop33)));
-    __ pop(rscratch2);
-    __ pop(rscratch1);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-    __ pop(rax);
-  }
-  */
   __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address), thread, exception_pc);
   // rax: exception handler address of the caller
 
@@ -1156,7 +1133,6 @@ OopMapSet* Runtime1::generate_code_for(StubID id, StubAssembler* sasm) {
 
     case counter_overflow_id:
       {
-        __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop20)));
         Register bci = rax, method = rbx;
         __ enter();
         OopMap* map = save_live_registers(sasm, 3);

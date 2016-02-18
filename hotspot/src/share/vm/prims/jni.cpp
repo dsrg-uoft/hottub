@@ -1304,12 +1304,12 @@ static void jni_invoke_static(JNIEnv *env, JavaValue* result, jobject receiver, 
   // Initialize result type
   result->set_type(args->get_ret_type());
 
-  _native_call_end();
+  _native_call_begin((JavaThread*) THREAD, method(), 1);
 
   // Invoke the method. Result is returned as oop.
   JavaCalls::call(result, method, &java_args, CHECK);
 
-  _native_call_begin();
+  _native_call_end((JavaThread*) THREAD, method(), 1);
 
   // Convert result
   if (result->get_type() == T_OBJECT || result->get_type() == T_ARRAY) {
@@ -1377,10 +1377,10 @@ static void jni_invoke_nonstatic(JNIEnv *env, JavaValue* result, jobject receive
   // Initialize result type
   result->set_type(args->get_ret_type());
 
-  _native_call_end();
+  _native_call_begin((JavaThread*) THREAD, method(), 1);
   // Invoke the method. Result is returned as oop.
   JavaCalls::call(result, method, &java_args, CHECK);
-  _native_call_begin();
+  _native_call_end((JavaThread*) THREAD, method(), 1);
 
   // Convert result
   if (result->get_type() == T_OBJECT || result->get_type() == T_ARRAY) {
@@ -5133,6 +5133,17 @@ void execute_internal_vm_tests() {
 #undef run_unit_test
 
 #endif
+
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CallingJavaMain() {
+  JavaThread* jt = JavaThread::current();
+  jt->_jvm_state_ready = 1;
+  return 0;
+}
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_FinishedJavaMain() {
+  JavaThread* jt = JavaThread::current();
+  jt->_jvm_state_ready = 0;
+  return 0;
+}
 
 #ifndef USDT2
 HS_DTRACE_PROBE_DECL3(hotspot_jni, CreateJavaVM__entry, vm, penv, args);

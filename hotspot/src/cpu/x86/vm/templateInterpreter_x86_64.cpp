@@ -1076,6 +1076,30 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
 
   // jvmti support
   __ notify_method_entry();
+  if (WildTurtle) {
+    __ push(rax);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+    __ movptr(c_rarg0, r15_thread);
+    __ get_method(c_rarg1);
+    __ xorptr(c_rarg2, c_rarg2);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _native_call_begin)));
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ pop(rax);
+  }
 
   // work registers
   const Register method = rbx;
@@ -1364,6 +1388,30 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
     __ bind(L);
   }
 
+  if (false && WildTurtle) {
+    __ push(rax);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+    __ movptr(c_rarg0, r15_thread);
+    __ get_method(c_rarg1);
+    __ xorptr(c_rarg2, c_rarg2);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _native_call_end)));
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ pop(rax);
+  }
   // jvmti support
   // Note: This must happen _after_ handling/throwing any exceptions since
   //       the exception handler code notifies the runtime of method exits
@@ -1546,6 +1594,29 @@ address InterpreterGenerator::generate_normal_entry(bool synchronized) {
 
   // jvmti support
   __ notify_method_entry();
+  if (false && WildTurtle) {
+    __ push(rax);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+    __ movptr(c_rarg0, r15_thread);
+    __ get_method(c_rarg1);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, SharedRuntime::_method_entry)));
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ pop(rax);
+  }
 
   __ dispatch_next(vtos);
 
@@ -1704,27 +1775,6 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
   // Entry point in previous activation (i.e., if the caller was
   // interpreted)
   Interpreter::_rethrow_exception_entry = __ pc();
-  if (WildTurtle) {
-    __ push(rax);
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    __ push(rscratch1);
-    __ push(rscratch2);
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop32)));
-    __ pop(rscratch2);
-    __ pop(rscratch1);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-    __ pop(rax);
-  }
   // Restore sp to interpreter_frame_last_sp even though we are going
   // to empty the expression stack for the exception processing.
   __ movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
@@ -1799,28 +1849,6 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
                                InterpreterRuntime::interpreter_contains), c_rarg1);
     __ testl(rax, rax);
     __ jcc(Assembler::notZero, caller_not_deoptimized);
-
-    if (WildTurtle) {
-      __ push(rax);
-      __ push(c_rarg0);
-      __ push(c_rarg1);
-      __ push(c_rarg2);
-      __ push(c_rarg3);
-      __ push(c_rarg4);
-      __ push(c_rarg5);
-      __ push(rscratch1);
-      __ push(rscratch2);
-      __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop30)));
-      __ pop(rscratch2);
-      __ pop(rscratch1);
-      __ pop(c_rarg5);
-      __ pop(c_rarg4);
-      __ pop(c_rarg3);
-      __ pop(c_rarg2);
-      __ pop(c_rarg1);
-      __ pop(c_rarg0);
-      __ pop(rax);
-    }
 
     // Compute size of arguments for saving when returning to
     // deoptimized caller
@@ -1937,39 +1965,6 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
   // rsp: expression stack of caller
   // rbp: ebp of caller
   __ push(rax);                                  // save exception
-  /*
-  if (WildTurtle) {
-    Label _after;
-    __ push(rscratch1);
-    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
-    __ cmpptr(rscratch1, rdx);
-    __ jcc(Assembler::notEqual, _after);
-    // my isle; hajimemashou
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    // no rdx
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    __ push(rscratch1);
-    __ push(rscratch2);
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_pop)));
-    __ movptr(rdx, rax);
-    __ pop(rscratch2);
-    __ pop(rscratch1);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    // no rdx
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-    __ movptr(rax, Address(rsp, 0));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop3)));
-    // my isle; chu chu
-    __ bind(_after);
-    __ pop(rscratch1);
-  }
-  */
   __ push(rdx);                                  // save return address
   __ super_call_VM_leaf(CAST_FROM_FN_PTR(address,
                           SharedRuntime::exception_handler_for_return_address),

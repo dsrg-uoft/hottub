@@ -670,13 +670,35 @@ void InterpreterMacroAssembler::remove_activation(
   } else {
     notify_method_exit(state, SkipNotifyJVMTI); // preserve TOSCA
   }
+  if (false && WildTurtle) {
+    push(rax);
+    push(c_rarg0);
+    push(c_rarg1);
+    push(c_rarg2);
+    push(c_rarg3);
+    push(c_rarg4);
+    push(c_rarg5);
+    push(rscratch1);
+    push(rscratch2);
+    movptr(c_rarg0, r15_thread);
+    get_method(c_rarg1);
+    call(RuntimeAddress(CAST_FROM_FN_PTR(address, SharedRuntime::_method_exit)));
+    pop(rscratch2);
+    pop(rscratch1);
+    pop(c_rarg5);
+    pop(c_rarg4);
+    pop(c_rarg3);
+    pop(c_rarg2);
+    pop(c_rarg1);
+    pop(c_rarg0);
+    pop(rax);
+  }
 
   // remove activation
   // get sender sp
   movptr(rbx,
          Address(rbp, frame::interpreter_frame_sender_sp_offset * wordSize));
   leave();                           // remove frame anchor
-  call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop10)));
   pop(ret_addr);                     // get return address
   if (WildTurtle) {
     if (ret_addr == rax) {
@@ -698,8 +720,9 @@ void InterpreterMacroAssembler::remove_activation(
     // no rscratch1
     push(rscratch2);
 
-    call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop31)));
-    lea(c_rarg0, Address(rsp, 8 * sizeof(void*)));
+    // 8 caller saved registers + rax - already popped
+    movptr(c_rarg0, r15_thread);
+    lea(c_rarg1, Address(rsp, 8 * sizeof(void*)));
     call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop)));
     pop(rscratch2);
     // no rscratch1
@@ -1490,11 +1513,10 @@ void InterpreterMacroAssembler::notify_method_entry() {
     call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dtrace_method_entry),
                  r15_thread, c_rarg1);
   }
-  {
-    SkipIfEqual _skip(this, &WildTurtle, false);
+
+  if (WildTurtle) {
     get_method(c_rarg1);
-    call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::_method_entry),
-                 r15_thread, c_rarg1);
+    call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::_method_entry), r15_thread, c_rarg1);
   }
 
   // RedefineClasses() tracing support for obsolete method entry
@@ -1531,8 +1553,6 @@ void InterpreterMacroAssembler::notify_method_exit(
     NOT_CC_INTERP(pop(state));
   }
 
-  //tty->print_cr("_HOTSPOT: method exit?");
-
   {
     SkipIfEqual skip(this, &DTraceMethodProbes, false);
     NOT_CC_INTERP(push(state));
@@ -1541,13 +1561,12 @@ void InterpreterMacroAssembler::notify_method_exit(
                  r15_thread, c_rarg1);
     NOT_CC_INTERP(pop(state));
   }
-  {
-    SkipIfEqual _skip(this, &WildTurtle, false);
-    NOT_CC_INTERP(push(state));
+
+  if (WildTurtle) {
+    push(state);
     get_method(c_rarg1);
-    call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::_method_exit),
-                 r15_thread, c_rarg1);
-    NOT_CC_INTERP(pop(state));
+    call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::_method_exit), r15_thread, c_rarg1);
+    pop(state);
   }
 }
 

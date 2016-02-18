@@ -30,6 +30,8 @@ SUNWprivate_1.1 {
                 JNI_CreateJavaVM;
                 JNI_GetCreatedJavaVMs;
                 JNI_GetDefaultJavaVMInitArgs;
+                JNI_CallingJavaMain;
+                JNI_FinishedJavaMain;
 
                 # JVM
                 JVM_Accept;

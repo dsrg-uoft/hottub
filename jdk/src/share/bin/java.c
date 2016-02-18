@@ -474,8 +474,10 @@ JavaMain(void * _args)
     mainArgs = CreateApplicationArgs(env, argv, argc);
     CHECK_EXCEPTION_NULL_LEAVE(mainArgs);
 
+    ifn.CallingJavaMain();
     /* Invoke main method. */
     (*env)->CallStaticVoidMethod(env, mainClass, mainID, mainArgs);
+    ifn.FinishedJavaMain();
 
     /*
      * The launcher's exit code (in the absence of calls to

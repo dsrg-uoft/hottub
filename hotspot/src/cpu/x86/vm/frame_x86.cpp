@@ -475,13 +475,12 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
 
   // On Intel the return_address is always the word on the stack
   address sender_pc = (address) *(sender_sp-1);
-  if (WildTurtle && _bdel_is_java_thread && (void*) sender_pc == (void*) _i2c_ret_handler) {
-    _rax_rdx _ret = _i2c_ret_verify_location_and_pop((void*) (sender_sp - 1));
-    sender_pc = (address) _ret.rax;
-    *((void**) (sender_sp - 1)) = _ret.rax;
-    //tty->print_cr("_HOTSPOT: in frame#sender_for_compiled_frame, patched return address");
+
+  if (WildTurtle && Thread::current()->is_Java_thread() && (void*) sender_pc == (void*) _i2c_ret_handler) {
+    void* ret = _i2c_ret_verify_location_and_pop(JavaThread::current(), (void*) (sender_sp - 1));
+    sender_pc = (address) ret;
+    *((void**) (sender_sp - 1)) = ret;
   }
-  //tty->print_cr("_HOTSPOT: in frame#sender_for_compiled_frame, return address is %p, handler is %p", (void*) sender_pc, (void*) _i2c_ret_handler);
 
   // This is the saved value of EBP which may or may not really be an FP.
   // It is only an FP if the sender is an interpreter frame (or C1?).

@@ -103,59 +103,8 @@ UncommonTrapBlob*   SharedRuntime::_uncommon_trap_blob;
 
 #include "runtime/_bdel.hpp"
 
-#define _BDEL_C2I2C_SIZE 96
-#define _BDEL_I2C_RET_STACK_SIZE 128
-
 volatile uint64_t _i_total;
 volatile uint64_t _c_total;
-
-__thread int8_t _jvm_state = 0;
-__thread int8_t _bdel_is_java_thread = 0;
-
-__thread uint64_t _i_timestamp = 0;
-__thread uint64_t _c_timestamp = 0;
-__thread uint64_t _i_counter = 0;
-__thread uint64_t _c_counter = 0;
-
-// local
-/*
- * Scenario:
- * - in compiled code
- * - call interpreted method
- * - `_jvm_state` set to interpreted
- * - method exits, need to set `_jvm_state` back to compiled
- * - but suppose interpreted method calls compiled method
- * - that compiled method may call another interpreted method
- * - hmmm...
- */
-__thread uint8_t _i_from_c = 0;
-__thread int8_t _i_from_c_levels[_BDEL_C2I2C_SIZE];
-__thread uint8_t _i_from_c_max = 0;
-
-__thread int8_t _native_levels = 0;
-
-static void _bdel_c2i2c_push(int8_t x) {
-  if (_likely(_i_from_c < _BDEL_C2I2C_SIZE)) {
-    _i_from_c_levels[_i_from_c] = x;
-  }
-  _i_from_c++;
-  if (_unlikely(_i_from_c > _i_from_c_max)) {
-    _i_from_c_max = _i_from_c;
-  }
-}
-static int8_t _bdel_c2i2c_pop() {
-  _i_from_c--;
-  if (_likely(_i_from_c < _BDEL_C2I2C_SIZE)) {
-    return _i_from_c_levels[_i_from_c];
-  }
-  return 0;
-}
-static void _bdel_c2i() {
-  uint64_t _t = _now();
-  _i_counter += _c_timestamp - _i_timestamp;
-  _c_counter += _t - _c_timestamp;
-  _i_timestamp = _t;
-}
 
 uint64_t _now() {
   struct timespec ts;
@@ -163,119 +112,121 @@ uint64_t _now() {
   assert(status == 0, "gettime error");
   return (uint64_t) ts.tv_sec * (1000 * 1000 * 1000) + (uint64_t) ts.tv_nsec;
 }
-__thread void* _i2c_ret_stack[_BDEL_I2C_RET_STACK_SIZE];
-__thread void* _i2c_rbp_stack[_BDEL_I2C_RET_STACK_SIZE];
-__thread int _i2c_ret_stack_pos = 0;
-//void* _i2c_ret_stack[_BDEL_I2C_RET_STACK_SIZE];
-//int _i2c_ret_stack_pos = 0;
+static void _jvm_transitions_push(JavaThread* jt, int8_t x) {
+  if (_unlikely(jt->_jvm_transitions_pos >= _JVM_TRANSITIONS_SIZE)) {
+    tty->print_cr("_HOTSPOT: jvm transitions overflowed");
+    ShouldNotReachHere();
+  }
+  jt->_jvm_transitions[jt->_jvm_transitions_pos++] = x;
+  jt->_jvm_transitions_max = _MAX(jt->_jvm_transitions_max, jt->_jvm_transitions_pos);
+}
+static int8_t _jvm_transitions_pop(JavaThread* jt) {
+  return jt->_jvm_transitions[--(jt->_jvm_transitions_pos)];
+}
+static void _jvm_transition_i2c(JavaThread* jt) {
+  if (_unlikely(jt->_jvm_state == 1)) {
+    tty->print_cr("_HOTSPOT %ld: bad jvm transition i2c, but was in compiled", _bdel_sys_gettid());
+    //ShouldNotReachHere();
+  }
+  uint64_t t0 = _now();
+  jt->_jvm_state_times[0] += t0 - jt->_jvm_state_last_timestamp;
+  jt->_jvm_state_last_timestamp = t0;
+  jt->_jvm_state = 1;
+}
+static void _jvm_transition_c2i(JavaThread* jt) {
+  if (_unlikely(jt->_jvm_state == 0)) {
+    tty->print_cr("_HOTSPOT %ld: bad jvm transition c2i, but was in interpreted", _bdel_sys_gettid());
+    //ShouldNotReachHere();
+  }
+  uint64_t t0 = _now();
+  jt->_jvm_state_times[1] += t0 - jt->_jvm_state_last_timestamp;
+  jt->_jvm_state_last_timestamp = t0;
+  jt->_jvm_state = 0;
+}
 void _bdel_knell(const char* str) {
+  JavaThread* jt = JavaThread::current();
   if (WildTurtle) {
-    __sync_fetch_and_add(&_i_total, _i_counter);
-    __sync_fetch_and_add(&_c_total, _c_counter);
     tty->print_cr(
-      "_BDEL: %s tolls for %ld"
+      "_WILDTURTLE: thread %ld exited from %s"
       " - %.3f interpreted"
       " - %.3f compiled"
       " - %.3f sum"
-      " - %.3f accumulated i"
-      " - %.3f accumulated c"
-      " - %d c2i2c levels"
-      " - %d c2i2c max"
-      " - %d i2c ret stack pos"
-      , str, _bdel_sys_gettid()
-      , _i_counter / 1e9, _c_counter / 1e9, (_i_counter + _c_counter) / 1e9
-      , _i_total / 1e9, _c_total / 1e9
-      , (int) _i_from_c, (int) _i_from_c_max
-      , _i2c_ret_stack_pos
+      " - %d transitions max"
+      " - %d i2c max"
+      , _bdel_sys_gettid(), str
+      , jt->_jvm_state_times[0] / 1e9, jt->_jvm_state_times[1] / 1e9, (jt->_jvm_state_times[0] + jt->_jvm_state_times[1]) / 1e9
+      , jt->_jvm_transitions_max, jt->_i2c_stack_max
     );
-    if (_i2c_ret_stack_pos != 0) {
-      tty->print_cr("_HOTSPOT: i2c ret stack not 0, is %d", _i2c_ret_stack_pos);
-      ShouldNotReachHere();
-    }
-    if (_native_levels != 0) {
-      tty->print_cr("_HOTSPOT: native levels not 0, is %d", _native_levels);
+    if (jt->_i2c_stack_pos != 0 || jt->_jvm_transitions_pos != 0 || jt->_native_levels != 0) {
+      tty->print_cr(
+        "_HOTSPOT: wildturtle indexes did not end at 0"
+        " - i2c stack pos %d"
+        " - jvm transitions pos %d"
+        " - native levels %d"
+        , jt->_i2c_stack_pos
+        , jt->_jvm_transitions_pos
+        , jt->_native_levels
+      );
       ShouldNotReachHere();
     }
   }
 }
 
-__thread int _kiwikid = 0;
 extern "C" {
-  void _i2c_ret_push(void* ret, Method* method) {
-    _bdel_is_java_thread = 1;
-    _i2c_verify_stack();
-    if (_unlikely(_i2c_ret_stack_pos >= _BDEL_I2C_RET_STACK_SIZE)) {
-      // badness
-      ((void (*)(void)) 0x0bad0bad)();
-      _i2c_ret_stack_pos = 0;
-    } else {
-      if (_kiwikid++ >= 42) {
-        //ret = (void*) 0xdeadc0de;
-      }
-      register void** rbp asm("rbp");
+  void _i2c_ret_push(JavaThread* jt, void* ret, Method* m) {
+    if (_unlikely(jt->_i2c_stack_pos >= _I2C_STACK_SIZE)) {
+      tty->print_cr("_HOTSPOT: i2c stack overflowed");
+      ShouldNotReachHere();
+    }
+    register void** rbp asm("rbp");
+    // ===============================
+    // | bottom of stack/top address |
+    // | ...
+    // | return address for i2c callee
+    // | 8 caller saved registers, done in i2c
+    // | return address for call to this
+    // | saved rbp                   | _<- current rbp
+    // | ...
+    // | top of stack                |
+    // ===============================
+    // rbp + this return address + 8 caller saved registers + rax - not yet pushed
+    jt->_i2c_rbp_stack[jt->_i2c_stack_pos] = rbp + 10;
+    jt->_i2c_ret_stack[jt->_i2c_stack_pos++] = ret;
+    jt->_i2c_stack_max = _MAX(jt->_i2c_stack_max, jt->_i2c_stack_pos);
 
-      // ===============================
-      // | bottom of stack/top address |
-      // | ...
-      // | return address for i2c callee
-      // | 8 caller saved registers, done in i2c
-      // | return address for call to this
-      // | saved rbp                   | _<- current rbp
-      // | ...
-      // | top of stack                |
-      // ===============================
-      _i2c_rbp_stack[_i2c_ret_stack_pos] = rbp + 10; // 8 caller saved registers + return address + rbp
-      _i2c_ret_stack[_i2c_ret_stack_pos++] = ret;
-      //tty->print_cr("_HOTSPOT: pushing %p", ret);
-    }
+    _jvm_transition_i2c(jt);
     if (Dyrus) {
-      Symbol* kname = method->klass_name();
-      Symbol* name = method->name();
-      tty->print_cr("_HOTSPOT %ld (%ld): i2c adapter %s#%s (from %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
-    }
-  }
-  void* _i2c_ret_peek() {
-    if (_unlikely(_i2c_ret_stack_pos <= 0)) {
-      asm(
-        "call _i2c_pop_nil\n"
+      tty->print_cr(
+        "_HOTSPOT %ld: calling i2c %s#%s, %d levels"
+        , _bdel_sys_gettid()
+        , m->klass_name()->as_C_string()
+        , m->name()->as_C_string()
+        , jt->_i2c_stack_pos
       );
     }
-    return _i2c_ret_stack[_i2c_ret_stack_pos - 1];
   }
-  _rax_rdx _i2c_ret_pop() {
-    if (_unlikely(_i2c_ret_stack_pos <= 0)) {
-      asm(
-        "call _i2c_pop_nil\n"
-      );
+  _rax_rdx _i2c_ret_pop(JavaThread* jt) {
+    if (_unlikely(jt->_i2c_stack_pos <= 0)) {
+      tty->print_cr("_HOTSPOT: i2c stack underflowed");
+      ShouldNotReachHere();
     }
     _rax_rdx ret;
-    ret.rdx = _i2c_rbp_stack[--_i2c_ret_stack_pos];
-    ret.rax = _i2c_ret_stack[_i2c_ret_stack_pos];
-    //tty->print_cr("_HOTSPOT: popping %p", ret.rax);
-    return ret;
-  }
-  _rax_rdx _i2c_ret_verify_and_pop() {
-    //tty->print_cr("_HOTSPOT: in verify and pop, levels is %d", _i2c_ret_stack_pos);
-    _rax_rdx ret = _i2c_ret_pop();
-    if (_unlikely(*((void**) ret.rdx) != &_i2c_ret_handler)) {
-      ((void (*)(void)) 0x2bad2bad)();
+    ret.rdx = jt->_i2c_rbp_stack[--(jt->_i2c_stack_pos)];
+    ret.rax = jt->_i2c_ret_stack[jt->_i2c_stack_pos];
+
+    _jvm_transition_c2i(jt);
+    if (Dyrus) {
+      tty->print_cr("_HOTSPOT %ld: returning i2c, %d levels", _bdel_sys_gettid(), jt->_i2c_stack_pos);
     }
-    _i2c_verify_stack();
     return ret;
   }
-  _rax_rdx _i2c_ret_verify_location_and_pop(void* rbp) {
-    _rax_rdx ret = _i2c_ret_pop();
+  void* _i2c_ret_verify_location_and_pop(JavaThread* jt, void* rbp) {
+    _rax_rdx ret = _i2c_ret_pop(jt);
     if (_unlikely(rbp != ret.rdx)) {
-      tty->print_cr("_HOTSPOT: i2c ret badness, rbp is %p, expected is %p", rbp, ret.rdx);
-      _dump_i2c_stack();
-      /*
-      asm(
-        "callq _i2c_ret_badness\n"
-      );
-      */
+      tty->print_cr("_HOTSPOT: i2c ret verify location and pop check failed; rbp is %p, expected is %p", rbp, ret.rdx);
+      ShouldNotReachHere();
     }
-    _i2c_verify_stack();
-    return ret;
+    return ret.rax;
   }
   void _i2c_ret_handler() {
     // ===============================
@@ -286,17 +237,16 @@ extern "C" {
     // | ...
     // | top of stack                |
     // ===============================
+    // - because we need to save `rax` and `rdx`, we need to push them onto the stack at the start
+    //   because we modify rsp, if we wrote C code with local variables, their offsets would be wrong
+    //   therefore, it's best this function only uses assembly
+    // - calling functions is okay because any caller saved registers could have been mangled
+    //   by the called compiled function we are returning from anyways
     asm(
       "push %rax\n"
       "\tpush %rdx\n"
-    );
-    /*
-    if (Dyrus) {
-      tty->print_cr("_HOTSPOT: %ld (%ld): i2c return handler", _bdel_sys_gettid(), _now());
-    }
-    */
-    asm(
-      "mov %rbp, %rdi\n"
+      "\tmov %r15, %rdi\n"
+      "\tmov %rbp, %rsi\n"
       "\tcallq _i2c_ret_verify_location_and_pop\n"
       "\tmov %rax, %r11\n"
       "\tpop %rdx\n"
@@ -306,11 +256,86 @@ extern "C" {
       "\tpush %rbp\n"
     );
   }
+  void _native_call_begin(JavaThread* jt, Method* m, int opposite) {
+    if (_unlikely(!jt->_jvm_state_ready)) {
+      return;
+    }
+    if (opposite) {
+      if (jt->_jvm_state != 1) {
+        tty->print_cr(
+          "_HOTSPOT %ld: calling n2i %s#%s, but jvm state was %d (expected compiled)"
+          , _bdel_sys_gettid()
+          , m == NULL ? "null" : m->klass_name()->as_C_string()
+          , m == NULL ? "null" : m->name()->as_C_string()
+          , jt->_jvm_state
+        );
+        //ShouldNotReachHere();
+      }
+      _jvm_transition_c2i(jt);
+    } else {
+      _jvm_transitions_push(jt, jt->_jvm_state);
+      if (jt->_jvm_state == 0) {
+        _jvm_transition_i2c(jt);
+      }
+    }
+    jt->_native_levels++;
+    if (Dyrus) {
+      tty->print_cr(
+        "_HOTSPOT %ld: calling %s %s#%s (to %d native levels, to %d transition depth)"
+        , _bdel_sys_gettid()
+        , opposite ? "n2i" : "i2n"
+        , m == NULL ? "System" : m->klass_name()->as_C_string()
+        , m == NULL ? "initializeSystemClass" : m->name()->as_C_string()
+        , jt->_native_levels
+        , jt->_jvm_transitions_pos
+      );
+    }
+  }
+  void _native_call_end(JavaThread* jt, Method* m, int opposite) {
+    if (_unlikely(!jt->_jvm_state_ready)) {
+      return;
+    }
+    if (opposite) {
+      if (jt->_jvm_state != 0) {
+        tty->print_cr(
+          "_HOTSPOT %ld: returning n2i %s#%s, but jvm state was %d (expected interpreted)"
+          , _bdel_sys_gettid()
+          , m == NULL ? "null" : m->klass_name()->as_C_string()
+          , m == NULL ? "null" : m->name()->as_C_string()
+          , jt->_jvm_state
+        );
+        //ShouldNotReachHere();
+      }
+      _jvm_transition_i2c(jt);
+    } else {
+      int8_t new_state = _jvm_transitions_pop(jt);
+      if (new_state == 0) {
+        _jvm_transition_c2i(jt);
+      }
+    }
+    jt->_native_levels--;
+    if (Dyrus) {
+      tty->print_cr(
+        "_HOTSPOT %ld: returning %s %s#%s (to %d native levels, to %d transition depth)"
+        , _bdel_sys_gettid()
+        , opposite ? "n2i" : "i2n"
+        , m == NULL ? "System" : m->klass_name()->as_C_string()
+        , m == NULL ? "initializeSystemClass" : m->name()->as_C_string()
+        , jt->_native_levels
+        , jt->_jvm_transitions_pos
+      );
+    }
+  }
+}
+
+extern "C" {
   void _dump_i2c_stack() {
+    /*
     tty->print_cr("=== i2c ret stack (handler is at %p) ===", (void*) &_i2c_ret_handler);
     for (int i = _i2c_ret_stack_pos - 1; i >= 0; i--) {
       tty->print_cr(" %d. %p: %p", i, _i2c_ret_stack[i], _i2c_rbp_stack[i]);
     }
+    */
   }
   void _i2c_verify_stack() {
     /*
@@ -319,125 +344,13 @@ extern "C" {
       if (ret_addr != (void*) &_i2c_ret_handler) {
         tty->print_cr("_HOTSPOT: failed check at position %d", i);
         _dump_i2c_stack();
-        asm(
-          "call _i2c_ret_badness\n"
-        );
+        ShouldNotReachHere();
       }
     }
-
     */
-    //tty->print_cr("_HOTSPOT: i2c verify stack passed of %d items", _i2c_ret_stack_pos);
-  }
-  void _i2c_ret_badness() {
-    ((void (*)(void)) 0x3bad3bad)();
-  }
-  void _i2c_pop_nil() {
-    tty->print_cr("_HOTSPOT: in i2c pop nil, have is %d, i time is %lu", _bdel_is_java_thread, _i_timestamp);
-    ((void (*)(void)) 0x1bad1bad)();
-  }
-  void _native_call_begin() {
-    _c_timestamp = _now();
-    _jvm_state = 1;
-    if (Dyrus) {
-      tty->print_cr("_HOTSPOT %ld: going into native, from %d levels", _bdel_sys_gettid(), _native_levels++);
-    }
-  }
-  void _native_call_end() {
-    _bdel_c2i();
-    _jvm_state = 0;
-    if (Dyrus) {
-      tty->print_cr("_HOTSPOT %ld: leaving native, to %d levels", _bdel_sys_gettid(), --_native_levels);
-    }
   }
 }
 
-void _print_value(JavaThread* thread, void* ptr) {
-  tty->print_cr("hmmsauce is %p", ptr);
-}
-void _noop() {
-  return;
-}
-void _noop2() {
-  return;
-}
-void _noop3() {
-  return;
-}
-void _noop4() {
-  return;
-}
-void _noop5() {
-  return;
-}
-void _noop10() {
-  return;
-}
-extern "C" void _noop11() {
-  return;
-}
-extern "C" void _noop12() {
-  return;
-}
-extern "C" void _noop13() {
-  return;
-}
-extern "C" void _noop14() {
-  return;
-}
-extern "C" void _noop15() {
-  return;
-}
-extern "C" void _noop16() { return; }
-extern "C" void _noop20() { return; }
-extern "C" void _noop21() { return; }
-
-extern "C" void _noop30() {
-  tty->print_cr("_HOTSPOT: in TemplateInterpreterGenerator::generate_throw_exception, handling deopt frame");
-}
-extern "C" void _noop31() {
-  tty->print_cr("_HOTSPOT: removing activation");
-}
-extern "C" void _noop32() {
-  //tty->print_cr("_HOTSPOT: start of throw exception");
-}
-extern "C" void _noop33(void* return_address) {
-  tty->print_cr("_HOTSPOT: in c1_Runtime1_x86, generate unwind, return address is %p, handler is %p", return_address, (void*) &_i2c_ret_handler);
-}
-extern "C" void _noop40() { return; }
-extern "C" void _noop41() { return; }
-
-extern "C" void _saw_uncommon_trap() {
-  tty->print_cr("_HOTSPOT: saw uncommon trap");
-}
-extern "C" void _saw_safepoint_return_handler() {
-  tty->print_cr("_HOTSPOT: saw safepoint return handler");
-}
-extern "C" void _saw_call_stub() {
-  tty->print_cr("_HOTSPOT: saw call stub");
-}
-extern "C" void _saw_call_stub2() {
-  tty->print_cr("_HOTSPOT: saw call stub2");
-}
-extern "C" void _deopt_blob_start() {
-  tty->print_cr("_HOTSPOT: deopt blob start");
-}
-extern "C" void _deopt_blob_exception_case() {
-  tty->print_cr("_HOTSPOT: deopt blob exception case");
-}
-extern "C" void _deopt_blob_normal() {
-  tty->print_cr("_HOTSPOT: deopt blob normal");
-}
-extern "C" void _deopt_verified(void* return_address) {
-  tty->print_cr("_HOTSPOT: deopt verified %p, handler is %p, levels is %d", return_address, (void*) &_i2c_ret_handler, _i2c_ret_stack_pos);
-}
-extern "C" void _deopt_blob_test(void* return_address) {
-  tty->print_cr("_HOTSPOT: in deopt blob test %p, handler is %p, levels is %d", return_address, (void*) &_i2c_ret_handler, _i2c_ret_stack_pos);
-}
-extern "C" void _print_method(Method* method) {
-    Symbol* kname = method->klass_name();
-    Symbol* name = method->name();
-    tty->print_cr("_HOTSPOT %ld (%ld): print method for %s#%s (from %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
-}
 
 //----------------------------generate_stubs-----------------------------------
 void SharedRuntime::generate_stubs() {
@@ -1367,6 +1280,7 @@ JRT_LEAF(int, SharedRuntime::dtrace_method_exit(
 JRT_END
 
 JRT_LEAF(void, SharedRuntime::_i2c(JavaThread* thread))
+  /*
   if (_jvm_state == 0) {
     _jvm_state = 1;
     _c_timestamp = _now();
@@ -1374,53 +1288,89 @@ JRT_LEAF(void, SharedRuntime::_i2c(JavaThread* thread))
   if (Dyrus) {
     tty->print_cr("_HOTSPOT %ld (%ld): transition in SharedRuntime::_i2c", _bdel_sys_gettid(), _now());
   }
+  */
 JRT_END
 
 JRT_LEAF(void, SharedRuntime::_c2i(JavaThread* thread))
-  // doesn't seem to work (`where called from gen_c2i_adapter`)
-  _bdel_c2i();
+  /*
   if (Dyrus) {
     tty->print_cr("_HOTSPOT %ld (%ld): transition in SharedRuntime::_c2i", _bdel_sys_gettid(), _now());
   }
+
+  */
 JRT_END
 
 JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
-  uint64_t _t = _now();
-  if (_unlikely(_i_timestamp == 0)) {
-    _i_timestamp = _t;
+  /*
+  if (_unlikely(!thread->_jvm_state_ready)) {
+    return 0;
   }
-  if (_jvm_state == 1) {
-    _bdel_c2i2c_push(1);
-    _i_counter += _c_timestamp - _i_timestamp;
-    _c_counter += _t - _c_timestamp;
-    _i_timestamp = _t;
-  } else if (_i_from_c) {
-    _bdel_c2i2c_push(0);
+  */
+  if (_unlikely(thread->_jvm_state_last_timestamp == 0)) {
+    thread->_jvm_state_last_timestamp = _now();
+    if (thread->_jvm_state != 0) {
+      tty->print_cr("_HOTSPOT: interpreter method start not at 0");
+      thread->_jvm_state = 0;
+    }
+  }
+  int8_t old_state = thread->_jvm_state;
+  if (thread->_jvm_state) {
+    _jvm_transitions_push(thread, 1);
+    _jvm_transition_c2i(thread);
+  } else if (thread->_jvm_transitions_pos) {
+    _jvm_transitions_push(thread, 0);
   }
 
   if (Dyrus) {
     Symbol* kname = method->klass_name();
     Symbol* name = method->name();
-    tty->print_cr("_HOTSPOT %ld (%ld): method entry %s#%s (from %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
+    tty->print_cr(
+      "_HOTSPOT %ld: method entry %s#%s (from %s, to %d transition depth)"
+      , _bdel_sys_gettid()
+      , kname->as_C_string()
+      , name->as_C_string()
+      , old_state  == 0 ? "interpreted" : "compiled"
+      , thread->_jvm_transitions_pos
+    );
   }
 
-  _jvm_state = 0;
   return 0;
 JRT_END
 
 JRT_LEAF(int, SharedRuntime::_method_exit(JavaThread* thread, Method* method))
-  if (_i_from_c) {
-    int8_t b = _bdel_c2i2c_pop();
+  /*
+  if (_unlikely(!thread->_jvm_state_ready)) {
+    return 0;
+  }
+  */
+  if (method->is_native()) {
+    _native_call_end(thread, method, 0);
+  }
+  if (thread->_jvm_state != 0) {
+    Symbol* kname = method->klass_name();
+    Symbol* name = method->name();
+    tty->print_cr("_HOTSPOT: in interpreter method exit %s#%s, but not in interpreted state", kname->as_C_string(), name->as_C_string());
+    tty->print_cr("_HOTSPOT: method is native: %d", method->is_native());
+    //ShouldNotReachHere();
+  }
+  if (thread->_jvm_transitions_pos) {
+    int8_t b = _jvm_transitions_pop(thread);
     if (b) {
-      _jvm_state = 1;
-      _c_timestamp = _now();
+      _jvm_transition_i2c(thread);
     }
   }
 
   if (Dyrus) {
     Symbol* kname = method->klass_name();
     Symbol* name = method->name();
-    tty->print_cr("_HOTSPOT %ld (%ld): method exit %s#%s (to %s, %d levels)", _bdel_sys_gettid(), _now(), kname->as_C_string(), name->as_C_string(), _jvm_state == 0 ? "interpreted" : "compiled", _i_from_c);
+    tty->print_cr(
+      "_HOTSPOT %ld: method exit %s#%s (to %s, to %d transition depth)"
+      , _bdel_sys_gettid()
+      , kname->as_C_string()
+      , name->as_C_string()
+      , thread->_jvm_state == 0 ? "interpreted" : "compiled"
+      , thread->_jvm_transitions_pos
+    );
   }
   return 0;
 JRT_END;
@@ -1750,27 +1700,13 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method(JavaThread* thread))
   //tty->print_cr("_HOTSPOT: in handle wrong method a");
   frame caller_frame = stub_frame.sender(&reg_map);
 
-  //tty->print_cr("_HOTSPOT: in handle wrong method b");
-  /*
-  asm(
-    "call _noop40\n"
-  );
-  */
-
   if (caller_frame.is_interpreted_frame() ||
       caller_frame.is_entry_frame()) {
     Method* callee = thread->callee_target();
-    //tty->print_cr("_HOTSPOT: in handle wrong method, first block, for %s", callee->name()->as_C_string());
     guarantee(callee != NULL && callee->is_method(), "bad handshake");
     thread->set_vm_result_2(callee);
     thread->set_callee_target(NULL);
-    //return callee->get_c2i_entry();
-    address _ret = callee->get_c2i_entry();
-    //tty->print_cr("_HOTSPOT: in handle wrong method, first block, for %s, return value is %p", callee->name()->as_C_string(), (void*) _ret);
-    asm(
-      "call _noop11\n"
-    );
-    return _ret;
+    return callee->get_c2i_entry();
   }
 
   // Must be compiled to compiled path which is safe to stackwalk
@@ -1835,9 +1771,6 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::resolve_opt_virtual_call_C(JavaThread *t
     callee_method = SharedRuntime::resolve_helper(thread, true, true, CHECK_NULL);
     thread->set_vm_result_2(callee_method());
   JRT_BLOCK_END
-  if (Dyrus) {
-      tty->print_cr("_HOTSPOT %ld (%ld): entering opt virtual jit %s#%s?", _bdel_sys_gettid(), _now(), callee_method->klass_name()->as_C_string(), callee_method->name()->as_C_string());
-  }
   // return compiled code entry point after potential safepoints
   assert(callee_method->verified_code_entry() != NULL, " Jump to zero!");
   return callee_method->verified_code_entry();
@@ -2120,9 +2053,6 @@ void SharedRuntime::check_member_name_argument_is_last_argument(methodHandle met
 // interpreted. If the caller is compiled we attempt to patch the caller
 // so he no longer calls into the interpreter.
 IRT_LEAF(void, SharedRuntime::fixup_callers_callsite(Method* method, address caller_pc))
-  if (Dyrus) {
-      tty->print_cr("_HOTSPOT: in SharedRuntime::fixup_callers_callsite for %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
-  }
   Method* moop(method);
 
   address entry_point = moop->from_compiled_entry();
@@ -2138,17 +2068,9 @@ IRT_LEAF(void, SharedRuntime::fixup_callers_callsite(Method* method, address cal
   // ask me how I know this...
 
   CodeBlob* cb = CodeCache::find_blob(caller_pc);
-  //tty->print_cr("_HOTSPOT: in SharedRuntime::fixup_callers_callsite for %s#%s, address is %p, cb is nmethod %d, entry point is c2i entry %d", method->klass_name()->as_C_string(), method->name()->as_C_string(), (void*) caller_pc, cb->is_nmethod(), entry_point == moop->get_c2i_entry());
-  //tty->print_cr("_HOTSPOT: in SharedRuntime::fixup_callers_callsite for %s#%s, caller_pc is %p, cb is %p, handler is %p", method->klass_name()->as_C_string(), method->name()->as_C_string(), (void*) caller_pc, cb, (void*) _i2c_ret_handler);
   if (!cb->is_nmethod() || entry_point == moop->get_c2i_entry()) {
-    asm(
-      "call _noop12\n"
-    );
     return;
   }
-  asm(
-    "call _noop13\n"
-  );
 
   // The check above makes sure this is a nmethod.
   nmethod* nm = cb->as_nmethod_or_null();
@@ -3408,10 +3330,9 @@ JRT_LEAF(intptr_t*, SharedRuntime::OSR_migration_begin( JavaThread *thread) )
   }
   assert( i - max_locals == active_monitor_count*2, "found the expected number of monitors" );
 
-  _jvm_state = 1;
-  _c_timestamp = _now();
+  _jvm_transition_i2c(thread);
   if (Dyrus) {
-      tty->print_cr("_HOTSPOT %ld (%ld): entering OSR", _bdel_sys_gettid(), _c_timestamp);
+      tty->print_cr("_HOTSPOT %ld: entering OSR", _bdel_sys_gettid());
   }
 
   return buf;
@@ -3420,11 +3341,10 @@ JRT_END
 JRT_LEAF(void, SharedRuntime::OSR_migration_end( intptr_t* buf) )
   FREE_C_HEAP_ARRAY(intptr_t,buf, mtCode);
 
-  _bdel_c2i();
+  _jvm_transition_c2i(JavaThread::current());
   if (Dyrus) {
-    tty->print_cr("_HOTSPOT %ld (%ld): exiting OSR", _bdel_sys_gettid(), _now());
+    tty->print_cr("_HOTSPOT %ld: exiting OSR", _bdel_sys_gettid());
   }
-  _jvm_state = 0;
 JRT_END
 
 bool AdapterHandlerLibrary::contains(CodeBlob* b) {

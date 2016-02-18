@@ -505,7 +505,9 @@ static void patch_callers_callsite(MacroAssembler *masm) {
     // no rscratch1
     __ push(rscratch2);
 
-    __ lea(c_rarg0, Address(rsp, 8 * sizeof(void*)));
+    // 8 caller saved registers
+    __ movptr(c_rarg0, r15_thread);
+    __ lea(c_rarg1, Address(rsp, 8 * wordSize));
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop)));
     __ pop(rscratch2);
     // no rscratch1
@@ -682,38 +684,6 @@ static void gen_c2i_adapter(MacroAssembler *masm,
     }
   }
 
-  if (WildTurtle) {
-    //__ call_VM(noreg, CAST_FROM_FN_PTR(address, SharedRuntime::_c2i));
-  }
-  /*
-  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop14)));
-  __ push(rax);
-
-  __ push(c_rarg0);
-  __ push(c_rarg1);
-  __ push(c_rarg2);
-  __ push(c_rarg3);
-  __ push(c_rarg4);
-  __ push(c_rarg5);
-  __ push(rscratch1);
-  __ push(rscratch2);
-
-  //__ lea(rax, RuntimeAddress((address) 0xdeadc0de));
-  __ movptr(c_rarg0, rbx);
-  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _print_method)));
-
-  __ pop(rscratch2);
-  __ pop(rscratch1);
-  __ pop(c_rarg5);
-  __ pop(c_rarg4);
-  __ pop(c_rarg3);
-  __ pop(c_rarg2);
-  __ pop(c_rarg1);
-  __ pop(c_rarg0);
-
-  __ pop(rax);
-  */
-
   // Schedule the branch target address early.
   __ movptr(rcx, Address(rbx, in_bytes(Method::interpreter_entry_offset())));
   __ jmp(rcx);
@@ -830,9 +800,9 @@ static void gen_i2c_adapter(MacroAssembler *masm,
     __ push(rscratch1);
     __ push(rscratch2);
 
-    //__ lea(rax, RuntimeAddress((address) 0xdeadc0de));
-    __ movptr(c_rarg0, rax);
-    __ movptr(c_rarg1, rbx);
+    __ movptr(c_rarg0, r15_thread);
+    __ movptr(c_rarg1, rax);
+    __ movptr(c_rarg2, rbx);
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_push)));
 
     __ pop(rscratch2);
@@ -845,7 +815,6 @@ static void gen_i2c_adapter(MacroAssembler *masm,
     __ pop(c_rarg0);
 
     __ pop(rax);
-    //__ lea(rax, RuntimeAddress(__ _address_from_label(_i2c_ret_label)));
     __ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
   }
   __ push(rax);
@@ -1875,7 +1844,9 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
                                                 BasicType* in_sig_bt,
                                                 VMRegPair* in_regs,
                                                 BasicType ret_type) {
+  tty->print_cr("_HOTSPOT: generating native wrapper for %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
   if (method->is_method_handle_intrinsic()) {
+    tty->print_cr("_HOTSPOT: generating native wrapper for instrinsic method %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
     vmIntrinsics::ID iid = method->intrinsic_id();
     intptr_t start = (intptr_t)__ pc();
     int vep_offset = ((intptr_t)__ pc()) - start;
@@ -2467,6 +2438,10 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     __ push(c_rarg5);
     __ push(rscratch1);
     __ push(rscratch2);
+    __ movptr(c_rarg0, r15_thread);
+    __ lea(c_rarg1, RuntimeAddress((address) method()));
+    __ mov_metadata(c_rarg1, method());
+    __ xorptr(c_rarg2, c_rarg2);
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _native_call_begin)));
     __ pop(rscratch2);
     __ pop(rscratch1);
@@ -2482,6 +2457,10 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   if (WildTurtle) {
     __ push(rax);
     __ push(rdx);
+    __ movptr(c_rarg0, r15_thread);
+    __ lea(c_rarg1, RuntimeAddress((address) method()));
+    __ mov_metadata(c_rarg1, method());
+    __ xorptr(c_rarg2, c_rarg2);
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _native_call_end)));
     __ pop(rdx);
     __ pop(rax);
@@ -3565,31 +3544,6 @@ void SharedRuntime::generate_deopt_blob() {
   // rdx which contain the exception oop and exception pc
   // respectively.  Set them in TLS and fall thru to the
   // unpack_with_exception_in_tls entry point.
-  if (WildTurtle) {
-    __ push(rax);
-
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    __ push(rscratch1);
-    __ push(rscratch2);
-
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_blob_exception_case)));
-
-    __ pop(rscratch2);
-    __ pop(rscratch1);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-
-    __ pop(rax);
-  }
 
   __ movptr(Address(r15_thread, JavaThread::exception_pc_offset()), rdx);
   __ movptr(Address(r15_thread, JavaThread::exception_oop_offset()), rax);
@@ -3712,43 +3666,6 @@ void SharedRuntime::generate_deopt_blob() {
   __ addptr(rsp, rcx);
 
   // rsp should be pointing at the return address to the caller (3)
-  /*
-  if (WildTurtle) {
-    __ push(rscratch1);
-    Label _after;
-    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
-    __ cmpptr(rscratch1, Address(rsp, 1 * sizeof(void*)));
-    __ jcc(Assembler::notEqual, _after);
-    // my isle; hajimemashou
-    __ push(rax);
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    // no rscratch1
-    __ push(rscratch2);
-
-    __ movptr(c_rarg0, Address(rsp, 9 * sizeof(void*)));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_verified)));
-    __ lea(c_rarg0, Address(rsp, 9 * sizeof(void*)));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop)));
-    __ pop(rscratch2);
-    // no rscratch1
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-    __ movptr(Address(rsp, 2 * sizeof(void*)), rax);
-    __ pop(rax);
-    // my isle; chu chu
-    __ bind(_after);
-    __ pop(rscratch1);
-  }
-  */
 
   // Pick up the initial fp we should save
   // restore rbp before stack bang because if stack overflow is thrown it needs to be pushed (and preserved)
@@ -3949,34 +3866,6 @@ void SharedRuntime::generate_uncommon_trap_blob() {
   assert(SimpleRuntimeFrame::framesize % 4 == 0, "sp not 16-byte aligned");
 
   address start = __ pc();
-  //__ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop2)));
-  if (false && WildTurtle) {
-    __ push(rax);
-
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    __ push(rscratch1);
-    __ push(rscratch2);
-
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _saw_uncommon_trap)));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_and_pop)));
-    __ movptr(Address(rdx, 0), rax);
-
-    __ pop(rscratch2);
-    __ pop(rscratch1);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-
-    __ pop(rax);
-  }
 
   if (UseRTMLocking) {
     // Abort RTM transaction before possible nmethod deoptimization.
@@ -4265,38 +4154,6 @@ RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const cha
   OopMap* map = NULL;
 
   int start = __ offset();
-
-  if (destination == CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method)) {
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop15)));
-  }
-  if (false && WildTurtle && destination == CAST_FROM_FN_PTR(address, SharedRuntime::handle_wrong_method)) {
-    __ push(rax);
-
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    __ push(rscratch1);
-    __ push(rscratch2);
-
-    __ lea(c_rarg0, Address(rsp, 9 * sizeof(void*)));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_and_pop)));
-    __ movptr(Address(rdx, 0), rax);
-
-    __ pop(rscratch2);
-    __ pop(rscratch1);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-
-    __ pop(rax);
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop)));
-  }
 
   map = RegisterSaver::save_live_registers(masm, 0, &frame_size_in_words);
 

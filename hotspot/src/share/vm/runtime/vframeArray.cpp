@@ -352,11 +352,6 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
     StackValue *value = locals()->at(i);
     intptr_t* addr  = iframe()->interpreter_frame_local_at(i);
     //tty->print_cr("_HOTSPOT: i is %d, location is %p, value is %p", i, addr, (void*) *addr);
-    if (_unlikely((void*) *addr == (void*) *_i2c_ret_handler)) {
-      asm(
-        "call _noop21\n"
-      );
-    }
     switch(value->type()) {
       case T_INT:
         *addr = value->get_int();

@@ -1167,13 +1167,6 @@ void frame::oops_do_internal(OopClosure* f, CLDClosure* cld_f, CodeBlobClosure* 
 }
 
 void frame::nmethods_do(CodeBlobClosure* cf) {
-  /*
-  tty->print_cr("_HOTSPOT: in nmethods do, pc is %p, handler is %p, cb is %p, is nmethod is %d", pc(), (void*) &_i2c_ret_handler, _cb, _cb != NULL && _cb->is_nmethod());
-  if ((void*) pc() == (void*) &_i2c_ret_handler) {
-    tty->print_cr("_HOTSPOT: badness");
-    ShouldNotReachHere();
-  }
-  */
   if (_cb != NULL && _cb->is_nmethod()) {
     cf->do_code_blob(_cb);
   }

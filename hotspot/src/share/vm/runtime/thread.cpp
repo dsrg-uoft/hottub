@@ -1425,6 +1425,17 @@ void WatcherThread::print_on(outputStream* st) const {
 void JavaThread::initialize() {
   // Initialize fields
 
+  _jvm_state = 0;
+  _jvm_state_ready = 0;
+  _jvm_state_times[0] = 0;
+  _jvm_state_times[1] = 0;
+  _jvm_state_last_timestamp = _now();
+  _i2c_stack_pos = 0;
+  _i2c_stack_max = 0;
+  _native_levels = 0;
+  _jvm_transitions_pos = 0;
+  _jvm_transitions_max = 0;
+
   // Set the claimed par_id to UINT_MAX (ie not claiming any par_ids)
   set_claimed_par_id(UINT_MAX);
 
@@ -1515,6 +1526,8 @@ JavaThread::JavaThread(bool is_attaching_via_jni) :
 #endif // INCLUDE_ALL_GCS
 {
   initialize();
+  // is false for main thread
+  tty->print_cr("_HOTSPOT %ld: attaching via jni is %d", _bdel_sys_gettid(), is_attaching_via_jni);
   if (is_attaching_via_jni) {
     _jni_attach_state = _attaching_via_jni;
   } else {
@@ -1575,6 +1588,8 @@ JavaThread::JavaThread(ThreadFunction entry_point, size_t stack_sz) :
     tty->print_cr("creating thread %p", this);
   }
   initialize();
+  this->_jvm_state_ready = 1;
+  tty->print_cr("_HOTSPOT %ld: new java thread with entry point", _bdel_sys_gettid());
   _jni_attach_state = _not_attaching_via_jni;
   set_entry_point(entry_point);
   // Create the native thread itself.

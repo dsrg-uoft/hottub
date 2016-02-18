@@ -1938,6 +1938,12 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL
 JNI_CreateJavaVM(JavaVM **pvm, void **penv, void *args);
 
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL
+JNI_CallingJavaMain();
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL
+JNI_FinishedJavaMain();
+
+
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL
 JNI_GetCreatedJavaVMs(JavaVM **, jsize, jsize *);
 
 /* Defined by native libraries. */
