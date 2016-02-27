@@ -268,8 +268,6 @@ class SharedRuntime: AllStatic {
 
   static int _method_entry(JavaThread* thread, Method* m);
   static int _method_exit(JavaThread* thread, Method* m);
-  static void _i2c(JavaThread* thread);
-  static void _c2i(JavaThread* thread);
 
   // Utility method for retrieving the Java thread id, returns 0 if the
   // thread is not a well formed Java thread.

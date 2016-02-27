@@ -1527,7 +1527,7 @@ JavaThread::JavaThread(bool is_attaching_via_jni) :
 {
   initialize();
   // is false for main thread
-  tty->print_cr("_HOTSPOT %ld: attaching via jni is %d", _bdel_sys_gettid(), is_attaching_via_jni);
+  tty->print_cr("_HOTSPOT %ld: new thread attaching via jni is %d", _bdel_sys_gettid(), is_attaching_via_jni);
   if (is_attaching_via_jni) {
     _jni_attach_state = _attaching_via_jni;
   } else {
@@ -2690,6 +2690,8 @@ void JavaThread::make_zombies() {
 
 void JavaThread::deoptimized_wrt_marked_nmethods() {
   if (!has_last_Java_frame()) return;
+  actually_patch = 0;
+  //_i2c_unpatch(this, "deoptimized wrt marked nmethods");
   // BiasedLocking needs an updated RegisterMap for the revoke monitors pass
   StackFrameStream fst(this, UseBiasedLocking);
   for(; !fst.is_done(); fst.next()) {
@@ -2703,6 +2705,8 @@ void JavaThread::deoptimized_wrt_marked_nmethods() {
       Deoptimization::deoptimize(this, *fst.current(), fst.register_map());
     }
   }
+  actually_patch = 1;
+  //_i2c_repatch(this, "deoptimized wrt marked nmethods");
 }
 
 
@@ -2816,10 +2820,14 @@ void JavaThread::nmethods_do(CodeBlobClosure* cf) {
           (has_last_Java_frame() && java_call_counter() > 0), "wrong java_sp info!");
 
   if (has_last_Java_frame()) {
+    actually_patch = 0;
+    //_i2c_unpatch(this, "nmethods do");
     // Traverse the execution stack
     for(StackFrameStream fst(this); !fst.is_done(); fst.next()) {
       fst.current()->nmethods_do(cf);
     }
+    //_i2c_repatch(this, "nmethods do");
+    actually_patch = 1;
   }
 }
 

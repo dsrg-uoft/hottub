@@ -684,6 +684,29 @@ static void gen_c2i_adapter(MacroAssembler *masm,
     }
   }
 
+  if (WildTurtle && Dyrus) {
+    __ push(rax);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+    __ movptr(c_rarg0, r15_thread);
+    __ movptr(c_rarg1, rbx);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _saw_c2i)));
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ pop(rax);
+  }
   // Schedule the branch target address early.
   __ movptr(rcx, Address(rbx, in_bytes(Method::interpreter_entry_offset())));
   __ jmp(rcx);

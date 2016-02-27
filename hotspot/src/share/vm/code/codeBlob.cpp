@@ -189,9 +189,10 @@ void CodeBlob::flush() {
   _strings.free();
 }
 
-
+#include "runtime/_bdel.hpp"
 OopMap* CodeBlob::oop_map_for_return_address(address return_address) {
   assert(oop_maps() != NULL, "nope");
+  tty->print_cr("_HOTSPOT: return address is %p, handler is %p", (void*) return_address, &_i2c_ret_handler);
   return oop_maps()->find_map_at_offset((intptr_t) return_address - (intptr_t) code_begin());
 }
 

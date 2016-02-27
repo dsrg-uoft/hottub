@@ -53,15 +53,21 @@ OopMapStream::OopMapStream(OopMap* oop_map) {
 
 
 OopMapStream::OopMapStream(OopMap* oop_map, int oop_types_mask) {
+  tty->print_cr("_HOTSPOT: hi, oop map is %p", oop_map);
+  tty->print_cr("_HOTSPOT: creating oop map stream, omv data is %p", oop_map->omv_data());
   if(oop_map->omv_data() == NULL) {
+    tty->print_cr("_HOTSPOT: a");
     _stream = new CompressedReadStream(oop_map->write_stream()->buffer());
   } else {
+    tty->print_cr("_HOTSPOT: b");
     _stream = new CompressedReadStream(oop_map->omv_data());
   }
+  tty->print_cr("_HOTSPOT: creating oop map stream 2");
   _mask = oop_types_mask;
   _size = oop_map->omv_count();
   _position = 0;
   _valid_omv = false;
+  tty->print_cr("_HOTSPOT: creating oop map stream 3");
 }
 
 
@@ -303,6 +309,7 @@ OopMap* OopMapSet::find_map_at_offset(int pc_offset) const {
   }
 
   assert( i < len, "oopmap not found" );
+  tty->print_cr("_HOTSPOT: oop map %d, %d", i, len);
 
   OopMap* m = at(i);
   assert( m->offset() == pc_offset, "oopmap not found" );
@@ -463,8 +470,15 @@ void OopMapSet::all_do(const frame *fr, const RegisterMap *reg_map,
 // Update callee-saved register info for the following frame
 void OopMapSet::update_register_map(const frame *fr, RegisterMap *reg_map) {
   ResourceMark rm;
+  tty->print_cr("_HOTSPOT: in oop map set update register map, frame is interpreted %d, is compiled %d", fr->is_interpreted_frame(), fr->is_compiled_frame());
   CodeBlob* cb = fr->cb();
   assert(cb != NULL, "no codeblob");
+
+  if (cb == NULL) {
+    tty->print_cr("_HOTSPOT: cb is null");
+  } else {
+    tty->print_cr("_HOTSPOT: cb is not null");
+  }
 
   // Any reg might be saved by a safepoint handler (see generate_handler_blob).
   assert( reg_map->_update_for_id == NULL || fr->is_older(reg_map->_update_for_id),
@@ -481,16 +495,24 @@ void OopMapSet::update_register_map(const frame *fr, RegisterMap *reg_map) {
 
   address pc = fr->pc();
   OopMap* map  = cb->oop_map_for_return_address(pc);
+  if (map == NULL) {
+    tty->print_cr("_HOTSPOT: oop map is null");
+  } else {
+    tty->print_cr("_HOTSPOT: oop map is not null, is %p", map);
+  }
   assert(map != NULL, "no ptr map found");
   DEBUG_ONLY(int nof_callee = 0;)
 
   for (OopMapStream oms(map, OopMapValue::callee_saved_value); !oms.is_done(); oms.next()) {
+    tty->print_cr("_HOTSPOT: oop map loop start");
     OopMapValue omv = oms.current();
     VMReg reg = omv.content_reg();
     oop* loc = fr->oopmapreg_to_location(omv.reg(), reg_map);
     reg_map->set_location(reg, (address) loc);
     DEBUG_ONLY(nof_callee++;)
+    tty->print_cr("_HOTSPOT: oop map loop done");
   }
+  tty->print_cr("_HOTSPOT: oop map all done");
 
   // Check that runtime stubs save all callee-saved registers
 #ifdef COMPILER2

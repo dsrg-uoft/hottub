@@ -15,19 +15,35 @@
 #define _bdel_sys_gettid() ((int64_t) syscall(SYS_gettid))
 #define _MAX(a, b) ((a) > (b) ? (a) : (b))
 
-/*
- * Scenario:
- * - in compiled code
- * - call interpreted method
- * - `_jvm_state` set to interpreted
- * - method exits, need to set `_jvm_state` back to compiled
- * - but suppose interpreted method calls compiled method
- * - that compiled method may call another interpreted method
- * - hmmm...
- */
+extern __thread int actually_patch;
 
-extern volatile uint64_t _i_total;
-extern volatile uint64_t _c_total;
+/**
+ * Notes
+ * =====
+ * Hmmm.
+ *
+ * ## i2c stack
+ * We patch the return address for compiled calls in i2c to point to our handler so we know when the function finishes.
+ * We need to save the "real" return address so we know where to jump back to,
+ * or what to repatch/unpatch the return address to in case of deoptimization or exception thrown.
+ * We also save the location we placed the return address (for verification purposes).
+ *
+ * ## Transition stack
+ * On function return, we need to transition back to the caller's state.
+ * Technically, we should have compiled method returns, but sometimes we see two i2cs...
+ * So, we treat interpreter entry, i2c, osr migration begin, and native wrapper, and n2i
+ * only as entries, making no assumptions about the previous state.
+ *
+ * ## Marking activations in safepoints
+ * At a safepoint, the JVM scans the stack, tracing call frames via rbp and building a call stack from return addresses.
+ * Before it does this, we need to unpatch the return addresses and (re)patch them afterwards,
+ * so it knows what nmethods are active.
+ *
+ * ## TODO
+ * - race conditions for safepoints
+ *
+ * Hmmm.
+ */
 
 uint64_t _now();
 void _bdel_knell(const char*);
@@ -44,47 +60,14 @@ extern "C" {
   void _i2c_ret_handler();
   void _native_call_begin(JavaThread*, Method*, int);
   void _native_call_end(JavaThread*, Method*, int);
+  void _i2c_unpatch(JavaThread*, const char*);
+  void _i2c_repatch(JavaThread*, const char*);
 }
 
 extern "C" {
-  void _dump_i2c_stack();
+  void _i2c_dump_stack();
   void _i2c_verify_stack();
+  void _saw_c2i(JavaThread*, Method*);
 }
-
-/*
-void _noop();
-void _noop2();
-void _noop3();
-void _noop4();
-void _noop5();
-void _noop10();
-
-extern "C" void _noop11();
-extern "C" void _noop12();
-extern "C" void _noop13();
-extern "C" void _noop14();
-extern "C" void _noop15();
-extern "C" void _noop16();
-extern "C" void _noop20();
-extern "C" void _noop21();
-extern "C" void _noop30();
-extern "C" void _noop31();
-extern "C" void _noop32();
-extern "C" void _noop33(void*);
-extern "C" void _noop40();
-extern "C" void _noop41();
-
-extern "C" void _saw_uncommon_trap();
-extern "C" void _deopt_blob_start();
-extern "C" void _deopt_blob_exception_case();
-extern "C" void _deopt_blob_normal();
-extern "C" void _deopt_blob_test(void*);
-extern "C" void _deopt_verified(void*);
-
-extern "C" void _saw_safepoint_return_handler();
-extern "C" void _saw_call_stub();
-extern "C" void _saw_call_stub2();
-
-*/
 
 #endif // SHARE_VM_RUNTIME__BDEL_HPP

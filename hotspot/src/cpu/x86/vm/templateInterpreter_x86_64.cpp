@@ -1076,6 +1076,7 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
 
   // jvmti support
   __ notify_method_entry();
+  /*
   if (WildTurtle) {
     __ push(rax);
     __ push(c_rarg0);
@@ -1100,6 +1101,7 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
     __ pop(c_rarg0);
     __ pop(rax);
   }
+  */
 
   // work registers
   const Register method = rbx;
