@@ -163,7 +163,8 @@ void _bdel_knell(const char* str) {
     );
     if (true || jt->_i2c_stack_pos != 0 || jt->_jvm_transitions_pos != 0 || jt->_native_levels != 0) {
       tty->print_cr(
-        "_HOTSPOT: wildturtle indexes did not end at 0"
+        //"_HOTSPOT: wildturtle indexes did not end at 0"
+        "_HOTSPOT: wildturtle indexes"
         " - i2c stack pos %d"
         " - jvm transitions pos %d"
         " - native levels %d"

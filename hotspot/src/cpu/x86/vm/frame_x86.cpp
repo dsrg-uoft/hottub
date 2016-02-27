@@ -481,9 +481,6 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
     sender_pc = (address) ret;
     *((void**) (sender_sp - 1)) = ret;
   }
-  if ((void*) sender_pc == (void*) &_i2c_ret_handler) {
-    tty->print_cr("_HOTSPOT: was");
-  }
 
   // This is the saved value of EBP which may or may not really be an FP.
   // It is only an FP if the sender is an interpreter frame (or C1?).
@@ -495,9 +492,7 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
     // outside of update_register_map.
     map->set_include_argument_oops(_cb->caller_must_gc_arguments(map->thread()));
     if (_cb->oop_maps() != NULL) {
-      tty->print_cr("_HOTSPOT: updating register map");
       OopMapSet::update_register_map(this, map);
-      tty->print_cr("_HOTSPOT: done register map");
     }
 
     // Since the prolog does the save and restore of EBP there is no oopmap
@@ -521,12 +516,10 @@ frame frame::sender(RegisterMap* map) const {
   if (is_entry_frame())       return sender_for_entry_frame(map);
   if (is_interpreted_frame()) return sender_for_interpreter_frame(map);
   assert(_cb == CodeCache::find_blob(pc()),"Must be the same");
-  tty->print_cr("_HOTSPOT: pc is %p, cb is %p", (void*) pc(), _cb);
 
   if (_cb != NULL) {
     return sender_for_compiled_frame(map);
   }
-  tty->print_cr("_HOTSPOT: sender pc is %p, sending up", sender_pc());
   // Must be native-compiled frame, i.e. the marshaling code for native
   // methods that exists in the core system.
   return frame(sender_sp(), link(), sender_pc());
