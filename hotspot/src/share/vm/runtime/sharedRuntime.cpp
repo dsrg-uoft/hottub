@@ -108,6 +108,7 @@ __thread int actually_patch = 1;
 static __thread int _method_levels = 0;
 static __thread Method* _call_stack[128];
 static __thread int _i2c_levels;
+static __thread int _c2i_levels;
 static __thread int _i2n_levels;
 static __thread int _n2i_levels;
 static __thread int _i_levels;
@@ -170,6 +171,7 @@ void _bdel_knell(const char* str) {
         " - native levels %d"
         " - method levels %d"
         " - i2c levels %d"
+        " - c2i levels %d"
         " - i2n levels %d"
         " - n2i levels %d"
         " - i levels %d"
@@ -178,6 +180,7 @@ void _bdel_knell(const char* str) {
         , jt->_native_levels
         , _method_levels
         , _i2c_levels
+        , _c2i_levels
         , _i2n_levels
         , _n2i_levels
         , _i_levels
@@ -188,11 +191,15 @@ void _bdel_knell(const char* str) {
 }
 
 extern "C" {
-  void _i2c_ret_push(JavaThread* jt, void* ret, Method* m) {
+  void _i2c_ret_push(JavaThread* jt, void* ret, void* rbp, Method* m) {
+    if (ret == (void*) &_c2i_ret_handler) {
+      tty->print_cr("_HOTSPOT: i2c saw c2i");
+      ShouldNotReachHere();
+    }
     _i2c_levels++;
     if (Dyrus) {
       tty->print_cr(
-        "_HOTSPOT %ld: calling i2c %s#%s, %d levels"
+        "_HOTSPOT %ld: calling i2c %s#%s, from %d levels"
         , _bdel_sys_gettid()
         , m->klass_name()->as_C_string()
         , m->name()->as_C_string()
@@ -203,7 +210,7 @@ extern "C" {
       tty->print_cr("_HOTSPOT: i2c stack overflowed");
       ShouldNotReachHere();
     }
-    register void** rbp asm("rbp");
+    //register void** rbp asm("rbp");
     // ===============================
     // | bottom of stack/top address |
     // | ...
@@ -215,7 +222,8 @@ extern "C" {
     // | top of stack                |
     // ===============================
     // rbp + this return address + 8 caller saved registers + rax - not yet pushed
-    jt->_i2c_rbp_stack[jt->_i2c_stack_pos] = rbp + 10;
+    //jt->_i2c_rbp_stack[jt->_i2c_stack_pos] = rbp + 10;
+    jt->_i2c_rbp_stack[jt->_i2c_stack_pos] = rbp;
     jt->_i2c_ret_stack[jt->_i2c_stack_pos++] = ret;
     jt->_i2c_stack_max = _MAX(jt->_i2c_stack_max, jt->_i2c_stack_pos);
 
@@ -224,7 +232,8 @@ extern "C" {
   _rax_rdx _i2c_ret_pop(JavaThread* jt) {
     _i2c_levels--;
     if (Dyrus) {
-      tty->print_cr("_HOTSPOT %ld: returning i2c, %d levels", _bdel_sys_gettid(), jt->_i2c_stack_pos);
+      tty->print_cr("_HOTSPOT %ld: returning i2c, from %d levels", _bdel_sys_gettid(), jt->_i2c_stack_pos);
+      //_i2c_verify_stack();
     }
     if (_unlikely(jt->_i2c_stack_pos <= 0)) {
       tty->print_cr("_HOTSPOT: i2c stack underflowed");
@@ -240,8 +249,32 @@ extern "C" {
   void* _i2c_ret_verify_location_and_pop(JavaThread* jt, void* rbp) {
     _rax_rdx ret = _i2c_ret_pop(jt);
     if (_unlikely(rbp != ret.rdx)) {
-      tty->print_cr("_HOTSPOT: i2c ret verify location and pop check failed; rbp is %p, expected is %p, was %lu bytes deeper", rbp, ret.rdx, (uint64_t) rbp - (uint64_t) ret.rdx);
-      //ShouldNotReachHere();
+      tty->print_cr("_HOTSPOT: i2c ret verify location and pop check failed; rbp is %p, expected is %p, was %ld bytes deeper", rbp, ret.rdx, (int64_t) rbp - (int64_t) ret.rdx);
+      tty->print_cr("_HOTSPOT: position is %d", jt->_i2c_stack_pos);
+      int found = 0;
+      for (int i = 0; i < 128; i++) {
+        if (jt->_i2c_rbp_stack[i] == rbp) {
+          tty->print_cr("_HOTSPOT: found match at %d", i);
+          asm(
+            "callq noop10\n"
+          );
+          found = 1;
+          break;
+        }
+      }
+      if (!found) {
+        tty->print_cr("_HOTSPOT: not found");
+        for (int i = 0; i < 128; i++) {
+          int64_t x = (int64_t) jt->_i2c_rbp_stack[i];
+          int64_t y = (int64_t) rbp;
+          if ((x - y < 40) || (y - x < 40)) {
+            tty->print_cr("_HOTSPOT: found close at %d", i);
+            break;
+          }
+        }
+        tty->print_cr("_HOTSPOT: checked close");
+      }
+      ShouldNotReachHere();
     }
     return ret.rax;
   }
@@ -317,6 +350,7 @@ extern "C" {
     jt->_native_levels--;
   }
   void _i2c_unpatch(JavaThread* jt, const char* where) {
+    _c2i_unpatch(jt, where);
     if (jt->_i2c_stack_pos == 0) {
       return;
     }
@@ -338,6 +372,7 @@ extern "C" {
     }
   }
   void _i2c_repatch(JavaThread* jt, const char* where) {
+    _c2i_repatch(jt, where);
     if (jt->_i2c_stack_pos == 0) {
       return;
     }
@@ -357,6 +392,125 @@ extern "C" {
     } else {
       tty->print_cr("_HOTSPOT %ld: done i2c repatch of %d levels (%s)", _bdel_sys_gettid(), jt->_i2c_stack_pos, where);
     }
+  }
+  void _c2i_ret_push(JavaThread* jt, void* ret, void* rbp, Method* m) {
+    if (ret == (void*) &_i2c_ret_handler) {
+      tty->print_cr("_HOTSPOT: c2i saw i2c");
+      ShouldNotReachHere();
+    }
+    _c2i_levels++;
+    if (Dyrus) {
+      tty->print_cr(
+        "_HOTSPOT %ld: calling c2i %s#%s, %d levels"
+        , _bdel_sys_gettid()
+        , m->klass_name()->as_C_string()
+        , m->name()->as_C_string()
+        , jt->_c2i_stack_pos
+      );
+    }
+    if (_unlikely(jt->_c2i_stack_pos >= _I2C_STACK_SIZE)) {
+      tty->print_cr("_HOTSPOT: c2i stack overflowed");
+      ShouldNotReachHere();
+    }
+    jt->_c2i_rbp_stack[jt->_c2i_stack_pos] = rbp;
+    jt->_c2i_ret_stack[jt->_c2i_stack_pos++] = ret;
+
+    _jvm_transitions_push(jt, 0);
+  }
+  _rax_rdx _c2i_ret_pop(JavaThread* jt, int where) {
+    _c2i_levels--;
+    if (Dyrus) {
+      tty->print_cr("_HOTSPOT %ld: returning c2i (source %d), %d levels", _bdel_sys_gettid(), where, jt->_c2i_stack_pos);
+      //_c2i_verify_stack();
+    }
+    if (_unlikely(jt->_c2i_stack_pos <= 0)) {
+      tty->print_cr("_HOTSPOT: c2i stack underflowed");
+      ShouldNotReachHere();
+    }
+    _rax_rdx ret;
+    ret.rdx = jt->_c2i_rbp_stack[--(jt->_c2i_stack_pos)];
+    ret.rax = jt->_c2i_ret_stack[jt->_c2i_stack_pos];
+
+    _jvm_transitions_pop(jt);
+    return ret;
+  }
+  void* _c2i_ret_verify_location_and_pop(JavaThread* jt, void* rbp, int where) {
+    _rax_rdx ret = _c2i_ret_pop(jt, where);
+    if (_unlikely(rbp != ret.rdx)) {
+      tty->print_cr("_HOTSPOT: c2i ret verify location and pop check failed (%d); rbp is %p, expected is %p, was %ld bytes deeper", where, rbp, ret.rdx, (int64_t) rbp - (int64_t) ret.rdx);
+      //ShouldNotReachHere();
+      /*
+      asm(
+        "callq noop10\n"
+      );
+      */
+    } else {
+      tty->print_cr("_HOTSPOT: c2i ret verify location and pop check was good (%d)", where);
+    }
+    return ret.rax;
+  }
+  void _c2i_ret_handler() {
+    asm(
+      "push %rax\n"
+      "\tpush %rdx\n"
+      "\tmov %r15, %rdi\n"
+      "\tmov %rbp, %rsi\n"
+      "\tlea -1, %rdx\n"
+      "\tcallq _c2i_ret_verify_location_and_pop\n"
+      "\tmov %rax, %r11\n"
+      "\tpop %rdx\n"
+      "\tpop %rax\n"
+      "\tpop %rbp\n"
+      "\tpush %r11\n"
+      "\tpush %rbp\n"
+    );
+  }
+  void _c2i_unpatch(JavaThread* jt, const char* where) {
+    if (jt->_c2i_stack_pos == 0) {
+      return;
+    }
+    tty->print_cr("_HOTSPOT %ld: beginning c2i unpatch of %d levels (%s)", _bdel_sys_gettid(), jt->_c2i_stack_pos, where);
+    int badness = 0;
+    for (int i = 0; i < jt->_c2i_stack_pos; i++) {
+      void** location = (void**) jt->_c2i_rbp_stack[i];
+      if (*location == (void*) &_c2i_ret_handler) {
+        *location = jt->_c2i_ret_stack[i];
+      } else {
+        badness = 1;
+      }
+    }
+    if (badness) {
+      tty->print_cr("_HOTSPOT %ld: c2i unpatch faulty (%s)", _bdel_sys_gettid(), where);
+      //_c2i_dump_stack();
+    } else {
+      tty->print_cr("_HOTSPOT %ld: done c2i unpatch of %d levels (%s)", _bdel_sys_gettid(), jt->_c2i_stack_pos, where);
+    }
+  }
+  void _c2i_repatch(JavaThread* jt, const char* where) {
+    if (jt->_c2i_stack_pos == 0) {
+      return;
+    }
+    tty->print_cr("_HOTSPOT %ld: beginning c2i repatch of %d levels (%s)", _bdel_sys_gettid(), jt->_c2i_stack_pos, where);
+    int badness = 0;
+    for (int i = 0; i < jt->_c2i_stack_pos; i++) {
+      void** location = (void**) jt->_c2i_rbp_stack[i];
+      if (*location == (void*) jt->_c2i_ret_stack[i]) {
+        *location = (void*) &_c2i_ret_handler;
+      } else {
+        badness = 1;
+      }
+    }
+    if (badness) {
+      tty->print_cr("_HOTSPOT %ld: c2i unpatch faulty (%s)", _bdel_sys_gettid(), where);
+      //_c2i_dump_stack();
+    } else {
+      tty->print_cr("_HOTSPOT %ld: done c2i repatch of %d levels (%s)", _bdel_sys_gettid(), jt->_c2i_stack_pos, where);
+    }
+  }
+}
+extern "C" {
+  void noop10() {
+    return;
   }
 }
 JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
@@ -435,18 +589,37 @@ JRT_END;
 extern "C" {
   void _i2c_dump_stack() {
     JavaThread* jt = JavaThread::current();
-    tty->print_cr("=== i2c ret stack for %ld (handler at %p) ===", _bdel_sys_gettid(), (void*) &_i2c_ret_handler);
-    for (int i = jt->_i2c_stack_pos; i >= 0; i--) {
+    tty->print_cr("=== i2c ret stack for %ld (handler at %p, c2i at %p) ===", _bdel_sys_gettid(), (void*) &_i2c_ret_handler, (void*) &_c2i_ret_handler);
+    for (int i = jt->_i2c_stack_pos - 1; i >= 0; i--) {
       tty->print_cr(" %d. %p: %p", i, jt->_i2c_rbp_stack[i], jt->_i2c_ret_stack[i]);
+    }
+  }
+  void _c2i_dump_stack() {
+    JavaThread* jt = JavaThread::current();
+    tty->print_cr("=== c2i ret stack for %ld (handler at %p, i2c at %p) ===", _bdel_sys_gettid(), (void*) &_c2i_ret_handler, (void*) &_i2c_ret_handler);
+    for (int i = jt->_c2i_stack_pos - 1; i >= 0; i--) {
+      tty->print_cr(" %d. %p: %p", i, jt->_c2i_rbp_stack[i], jt->_c2i_ret_stack[i]);
     }
   }
   void _i2c_verify_stack() {
     JavaThread* jt = JavaThread::current();
-    for (int i = jt->_i2c_stack_pos; i >= 0; i--) {
+    for (int i = jt->_i2c_stack_pos - 1; i >= 0; i--) {
       void* ret_addr = *((void**) jt->_i2c_rbp_stack[i]);
       if (_unlikely(ret_addr != (void*) &_i2c_ret_handler)) {
-        tty->print_cr("_HOTSPOT %ld: failed i2c stack check at position %d", i);
+        tty->print_cr("_HOTSPOT %ld: failed i2c stack check at position %d", _bdel_sys_gettid(), i);
         _i2c_dump_stack();
+        ShouldNotReachHere();
+      }
+    }
+    tty->print_cr("_HOTSPOT: verified i2c stack");
+  }
+  void _c2i_verify_stack() {
+    JavaThread* jt = JavaThread::current();
+    for (int i = jt->_c2i_stack_pos - 1; i >= 0; i--) {
+      void* ret_addr = *((void**) jt->_c2i_rbp_stack[i]);
+      if (_unlikely(ret_addr != (void*) &_c2i_ret_handler)) {
+        tty->print_cr("_HOTSPOT %ld: failed c2i stack check at position %d", _bdel_sys_gettid(), i);
+        _c2i_dump_stack();
         ShouldNotReachHere();
       }
     }
@@ -2069,6 +2242,7 @@ void SharedRuntime::check_member_name_argument_is_last_argument(methodHandle met
 // so he no longer calls into the interpreter.
 IRT_LEAF(void, SharedRuntime::fixup_callers_callsite(Method* method, address caller_pc))
   Method* moop(method);
+  tty->print_cr("_HOTSPOT: in fixup callers callsite for %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
 
   address entry_point = moop->from_compiled_entry();
 

@@ -361,9 +361,12 @@ class vframeStream : public vframeStreamCommon {
       return;
     }
 
+    //tty->print_cr("_HOTSPOT: in vframestream constructor, about to get last frame");
     _frame = _thread->last_frame();
+    //tty->print_cr("_HOTSPOT: in vframestream constructor, starting loop");
     while (!fill_from_frame()) {
       _frame = _frame.sender(&_reg_map);
+      //tty->print_cr("_HOTSPOT: in vframestream constructor, loop iteration");
     }
   }
 

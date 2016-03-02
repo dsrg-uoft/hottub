@@ -1223,8 +1223,12 @@ address OptoRuntime::handle_exception_C(JavaThread* thread) {
 // *THIS IS NOT RECOMMENDED PROGRAMMING STYLE*
 //
 address OptoRuntime::rethrow_C(oopDesc* exception, JavaThread* thread, address ret_pc) {
-  if ((void*) ret_pc == (void*) _i2c_ret_handler) {
+  if ((void*) ret_pc == (void*) &_i2c_ret_handler) {
     _rax_rdx ret = _i2c_ret_pop(thread);
+    ret_pc = (address) ret.rax;
+  }
+  if ((void*) ret_pc == (void*) &_c2i_ret_handler) {
+    _rax_rdx ret = _c2i_ret_pop(thread, -6);
     ret_pc = (address) ret.rax;
   }
 #ifndef PRODUCT

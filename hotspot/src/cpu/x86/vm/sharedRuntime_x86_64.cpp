@@ -522,7 +522,42 @@ static void patch_callers_callsite(MacroAssembler *masm) {
     // my isle; chu chu
     __ bind(_after);
     __ pop(rscratch1);
+  }
+  if (WildTurtle) {
+    __ push(rscratch1);
+    Label _after;
+    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));
+    __ cmpptr(rscratch1, rax);
+    __ jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    // no rax
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    // no rscratch1
+    __ push(rscratch2);
 
+    // 8 caller saved registers
+    __ movptr(c_rarg0, r15_thread);
+    __ lea(c_rarg1, Address(rsp, 8 * wordSize));
+    __ lea(c_rarg2, RuntimeAddress((address) -5));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop)));
+    __ pop(rscratch2);
+    // no rscratch1
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ movptr(Address(rsp, wordSize), rax);
+    // no rax
+    // my isle; chu chu
+    __ bind(_after);
+    __ pop(rscratch1);
   }
 
   // align stack so push_CPU_state doesn't fault
@@ -587,6 +622,32 @@ static void gen_c2i_adapter(MacroAssembler *masm,
 
   __ subptr(rsp, extraspace);
 
+  if (WildTurtle) {
+    // no rax
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+    __ movptr(c_rarg0, r15_thread);
+    __ movptr(c_rarg1, rax);
+    __ lea(c_rarg2, Address(rsp, 8 * wordSize));
+    __ movptr(c_rarg3, rbx);
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_push)));
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    // no rax
+    __ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, &_c2i_ret_handler)));
+  }
   // Store the return address in the expected location
   __ movptr(Address(rsp, 0), rax);
 
@@ -684,29 +745,6 @@ static void gen_c2i_adapter(MacroAssembler *masm,
     }
   }
 
-  if (WildTurtle && Dyrus) {
-    __ push(rax);
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    __ push(rscratch1);
-    __ push(rscratch2);
-    __ movptr(c_rarg0, r15_thread);
-    __ movptr(c_rarg1, rbx);
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _saw_c2i)));
-    __ pop(rscratch2);
-    __ pop(rscratch1);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-    __ pop(rax);
-  }
   // Schedule the branch target address early.
   __ movptr(rcx, Address(rbx, in_bytes(Method::interpreter_entry_offset())));
   __ jmp(rcx);
@@ -812,8 +850,6 @@ static void gen_i2c_adapter(MacroAssembler *masm,
   // push the return address and misalign the stack that youngest frame always sees
   // as far as the placement of the call instruction
   if (WildTurtle) {
-    __ push(rax);
-
     __ push(c_rarg0);
     __ push(c_rarg1);
     __ push(c_rarg2);
@@ -825,7 +861,8 @@ static void gen_i2c_adapter(MacroAssembler *masm,
 
     __ movptr(c_rarg0, r15_thread);
     __ movptr(c_rarg1, rax);
-    __ movptr(c_rarg2, rbx);
+    __ lea(c_rarg2, Address(rsp, 7 * wordSize));
+    __ movptr(c_rarg3, rbx);
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_push)));
 
     __ pop(rscratch2);
@@ -837,7 +874,6 @@ static void gen_i2c_adapter(MacroAssembler *masm,
     __ pop(c_rarg1);
     __ pop(c_rarg0);
 
-    __ pop(rax);
     __ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
   }
   __ push(rax);

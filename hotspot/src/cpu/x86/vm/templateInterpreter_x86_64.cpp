@@ -1958,6 +1958,43 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
   // restore exception
   __ get_vm_result(rax, r15_thread);
 
+  if (WildTurtle) {
+    __ push(rscratch1);
+    Label _after;
+    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));
+    __ cmpptr(rscratch1, rdx);
+    __ jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    __ push(rax);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    // no rscratch1
+    __ push(rscratch2);
+
+    // 8 caller saved registers + rax
+    __ movptr(c_rarg0, r15_thread);
+    __ lea(c_rarg1, Address(rsp, 8 * wordSize));
+    __ lea(c_rarg2, RuntimeAddress((address) -6));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop)));
+    __ pop(rscratch2);
+    // no rscratch1
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ movptr(rdx, rax);
+    __ pop(rax);
+    // my isle; chu chu
+    __ bind(_after);
+    __ pop(rscratch1);
+  }
+
   // In between activations - previous activation type unknown yet
   // compute continuation point - the continuation point expects the
   // following registers set up:

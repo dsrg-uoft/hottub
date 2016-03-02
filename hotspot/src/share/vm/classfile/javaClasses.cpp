@@ -1588,7 +1588,9 @@ void java_lang_Throwable::print_stack_trace(oop throwable, outputStream* st) {
   }
 }
 
+#include "runtime/_bdel.hpp"
 void java_lang_Throwable::fill_in_stack_trace(Handle throwable, methodHandle method, TRAPS) {
+  tty->print_cr("_HOTSPOT: in fill_in_stack_trace with traps");
   if (!StackTraceInThrowable) return;
   ResourceMark rm(THREAD);
 
@@ -1608,13 +1610,18 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, methodHandle met
 
   // If there is no Java frame just return the method that was being called
   // with bci 0
+  tty->print_cr("_HOTSPOT: me here");
   if (!thread->has_last_Java_frame()) {
+    tty->print_cr("_HOTSPOT: doesn't have last java frame");
     if (max_depth >= 1 && method() != NULL) {
       bt.push(method(), 0, CHECK);
       set_backtrace(throwable(), bt.backtrace());
     }
     return;
   }
+  tty->print_cr("_HOTSPOT: have java frame 2");
+
+  _i2c_unpatch(thread, "fill in stack trace");
 
   // Instead of using vframe directly, this version of fill_in_stack_trace
   // basically handles everything by hand. This significantly improved the
@@ -1624,6 +1631,9 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, methodHandle met
   // trace as utilizing vframe.
 #ifdef ASSERT
   vframeStream st(thread);
+  tty->print_cr("_HOTSPOT: i am here, trying to get method");
+  st.method();
+  tty->print_cr("_HOTSPOT: i am here, got method");
   methodHandle st_method(THREAD, st.method());
 #endif
   int total_count = 0;
@@ -1721,9 +1731,12 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, methodHandle met
 
   // Put completed stack trace into throwable object
   set_backtrace(throwable(), bt.backtrace());
+
+  _i2c_repatch(thread, "fill in stack trace");
 }
 
 void java_lang_Throwable::fill_in_stack_trace(Handle throwable, methodHandle method) {
+  tty->print_cr("_HOTSPOT: in fill_in_stack_trace with just throwable and method");
   // No-op if stack trace is disabled
   if (!StackTraceInThrowable) {
     return;
@@ -1737,7 +1750,9 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, methodHandle met
   PRESERVE_EXCEPTION_MARK;
 
   JavaThread* thread = JavaThread::active();
+  tty->print_cr("_HOTSPOT: in fill_in_stack_trace with just throwable and method, part 2");
   fill_in_stack_trace(throwable, method, thread);
+  tty->print_cr("_HOTSPOT: in fill_in_stack_trace with just throwable and method, part 3");
   // ignore exceptions thrown during stack trace filling
   CLEAR_PENDING_EXCEPTION;
 }

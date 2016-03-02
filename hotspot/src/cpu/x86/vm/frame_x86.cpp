@@ -476,8 +476,24 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   // On Intel the return_address is always the word on the stack
   address sender_pc = (address) *(sender_sp-1);
 
-  if (WildTurtle && Thread::current()->is_Java_thread() && (void*) sender_pc == (void*) &_i2c_ret_handler && actually_patch) {
+  //if (WildTurtle && Thread::current()->is_Java_thread() && (void*) sender_pc == (void*) &_i2c_ret_handler) {
+  if (WildTurtle && (void*) sender_pc == (void*) &_i2c_ret_handler) {
+    tty->print_cr("_HOTSPOT: in frame found i2c %p, c2i %p", (void*) &_i2c_ret_handler, (void*) &_c2i_ret_handler);
+    /*
+    asm(
+      "callq noop10\n"
+    );
+    */
     void* ret = _i2c_ret_verify_location_and_pop(JavaThread::current(), (void*) (sender_sp - 1));
+    tty->print_cr("_HOTSPOT: frame i2c got %p", ret);
+    sender_pc = (address) ret;
+    *((void**) (sender_sp - 1)) = ret;
+  }
+  //_i2c_verify_stack();
+  if (WildTurtle && (void*) sender_pc == (void*) &_c2i_ret_handler) {
+    tty->print_cr("_HOTSPOT: in frame found c2i %p, i2c %p", (void*) &_c2i_ret_handler, (void*) &_i2c_ret_handler);
+    void* ret = _c2i_ret_verify_location_and_pop(JavaThread::current(), (void*) (sender_sp - 1), -2);
+    tty->print_cr("_HOTSPOT: frame c2i got %p", ret);
     sender_pc = (address) ret;
     *((void**) (sender_sp - 1)) = ret;
   }

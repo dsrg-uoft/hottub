@@ -54,7 +54,7 @@ typedef struct {
 } _rax_rdx;
 
 extern "C" {
-  void _i2c_ret_push(JavaThread*, void*, Method*);
+  void _i2c_ret_push(JavaThread*, void*, void*, Method*);
   _rax_rdx _i2c_ret_pop(JavaThread*);
   void* _i2c_ret_verify_location_and_pop(JavaThread*, void*);
   void _i2c_ret_handler();
@@ -63,11 +63,23 @@ extern "C" {
   void _i2c_unpatch(JavaThread*, const char*);
   void _i2c_repatch(JavaThread*, const char*);
 }
+extern "C" {
+  void _c2i_ret_push(JavaThread*, void*, void*, Method*);
+  _rax_rdx _c2i_ret_pop(JavaThread*, int);
+  void* _c2i_ret_verify_location_and_pop(JavaThread*, void*, int);
+  void _c2i_ret_handler();
+  void _c2i_unpatch(JavaThread*, const char*);
+  void _c2i_repatch(JavaThread*, const char*);
+}
 
 extern "C" {
   void _i2c_dump_stack();
   void _i2c_verify_stack();
+  void _c2i_dump_stack();
+  void _c2i_verify_stack();
   void _saw_c2i(JavaThread*, Method*);
+
+  void noop10();
 }
 
 #endif // SHARE_VM_RUNTIME__BDEL_HPP
