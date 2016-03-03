@@ -350,7 +350,9 @@ extern "C" {
     jt->_native_levels--;
   }
   void _i2c_unpatch(JavaThread* jt, const char* where) {
-    _c2i_unpatch(jt, where);
+    jt->_c2i_unpatch = 1;
+    jt->_c2i_unpatch_pos = 0;
+    // i2c
     if (jt->_i2c_stack_pos == 0) {
       return;
     }
@@ -372,7 +374,18 @@ extern "C" {
     }
   }
   void _i2c_repatch(JavaThread* jt, const char* where) {
-    _c2i_repatch(jt, where);
+    //_c2i_repatch(jt, where);
+    tty->print_cr("_HOTSPOT %ld: beginning c2i repatch, stack pos is %d, unpatch pos is %d", _bdel_sys_gettid(), jt->_c2i_stack_pos, jt->_c2i_unpatch_pos);
+    for (int i = 0; i < jt->_c2i_unpatch_pos; i++) {
+      void** location = (void**) jt->_c2i_repatch_stack[i];
+      if (*location != jt->_c2i_ret_stack[jt->_c2i_stack_pos - i - 1]) {
+        tty->print_cr("_HOTSPOT %ld: c2i repatch at (%s) didn't match at pos (%d)", _bdel_sys_gettid(), where, i);
+      }
+      *location = (void*) &_c2i_ret_handler;
+    }
+    jt->_c2i_unpatch_pos = 0;
+    jt->_c2i_unpatch = 0;
+    // i2c
     if (jt->_i2c_stack_pos == 0) {
       return;
     }
@@ -594,8 +607,7 @@ extern "C" {
       tty->print_cr(" %d. %p: %p", i, jt->_i2c_rbp_stack[i], jt->_i2c_ret_stack[i]);
     }
   }
-  void _c2i_dump_stack() {
-    JavaThread* jt = JavaThread::current();
+  void _c2i_dump_stack(JavaThread* jt) {
     tty->print_cr("=== c2i ret stack for %ld (handler at %p, i2c at %p) ===", _bdel_sys_gettid(), (void*) &_c2i_ret_handler, (void*) &_i2c_ret_handler);
     for (int i = jt->_c2i_stack_pos - 1; i >= 0; i--) {
       tty->print_cr(" %d. %p: %p", i, jt->_c2i_rbp_stack[i], jt->_c2i_ret_stack[i]);
@@ -613,16 +625,16 @@ extern "C" {
     }
     tty->print_cr("_HOTSPOT: verified i2c stack");
   }
-  void _c2i_verify_stack() {
-    JavaThread* jt = JavaThread::current();
+  void _c2i_verify_stack(JavaThread* jt) {
     for (int i = jt->_c2i_stack_pos - 1; i >= 0; i--) {
       void* ret_addr = *((void**) jt->_c2i_rbp_stack[i]);
       if (_unlikely(ret_addr != (void*) &_c2i_ret_handler)) {
         tty->print_cr("_HOTSPOT %ld: failed c2i stack check at position %d", _bdel_sys_gettid(), i);
-        _c2i_dump_stack();
+        _c2i_dump_stack(jt);
         ShouldNotReachHere();
       }
     }
+    tty->print_cr("_HOTSPOT: c2i good of %d levels", jt->_c2i_stack_pos);
   }
   void _saw_c2i(JavaThread* jt, Method* method) {
     tty->print_cr(

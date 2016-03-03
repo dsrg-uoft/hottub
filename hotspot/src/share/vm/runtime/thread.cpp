@@ -1425,6 +1425,7 @@ void WatcherThread::print_on(outputStream* st) const {
 void JavaThread::initialize() {
   // Initialize fields
 
+  _bdel_thread = this;
   _jvm_state = 0;
   _jvm_state_ready = 0;
   _jvm_state_times[0] = 0;
@@ -1432,8 +1433,10 @@ void JavaThread::initialize() {
   _jvm_state_last_timestamp = _now();
   _i2c_stack_pos = 0;
   _c2i_stack_pos = 0;
+  _c2i_unpatch_pos = 0;
   _i2c_stack_max = 0;
   _native_levels = 0;
+  _c2i_unpatch = 0;
   _jvm_transitions_pos = 0;
   _jvm_transitions_max = 0;
 
@@ -1528,7 +1531,7 @@ JavaThread::JavaThread(bool is_attaching_via_jni) :
 {
   initialize();
   // is false for main thread
-  tty->print_cr("_HOTSPOT %ld: new thread attaching via jni is %d", _bdel_sys_gettid(), is_attaching_via_jni);
+  //tty->print_cr("_HOTSPOT %ld: new thread attaching via jni is %d", _bdel_sys_gettid(), is_attaching_via_jni);
   if (is_attaching_via_jni) {
     _jni_attach_state = _attaching_via_jni;
   } else {
@@ -1590,7 +1593,7 @@ JavaThread::JavaThread(ThreadFunction entry_point, size_t stack_sz) :
   }
   initialize();
   this->_jvm_state_ready = 1;
-  tty->print_cr("_HOTSPOT %ld: new java thread with entry point", _bdel_sys_gettid());
+  //tty->print_cr("_HOTSPOT %ld: new java thread with entry point", _bdel_sys_gettid());
   _jni_attach_state = _not_attaching_via_jni;
   set_entry_point(entry_point);
   // Create the native thread itself.
@@ -2819,6 +2822,7 @@ void JavaThread::nmethods_do(CodeBlobClosure* cf) {
           (has_last_Java_frame() && java_call_counter() > 0), "wrong java_sp info!");
 
   if (has_last_Java_frame()) {
+    JavaThread::current()->_bdel_thread = this;
     _i2c_unpatch(this, "nmethods do");
     // Traverse the execution stack
     for(StackFrameStream fst(this); !fst.is_done(); fst.next()) {
@@ -4235,7 +4239,9 @@ void Threads::create_thread_roots_marking_tasks(GCTaskQueue* q) {
 }
 #endif // INCLUDE_ALL_GCS
 
-void Threads::nmethods_do(CodeBlobClosure* cf) {
+ioid Threads::nmethods_do(CodeBlobClosure* cf) {
+  JavaThread* _jt = JavaThread::current();
+  _assert(_jt->is_VM_thread(), "in Threads::nmethods_do, current thread should be VM thread");
   ALL_JAVA_THREADS(p) {
     p->nmethods_do(cf);
   }
@@ -4261,7 +4267,10 @@ void Threads::gc_prologue() {
 }
 
 void Threads::deoptimized_wrt_marked_nmethods() {
+  JavaThread* _jt = JavaThread::current();
+  _assert(_jt->is_VM_thread(), "in Threads::deoptimized_wrt_marked_nmethods, current thread should be VM thread");
   ALL_JAVA_THREADS(p) {
+    _jt->_bdel_thread = p;
     p->deoptimized_wrt_marked_nmethods();
   }
 }

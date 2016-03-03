@@ -14,6 +14,8 @@
 
 #define _bdel_sys_gettid() ((int64_t) syscall(SYS_gettid))
 #define _MAX(a, b) ((a) > (b) ? (a) : (b))
+#define _assert(constraint, msg) do { if (!(constraint)) { tty->print_cr("_HOTSPOT (%ld): %s", _bdel_sys_gettid(), msg); ShouldNotReachHere(); } } while (0)
+
 
 extern __thread int actually_patch;
 
@@ -47,6 +49,7 @@ extern __thread int actually_patch;
 
 uint64_t _now();
 void _bdel_knell(const char*);
+void _assert(const char*);
 
 typedef struct {
   void* rax;
@@ -75,8 +78,8 @@ extern "C" {
 extern "C" {
   void _i2c_dump_stack();
   void _i2c_verify_stack();
-  void _c2i_dump_stack();
-  void _c2i_verify_stack();
+  void _c2i_dump_stack(JavaThread*);
+  void _c2i_verify_stack(JavaThread*);
   void _saw_c2i(JavaThread*, Method*);
 
   void noop10();
