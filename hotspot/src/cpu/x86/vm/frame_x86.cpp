@@ -463,18 +463,14 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
   address sender_pc = *location;
   if (WildTurtle && (void*) sender_pc == (void*) &_c2i_ret_handler) {
     JavaThread* jt = JavaThread::current()->_bdel_thread;
-    tty->print_cr("_HOTSPOT: jt is %p", jt);
     if (jt->_c2i_unpatch) {
       int pos = jt->_c2i_stack_pos - jt->_c2i_unpatch_pos - 1;
       int64_t expected = (int64_t) jt->_c2i_rbp_stack[pos];
       int64_t actual = (int64_t) location;
-      tty->print_cr("_HOTSPOT: c2i unpatching, expected %p, at %p, diff %ld", expected, actual, expected - actual);
       sender_pc = (address) jt->_c2i_ret_stack[pos];
       jt->_c2i_repatch_stack[jt->_c2i_unpatch_pos++] = location;
     } else {
-      tty->print_cr("_HOTSPOT (%ld): in frame found c2i %p, i2c %p", _bdel_sys_gettid(), (void*) &_c2i_ret_handler, (void*) &_i2c_ret_handler);
       void* ret = _c2i_ret_verify_location_and_pop(jt, (void*) location, -2);
-      tty->print_cr("_HOTSPOT: frame c2i got %p", ret);
       sender_pc = (address) ret;
     }
     *location = sender_pc;
@@ -500,13 +496,10 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
 
   //if (WildTurtle && Thread::current()->is_Java_thread() && (void*) sender_pc == (void*) &_i2c_ret_handler) {
   if (WildTurtle && (void*) sender_pc == (void*) &_i2c_ret_handler) {
-    tty->print_cr("_HOTSPOT: in frame found i2c %p, c2i %p", (void*) &_i2c_ret_handler, (void*) &_c2i_ret_handler);
     void* ret = _i2c_ret_verify_location_and_pop(JavaThread::current(), (void*) (sender_sp - 1));
-    tty->print_cr("_HOTSPOT: frame i2c got %p", ret);
     sender_pc = (address) ret;
     *((void**) (sender_sp - 1)) = ret;
   }
-  //_i2c_verify_stack();
 
   // This is the saved value of EBP which may or may not really be an FP.
   // It is only an FP if the sender is an interpreter frame (or C1?).

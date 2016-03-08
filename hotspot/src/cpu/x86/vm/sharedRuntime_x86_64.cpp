@@ -623,7 +623,6 @@ static void gen_c2i_adapter(MacroAssembler *masm,
   __ subptr(rsp, extraspace);
 
   if (WildTurtle) {
-    // no rax
     __ push(c_rarg0);
     __ push(c_rarg1);
     __ push(c_rarg2);
@@ -645,8 +644,6 @@ static void gen_c2i_adapter(MacroAssembler *masm,
     __ pop(c_rarg2);
     __ pop(c_rarg1);
     __ pop(c_rarg0);
-    // no rax
-    __ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, &_c2i_ret_handler)));
   }
   // Store the return address in the expected location
   __ movptr(Address(rsp, 0), rax);
@@ -873,8 +870,6 @@ static void gen_i2c_adapter(MacroAssembler *masm,
     __ pop(c_rarg2);
     __ pop(c_rarg1);
     __ pop(c_rarg0);
-
-    __ lea(rax, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
   }
   __ push(rax);
 
@@ -1903,9 +1898,9 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
                                                 BasicType* in_sig_bt,
                                                 VMRegPair* in_regs,
                                                 BasicType ret_type) {
-  tty->print_cr("_HOTSPOT: generating native wrapper for %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
+  //tty->print_cr("_HOTSPOT: generating native wrapper for %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
   if (method->is_method_handle_intrinsic()) {
-    tty->print_cr("_HOTSPOT: generating native wrapper for instrinsic method %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
+    //tty->print_cr("_HOTSPOT: generating native wrapper for instrinsic method %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
     vmIntrinsics::ID iid = method->intrinsic_id();
     intptr_t start = (intptr_t)__ pc();
     int vep_offset = ((intptr_t)__ pc()) - start;

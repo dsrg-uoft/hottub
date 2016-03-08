@@ -1592,7 +1592,6 @@ JavaThread::JavaThread(ThreadFunction entry_point, size_t stack_sz) :
     tty->print_cr("creating thread %p", this);
   }
   initialize();
-  this->_jvm_state_ready = 1;
   //tty->print_cr("_HOTSPOT %ld: new java thread with entry point", _bdel_sys_gettid());
   _jni_attach_state = _not_attaching_via_jni;
   set_entry_point(entry_point);
@@ -4239,9 +4238,12 @@ void Threads::create_thread_roots_marking_tasks(GCTaskQueue* q) {
 }
 #endif // INCLUDE_ALL_GCS
 
-ioid Threads::nmethods_do(CodeBlobClosure* cf) {
+void Threads::nmethods_do(CodeBlobClosure* cf) {
   JavaThread* _jt = JavaThread::current();
-  _assert(_jt->is_VM_thread(), "in Threads::nmethods_do, current thread should be VM thread");
+  if (_unlikely(!_jt->is_VM_thread())) {
+    tty->print_cr("_HOTSPOT (%ld): in Threads::nmethods_do, current thread is not VM thread", _bdel_sys_gettid());
+    ShouldNotReachHere();
+  }
   ALL_JAVA_THREADS(p) {
     p->nmethods_do(cf);
   }
@@ -4268,7 +4270,10 @@ void Threads::gc_prologue() {
 
 void Threads::deoptimized_wrt_marked_nmethods() {
   JavaThread* _jt = JavaThread::current();
-  _assert(_jt->is_VM_thread(), "in Threads::deoptimized_wrt_marked_nmethods, current thread should be VM thread");
+  if (_unlikely(!_jt->is_VM_thread())) {
+    tty->print_cr("_HOTSPOT (%ld): in Threads::deoptimized_wrt_marked_nmethods, current thread is not VM thread", _bdel_sys_gettid());
+    ShouldNotReachHere();
+  }
   ALL_JAVA_THREADS(p) {
     _jt->_bdel_thread = p;
     p->deoptimized_wrt_marked_nmethods();

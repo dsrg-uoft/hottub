@@ -68,6 +68,9 @@ SUNWprivate_1.1 {
                 JVM_CountStackFrames;
                 JVM_CurrentClassLoader;
                 JVM_CurrentLoadedClass;
+                JVM_BdelReset;
+                JVM_BdelGetInt;
+                JVM_BdelGetComp;
                 JVM_CurrentThread;
                 JVM_CurrentTimeMillis;
                 JVM_DefineClass;

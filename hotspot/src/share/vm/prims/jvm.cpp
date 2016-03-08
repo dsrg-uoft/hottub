@@ -97,6 +97,8 @@ HS_DTRACE_PROBE_DECL1(hotspot, thread__sleep__end, int);
 HS_DTRACE_PROBE_DECL0(hotspot, thread__yield);
 #endif /* !USDT2 */
 
+#include "runtime/_bdel.hpp"
+
 /*
   NOTE about use of any ctor or function call that can trigger a safepoint/GC:
   such ctors and calls MUST NOT come between an oop declaration/init and its
@@ -548,6 +550,7 @@ JVM_END
 
 JVM_ENTRY(void, JVM_MonitorWait(JNIEnv* env, jobject handle, jlong ms))
   JVMWrapper("JVM_MonitorWait");
+  //tty->print_cr("_HOTSPOT: in jvm monitor wait");
   Handle obj(THREAD, JNIHandles::resolve_non_null(handle));
   JavaThreadInObjectWaitState jtiows(thread, ms != 0);
   if (JvmtiExport::should_post_monitor_wait()) {
@@ -559,7 +562,9 @@ JVM_ENTRY(void, JVM_MonitorWait(JNIEnv* env, jobject handle, jlong ms))
     // event handler cannot accidentally consume an unpark() meant for
     // the ParkEvent associated with this ObjectMonitor.
   }
+  //tty->print_cr("_HOTSPOT: about wait");
   ObjectSynchronizer::wait(obj, ms, CHECK);
+  //tty->print_cr("_HOTSPOT: after wait");
 JVM_END
 
 
@@ -3020,6 +3025,10 @@ JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
               "unable to create new native thread");
   }
 
+  if (WildTurtle) {
+    native_thread->_jvm_state_ready = 1;
+    native_thread->_jvm_state_last_timestamp = _now();
+  }
   Thread::start(native_thread);
 
 JVM_END
@@ -3061,6 +3070,34 @@ JVM_ENTRY(void, JVM_StopThread(JNIEnv* env, jobject jthread, jobject throwable))
     // exited setting this flag has no affect
     java_lang_Thread::set_stillborn(java_thread);
   }
+JVM_END
+
+JVM_ENTRY(void, JVM_BdelReset(JNIEnv* env, jobject jthread))
+  JVMWrapper("JVM_BdelReset");
+  oop java_thread = JNIHandles::resolve_non_null(jthread);
+  JavaThread* receiver = java_lang_Thread::thread(java_thread);
+  //tty->print_cr("_HOTSPOT (%ld): in bdel reset, ready is %d, times are %.6f and %.6f, %p, now is %lu", _bdel_sys_gettid(), receiver->_jvm_state_ready, receiver->_jvm_state_times[0] / 1e9, receiver->_jvm_state_times[1] / 1e9, receiver, _now());
+  receiver->_jvm_state_times[0] = 0;
+  receiver->_jvm_state_times[1] = 0;
+  receiver->_jvm_state_last_timestamp = _now();
+JVM_END
+
+JVM_ENTRY(jlong, JVM_BdelGetInt(JNIEnv* env, jobject jthread))
+  JVMWrapper("JVM_BdelGetInt");
+  oop java_thread = JNIHandles::resolve_non_null(jthread);
+  JavaThread* receiver = java_lang_Thread::thread(java_thread);
+  _jvm_transitions_clock(receiver, receiver->_jvm_state);
+  //tty->print_cr("_HOTSPOT (%ld): getting comp %.6f, %p, now is %lu", _bdel_sys_gettid(), receiver->_jvm_state_times[0] / 1e9, receiver, _now());
+  return (jlong) receiver->_jvm_state_times[0];
+JVM_END
+
+JVM_ENTRY(jlong, JVM_BdelGetComp(JNIEnv* env, jobject jthread))
+  JVMWrapper("JVM_BdelGetComp");
+  oop java_thread = JNIHandles::resolve_non_null(jthread);
+  JavaThread* receiver = java_lang_Thread::thread(java_thread);
+  _jvm_transitions_clock(receiver, receiver->_jvm_state);
+  //tty->print_cr("_HOTSPOT (%ld): getting int %.6f, %p, now is %lu", _bdel_sys_gettid(), receiver->_jvm_state_times[1] / 1e9, receiver, _now());
+  return (jlong) receiver->_jvm_state_times[1];
 JVM_END
 
 

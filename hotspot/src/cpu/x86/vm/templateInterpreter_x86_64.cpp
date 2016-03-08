@@ -1076,8 +1076,8 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
 
   // jvmti support
   __ notify_method_entry();
-  /*
-  if (WildTurtle) {
+  //*
+  if (false && WildTurtle) {
     __ push(rax);
     __ push(c_rarg0);
     __ push(c_rarg1);
@@ -1091,6 +1091,8 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
     __ get_method(c_rarg1);
     __ xorptr(c_rarg2, c_rarg2);
     __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _native_call_begin)));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop10)));
+    __ call_VM(noreg, CAST_FROM_FN_PTR(address, _noop11));
     __ pop(rscratch2);
     __ pop(rscratch1);
     __ pop(c_rarg5);
@@ -1101,7 +1103,7 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
     __ pop(c_rarg0);
     __ pop(rax);
   }
-  */
+  //*/
 
   // work registers
   const Register method = rbx;

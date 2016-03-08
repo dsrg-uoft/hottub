@@ -727,6 +727,10 @@ class Thread implements Runnable {
 
     private native void start0();
 
+    public native void resetIntCompTimes();
+    public native long getIntTime();
+    public native long getCompTime();
+
     /**
      * If this thread was constructed using a separate
      * <code>Runnable</code> run object, then that

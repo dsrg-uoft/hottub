@@ -14,10 +14,6 @@
 
 #define _bdel_sys_gettid() ((int64_t) syscall(SYS_gettid))
 #define _MAX(a, b) ((a) > (b) ? (a) : (b))
-#define _assert(constraint, msg) do { if (!(constraint)) { tty->print_cr("_HOTSPOT (%ld): %s", _bdel_sys_gettid(), msg); ShouldNotReachHere(); } } while (0)
-
-
-extern __thread int actually_patch;
 
 /**
  * Notes
@@ -49,7 +45,8 @@ extern __thread int actually_patch;
 
 uint64_t _now();
 void _bdel_knell(const char*);
-void _assert(const char*);
+
+void _jvm_transitions_clock(JavaThread*, int8_t);
 
 typedef struct {
   void* rax;
@@ -57,22 +54,24 @@ typedef struct {
 } _rax_rdx;
 
 extern "C" {
-  void _i2c_ret_push(JavaThread*, void*, void*, Method*);
+  void* _i2c_ret_push(JavaThread*, void*, void*, Method*);
   _rax_rdx _i2c_ret_pop(JavaThread*);
   void* _i2c_ret_verify_location_and_pop(JavaThread*, void*);
   void _i2c_ret_handler();
-  void _native_call_begin(JavaThread*, Method*, int);
-  void _native_call_end(JavaThread*, Method*, int);
   void _i2c_unpatch(JavaThread*, const char*);
   void _i2c_repatch(JavaThread*, const char*);
 }
 extern "C" {
-  void _c2i_ret_push(JavaThread*, void*, void*, Method*);
+  void* _c2i_ret_push(JavaThread*, void*, void*, Method*);
   _rax_rdx _c2i_ret_pop(JavaThread*, int);
   void* _c2i_ret_verify_location_and_pop(JavaThread*, void*, int);
   void _c2i_ret_handler();
   void _c2i_unpatch(JavaThread*, const char*);
   void _c2i_repatch(JavaThread*, const char*);
+}
+extern "C" {
+  void _native_call_begin(JavaThread*, Method*, int);
+  void _native_call_end(JavaThread*, Method*, int);
 }
 
 extern "C" {
@@ -80,9 +79,11 @@ extern "C" {
   void _i2c_verify_stack();
   void _c2i_dump_stack(JavaThread*);
   void _c2i_verify_stack(JavaThread*);
-  void _saw_c2i(JavaThread*, Method*);
+}
 
-  void noop10();
+extern "C" {
+  void _noop10();
+  void _noop11();
 }
 
 #endif // SHARE_VM_RUNTIME__BDEL_HPP
