@@ -751,6 +751,12 @@ class Thread implements Runnable {
      * a chance to clean up before it actually exits.
      */
     private void exit() {
+        // print out class loading performance counters
+        System.out.println("[thread exit] "+sun.misc.PerfCounter.getClassNameLockSync());
+        System.out.println("[thread exit] "+sun.misc.PerfCounter.getParentDelegationTime());
+        System.out.println("[thread exit] "+sun.misc.PerfCounter.getFindClassTime());
+        System.out.println("[thread exit] "+sun.misc.PerfCounter.getFindClasses());
+
         if (group != null) {
             group.threadTerminated(this);
             group = null;
