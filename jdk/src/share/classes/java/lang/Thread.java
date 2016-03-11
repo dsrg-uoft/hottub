@@ -756,6 +756,8 @@ class Thread implements Runnable {
         System.out.println("[thread exit] "+sun.misc.PerfCounter.getParentDelegationTime());
         System.out.println("[thread exit] "+sun.misc.PerfCounter.getFindClassTime());
         System.out.println("[thread exit] "+sun.misc.PerfCounter.getFindClasses());
+        System.out.println("[thread exit] "+sun.misc.PerfCounter.getNullFindClassTime());
+        System.out.println("[thread exit] "+sun.misc.PerfCounter.getNullFindClasses());
 
         if (group != null) {
             group.threadTerminated(this);

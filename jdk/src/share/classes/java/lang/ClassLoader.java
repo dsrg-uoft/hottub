@@ -412,7 +412,13 @@ public abstract class ClassLoader {
                     if (parent != null) {
                         c = parent.loadClass(name, false);
                     } else {
+                        long t5 = System.nanoTime();
                         c = findBootstrapClassOrNull(name);
+                        long t6 = System.nanoTime();
+                        if (c != null) {
+                            sun.misc.PerfCounter.getNullFindClassTime().addTime(t6 - t5);
+                            sun.misc.PerfCounter.getNullFindClasses().increment();
+                        }
                     }
                 } catch (ClassNotFoundException e) {
                     // ClassNotFoundException thrown if class not found
