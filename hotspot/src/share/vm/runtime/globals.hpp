@@ -958,6 +958,9 @@ class CommandLineFlags {
           "Shoutout to David for CSGO - 2015 December 8, R8 Revolver; "     \
           "Never forget")                                                   \
                                                                             \
+  product(bool, TheGeneral, false,                                          \
+          "Nagi no asukara")                                                \
+                                                                            \
   diagnostic(bool, TraceNMethodInstalls, false,                             \
           "Trace nmethod installation")                                     \
                                                                             \

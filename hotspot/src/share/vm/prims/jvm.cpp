@@ -1360,13 +1360,14 @@ JVM_ENTRY(jobject, JVM_DoPrivileged(JNIEnv *env, jclass cls, jobject action, job
     thread->set_privileged_stack_top(&pi);
   }
 
-
+  _native_call_begin((JavaThread*) THREAD, m(), 1);
   // invoke the Object run() in the action object. We cannot use call_interface here, since the static type
   // is not really known - it is either java.security.PrivilegedAction or java.security.PrivilegedExceptionAction
   Handle pending_exception;
   JavaValue result(T_OBJECT);
   JavaCallArguments args(object);
   JavaCalls::call(&result, m, &args, THREAD);
+  _native_call_end((JavaThread*) THREAD, m(), 1);
 
   // done with action, remove ourselves from the list
   if (!vfst.at_end()) {

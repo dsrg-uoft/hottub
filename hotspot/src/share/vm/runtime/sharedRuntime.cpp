@@ -537,6 +537,11 @@ JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
     _native_call_begin(thread, method, 0);
     return 0;
   }
+  if (TheGeneral) {
+    if (thread->_jvm_state != 0) {
+      tty->print_cr("_HOTSPOT (%ld): method %s#%s has failed this city!", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string());
+    }
+  }
   return 0;
   if (Dyrus) {
     Symbol* kname = method->klass_name();
