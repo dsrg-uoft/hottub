@@ -830,6 +830,7 @@ class JavaThread: public Thread {
   // bdel
  public:
   JavaThread* _bdel_thread;
+  int8_t _bdel_deopt;
   // 0 for interpreted, 1 for compiled
   int8_t _jvm_state;
   int8_t _jvm_state_ready;

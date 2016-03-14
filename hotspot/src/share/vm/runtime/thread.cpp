@@ -1426,6 +1426,7 @@ void JavaThread::initialize() {
   // Initialize fields
 
   _bdel_thread = this;
+  _bdel_deopt = 0;
   _jvm_state = 0;
   _jvm_state_ready = 0;
   _jvm_state_times[0] = 0;

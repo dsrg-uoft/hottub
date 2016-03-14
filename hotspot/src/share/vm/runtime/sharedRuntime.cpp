@@ -3025,6 +3025,7 @@ AdapterHandlerEntry* AdapterHandlerLibrary::get_adapter(methodHandle method) {
                                              sizeof(buffer_locs)/sizeof(relocInfo));
 
       MacroAssembler _masm(&buffer);
+      //tty->print_cr("_HOTSPOT: generating adapters for %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
       entry = SharedRuntime::generate_i2c2i_adapters(&_masm,
                                                      total_args_passed,
                                                      comp_args_on_stack,

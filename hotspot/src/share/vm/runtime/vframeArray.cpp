@@ -294,6 +294,11 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
   // we placed in the skeletal frame now that we finally know the
   // exact interpreter address we should use.
 
+  /*
+  if (is_top_frame) {
+    tty->print_cr("_HOTSPOT: sender pc is %p, i2c is %p, c2i is %p", (void*) pc, (void*) &_i2c_ret_handler, (void*) &_c2i_ret_handler);
+  }
+  */
   _frame.patch_pc(thread, pc);
 
   assert (!method()->is_synchronized() || locks > 0 || _removed_monitors, "synchronized methods must have monitors");
