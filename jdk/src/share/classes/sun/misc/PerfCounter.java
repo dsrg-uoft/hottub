@@ -141,7 +141,7 @@ public class PerfCounter {
         };
         static final ThreadLocal<PerfCounter> lct = new ThreadLocal<PerfCounter>() {
             @Override protected PerfCounter initialValue() {
-                return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_findClassesTime");
+                return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_findClassTime");
             }
         };
         static final ThreadLocal<PerfCounter> cnls = new ThreadLocal<PerfCounter>() {
@@ -152,6 +152,16 @@ public class PerfCounter {
         static final ThreadLocal<PerfCounter> rcbt = new ThreadLocal<PerfCounter>() {
             @Override protected PerfCounter initialValue() {
                 return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_readClassBytesTime");
+            }
+        };
+        static final ThreadLocal<PerfCounter> null_lc = new ThreadLocal<PerfCounter>() {
+            @Override protected PerfCounter initialValue() {
+                return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_null_findClasses");
+            }
+        };
+        static final ThreadLocal<PerfCounter> null_lct = new ThreadLocal<PerfCounter>() {
+            @Override protected PerfCounter initialValue() {
+                return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_null_findClassTime");
             }
         };
     }
@@ -217,5 +227,20 @@ public class PerfCounter {
      */
     public static PerfCounter getClassNameLockSync() {
         return CoreCounters.cnls.get();
+    }
+
+    /**
+     * Number of null class loader findClass calls
+     */
+    public static PerfCounter getNullFindClasses() {
+        return CoreCounters.null_lc.get();
+    }
+
+    /**
+     * Time (ns) spent in null finding classes that includes
+     * lookup and read class bytes and defineClass
+     */
+    public static PerfCounter getNullFindClassTime() {
+        return CoreCounters.null_lct.get();
     }
 }

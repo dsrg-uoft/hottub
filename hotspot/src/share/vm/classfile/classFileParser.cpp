@@ -4195,7 +4195,7 @@ instanceKlassHandle ClassFileParser::parseClassFile(Symbol* name,
     if (TraceClassLoading) {
       ResourceMark rm;
       // print in a single call to reduce interleaving of output
-      if (cfs->source() != NULL) {
+      if (false && cfs->source() != NULL) {
         tty->print("[Loaded %s from %s]\n", this_klass->external_name(),
                    cfs->source());
       } else if (class_loader.is_null()) {
@@ -4205,14 +4205,14 @@ instanceKlassHandle ClassFileParser::parseClassFile(Symbol* name,
                 : NULL;
         // caller can be NULL, for example, during a JVMTI VM_Init hook
         if (caller != NULL) {
-          tty->print("[Loaded %s by instance of %s]\n",
+          tty->print("[Loaded (null) %s by instance of %s]\n",
                      this_klass->external_name(),
                      InstanceKlass::cast(caller)->external_name());
         } else {
-          tty->print("[Loaded %s]\n", this_klass->external_name());
+          tty->print("[Loaded (null) %s]\n", this_klass->external_name());
         }
       } else {
-        tty->print("[Loaded %s from %s]\n", this_klass->external_name(),
+        tty->print("[Loaded (else) %s from %s]\n", this_klass->external_name(),
                    InstanceKlass::cast(class_loader->klass())->external_name());
       }
     }
