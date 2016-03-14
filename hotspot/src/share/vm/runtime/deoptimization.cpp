@@ -481,10 +481,10 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
   // and we'd undo the deopt.
 
   frame_pcs[0] = deopt_sender.raw_pc();
-  if (deopt_sender.is_compiled_frame()) {
+  if (WildTurtle && deopt_sender.is_compiled_frame()) {
     _c2i_ret_push(thread, (void*) frame_pcs[0], (void*) NULL, deopt_sender.cb()->as_nmethod_or_null()->method());
     frame_pcs[0] = (address) &_c2i_ret_handler;
-    tty->print_cr("_HOTSPOT: wow, this is a thing");
+    //tty->print_cr("_HOTSPOT: wow, this is a thing");
   }
   /*
   if ((void*) frame_pcs[0] == (void*) _i2c_ret_handler) {

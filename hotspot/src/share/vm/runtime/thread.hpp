@@ -116,6 +116,7 @@ class Thread: public ThreadShadow {
   // Support for forcing alignment of thread objects for biased locking
   void*       _real_malloc_address;
  public:
+  JavaThread* _bdel_thread;
   void* operator new(size_t size) throw() { return allocate(size, true); }
   void* operator new(size_t size, const std::nothrow_t& nothrow_constant) throw() {
     return allocate(size, false); }
@@ -829,7 +830,6 @@ class JavaThread: public Thread {
 
   // bdel
  public:
-  JavaThread* _bdel_thread;
   int8_t _bdel_deopt;
   // 0 for interpreted, 1 for compiled
   int8_t _jvm_state;
@@ -1983,6 +1983,8 @@ class Threads: AllStatic {
 
   // Sweeper
   static void nmethods_do(CodeBlobClosure* cf);
+  static void _bdel_safepoint_begin(VMThread*);
+  static void _bdel_safepoint_end(VMThread*);
 
   // RedefineClasses support
   static void metadata_do(void f(Metadata*));

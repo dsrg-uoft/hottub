@@ -176,7 +176,7 @@ void _bdel_knell(const char* str) {
     */
     if (_i2c_levels != 0 || _c2i_levels != 0 || _i2n_levels != 0 || _n2i_levels != 0) {
       tty->print_cr(
-        "_HOTSPOT: wildturtle indexes did not end at 0"
+        "_HOTSPOT (%ld): wildturtle indexes did not end at 0 (from %s)"
         " - i2c stack pos %d"
         " - jvm transitions pos %d"
         " - native levels %d"
@@ -186,6 +186,8 @@ void _bdel_knell(const char* str) {
         " - i2n levels %d"
         " - n2i levels %d"
         " - i levels %d"
+        , _bdel_sys_gettid()
+        , str
         , jt->_i2c_stack_pos
         , jt->_jvm_transitions_pos
         , jt->_native_levels
@@ -196,7 +198,7 @@ void _bdel_knell(const char* str) {
         , _n2i_levels
         , _i_levels
       );
-      ShouldNotReachHere();
+      //ShouldNotReachHere();
     } else {
       //tty->print_cr("_HOTSPOT: wildturtle happy");
     }

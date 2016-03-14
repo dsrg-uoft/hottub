@@ -462,7 +462,7 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
   address* location = sender_pc_addr();
   address sender_pc = *location;
   if (WildTurtle && (void*) sender_pc == (void*) &_c2i_ret_handler) {
-    JavaThread* jt = JavaThread::current()->_bdel_thread;
+    JavaThread* jt = Thread::current()->_bdel_thread;
     if (jt->_c2i_unpatch) {
       int pos = jt->_c2i_stack_pos - jt->_c2i_unpatch_pos - 1;
       int64_t expected = (int64_t) jt->_c2i_rbp_stack[pos];

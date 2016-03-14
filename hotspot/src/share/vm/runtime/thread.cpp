@@ -216,6 +216,7 @@ void Thread::operator delete(void* p) {
 
 
 Thread::Thread() {
+  _bdel_thread = NULL;
   // stack and get_thread
   set_stack_base(NULL);
   set_stack_size(0);
@@ -2694,7 +2695,7 @@ void JavaThread::make_zombies() {
 
 void JavaThread::deoptimized_wrt_marked_nmethods() {
   if (!has_last_Java_frame()) return;
-  _i2c_unpatch(this, "deoptimized wrt marked nmethods");
+  //_i2c_unpatch(this, "deoptimized wrt marked nmethods");
   // BiasedLocking needs an updated RegisterMap for the revoke monitors pass
   StackFrameStream fst(this, UseBiasedLocking);
   for(; !fst.is_done(); fst.next()) {
@@ -2708,7 +2709,7 @@ void JavaThread::deoptimized_wrt_marked_nmethods() {
       Deoptimization::deoptimize(this, *fst.current(), fst.register_map());
     }
   }
-  _i2c_repatch(this, "deoptimized wrt marked nmethods");
+  //_i2c_repatch(this, "deoptimized wrt marked nmethods");
 }
 
 
@@ -2822,13 +2823,13 @@ void JavaThread::nmethods_do(CodeBlobClosure* cf) {
           (has_last_Java_frame() && java_call_counter() > 0), "wrong java_sp info!");
 
   if (has_last_Java_frame()) {
-    JavaThread::current()->_bdel_thread = this;
-    _i2c_unpatch(this, "nmethods do");
+    //JavaThread::current()->_bdel_thread = this;
+    //_i2c_unpatch(this, "nmethods do");
     // Traverse the execution stack
     for(StackFrameStream fst(this); !fst.is_done(); fst.next()) {
       fst.current()->nmethods_do(cf);
     }
-    _i2c_repatch(this, "nmethods do");
+    //_i2c_repatch(this, "nmethods do");
   }
 }
 
@@ -3306,6 +3307,36 @@ bool        Threads::_vm_complete = false;
 
 // All JavaThreads
 #define ALL_JAVA_THREADS(X) for (JavaThread* X = _thread_list; X; X = X->next())
+
+void Threads::_bdel_safepoint_begin(VMThread* vm_thread) {
+  ALL_JAVA_THREADS(p) {
+    if (!p->has_last_Java_frame()) {
+      continue;
+    }
+    _i2c_unpatch(p, "bdel safepoint");
+    vm_thread->_bdel_thread = p;
+    // BiasedLocking needs an updated RegisterMap for the revoke monitors pass
+    StackFrameStream fst(p, UseBiasedLocking);
+    for(; !fst.is_done(); fst.next()) {
+      continue;
+    }
+  }
+}
+
+void Threads::_bdel_safepoint_end(VMThread* vm_thread) {
+  ALL_JAVA_THREADS(p) {
+    if (!p->has_last_Java_frame()) {
+      continue;
+    }
+    vm_thread->_bdel_thread = p;
+    // BiasedLocking needs an updated RegisterMap for the revoke monitors pass
+    StackFrameStream fst(p, UseBiasedLocking);
+    for(; !fst.is_done(); fst.next()) {
+      continue;
+    }
+    _i2c_repatch(p, "bdel safepoint");
+  }
+}
 
 // All JavaThreads + all non-JavaThreads (i.e., every thread in the system)
 void Threads::threads_do(ThreadClosure* tc) {
@@ -4276,7 +4307,7 @@ void Threads::deoptimized_wrt_marked_nmethods() {
     ShouldNotReachHere();
   }
   ALL_JAVA_THREADS(p) {
-    _jt->_bdel_thread = p;
+    //_jt->_bdel_thread = p;
     p->deoptimized_wrt_marked_nmethods();
   }
 }
