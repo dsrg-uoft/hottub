@@ -52,6 +52,8 @@
 
 
 #include "java.h"
+#include <sys/time.h> // for clocking jvm init time
+
 
 /*
  * A NOTE TO DEVELOPERS: For performance reasons it is important that
@@ -171,6 +173,9 @@ static jlong initialHeapSize    = 0;  /* inital heap size */
 /*
  * Entry point.
  */
+static int (*clock_gettime_func)(clockid_t, struct timespec*) = NULL;
+static struct timespec jvm_init_start = {0};
+
 int
 JLI_Launch(int argc, char ** argv,              /* main argc, argc */
         int jargc, const char** jargv,          /* java args */
@@ -185,6 +190,14 @@ JLI_Launch(int argc, char ** argv,              /* main argc, argc */
         jint ergo                               /* ergonomics class policy */
 )
 {
+    /* clock the start of jvm init and save it */
+    void* handle = dlopen("librt.so.1", RTLD_LAZY);
+    if (handle == NULL) {
+        handle = dlopen("librt.so", RTLD_LAZY);
+    }
+    clock_gettime_func = (int(*)(clockid_t, struct timespec*))dlsym(handle, "clock_gettime");
+    clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_start);
+
     int mode = LM_UNKNOWN;
     char *what = NULL;
     char *cpath = 0;
@@ -473,6 +486,12 @@ JavaMain(void * _args)
     /* Build platform specific argument array */
     mainArgs = CreateApplicationArgs(env, argv, argc);
     CHECK_EXCEPTION_NULL_LEAVE(mainArgs);
+
+    /* clock the end of jvm init and output it */
+    struct timespec jvm_init_end;
+    clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_end);
+    unsigned long diff = 1e9 * (jvm_init_end.tv_sec - jvm_init_start.tv_sec) + jvm_init_end.tv_nsec - jvm_init_start.tv_nsec;
+    printf("[jvm_init] time(ns) = %lu\n", diff);
 
     ifn.CallingJavaMain();
     /* Invoke main method. */
