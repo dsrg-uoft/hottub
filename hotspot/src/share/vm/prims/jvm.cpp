@@ -1387,9 +1387,12 @@ JVM_ENTRY(jobject, JVM_DoPrivileged(JNIEnv *env, jclass cls, jobject action, job
         !pending_exception->is_a(SystemDictionary::RuntimeException_klass())) {
       // Throw a java.security.PrivilegedActionException(Exception e) exception
       JavaCallArguments args(pending_exception);
+
+      //_native_call_begin((JavaThread*) THREAD, NULL, 1);
       THROW_ARG_0(vmSymbols::java_security_PrivilegedActionException(),
                   vmSymbols::exception_void_signature(),
                   &args);
+      //_native_call_end((JavaThread*) THREAD, NULL, 1);
     }
   }
 
@@ -4196,7 +4199,9 @@ JVM_ENTRY(jobject, JVM_InvokeMethod(JNIEnv *env, jobject method, jobject obj, jo
     method_handle = Handle(THREAD, JNIHandles::resolve(method));
     Handle receiver(THREAD, JNIHandles::resolve(obj));
     objArrayHandle args(THREAD, objArrayOop(JNIHandles::resolve(args0)));
+    //_native_call_begin((JavaThread*) THREAD, NULL, 2);
     oop result = Reflection::invoke_method(method_handle(), receiver, args, CHECK_NULL);
+    //_native_call_end((JavaThread*) THREAD, NULL, 2);
     jobject res = JNIHandles::make_local(env, result);
     if (JvmtiExport::should_post_vm_object_alloc()) {
       oop ret_type = java_lang_reflect_Method::return_type(method_handle());
@@ -4218,7 +4223,9 @@ JVM_ENTRY(jobject, JVM_NewInstanceFromConstructor(JNIEnv *env, jobject c, jobjec
   JVMWrapper("JVM_NewInstanceFromConstructor");
   oop constructor_mirror = JNIHandles::resolve(c);
   objArrayHandle args(THREAD, objArrayOop(JNIHandles::resolve(args0)));
+  //_native_call_begin((JavaThread*) THREAD, NULL, 3);
   oop result = Reflection::invoke_constructor(constructor_mirror, args, CHECK_NULL);
+  //_native_call_end((JavaThread*) THREAD, NULL, 3);
   jobject res = JNIHandles::make_local(env, result);
   if (JvmtiExport::should_post_vm_object_alloc()) {
     JvmtiExport::post_vm_object_alloc(JavaThread::current(), result);

@@ -961,6 +961,12 @@ class CommandLineFlags {
   product(bool, TheGeneral, false,                                          \
           "Nagi no asukara")                                                \
                                                                             \
+  product(bool, Yuuichi, false,                                             \
+          "Shiori's arc")                                                   \
+                                                                            \
+  product(bool, Sachiko, false,                                             \
+          "Okaasan")                                                        \
+                                                                            \
   diagnostic(bool, TraceNMethodInstalls, false,                             \
           "Trace nmethod installation")                                     \
                                                                             \

@@ -457,10 +457,12 @@ JNI_ENTRY(jclass, jni_FindClass(JNIEnv *env, const char *name))
     if (loader.is_null() &&
         k->name() == vmSymbols::java_lang_ClassLoader_NativeLibrary()) {
       JavaValue result(T_OBJECT);
+      _native_call_begin((JavaThread*) thread, NULL, 12);
       JavaCalls::call_static(&result, k,
                                       vmSymbols::getFromClass_name(),
                                       vmSymbols::void_class_signature(),
                                       thread);
+      _native_call_end((JavaThread*) thread, NULL, 12);
       if (HAS_PENDING_EXCEPTION) {
         Handle ex(thread, thread->pending_exception());
         CLEAR_PENDING_EXCEPTION;

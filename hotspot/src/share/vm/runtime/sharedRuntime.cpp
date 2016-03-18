@@ -310,11 +310,12 @@ extern "C" {
     }
     if (Dyrus) {
       tty->print_cr(
-        "_HOTSPOT %ld: calling %s %s#%s (to %d native levels, to %d transition depth)"
+        "_HOTSPOT (%ld): calling %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth)"
         , _bdel_sys_gettid()
         , opposite ? "n2i" : "i2n"
-        , m == NULL ? "System" : m->klass_name()->as_C_string()
-        , m == NULL ? "initializeSystemClass" : m->name()->as_C_string()
+        , m == NULL ? "<nil" : m->klass_name()->as_C_string()
+        , m == NULL ? "nil>" : m->name()->as_C_string()
+        , opposite
         , jt->_native_levels
         , jt->_jvm_transitions_pos
       );
@@ -341,11 +342,12 @@ extern "C" {
     }
     if (Dyrus) {
       tty->print_cr(
-        "_HOTSPOT %ld: returning %s %s#%s (to %d native levels, to %d transition depth)"
+        "_HOTSPOT (%ld): returning %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth)"
         , _bdel_sys_gettid()
         , opposite ? "n2i" : "i2n"
-        , m == NULL ? "System" : m->klass_name()->as_C_string()
-        , m == NULL ? "initializeSystemClass" : m->name()->as_C_string()
+        , m == NULL ? "<nil" : m->klass_name()->as_C_string()
+        , m == NULL ? "nil>" : m->name()->as_C_string()
+        , opposite
         , jt->_native_levels
         , jt->_jvm_transitions_pos
       );
@@ -533,13 +535,30 @@ extern "C" {
   }
 }
 JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
+  if (_unlikely(!thread->_jvm_state_ready)) {
+    return 0;
+  }
   if (method->is_native()) {
     _native_call_begin(thread, method, 0);
     return 0;
   }
-  if (TheGeneral) {
+  if (Dyrus) {
+    tty->print_cr("_HOTSPOT (%ld): dyrus ganked by %s#%s", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string());
+  }
+  if (TheGeneral || Sachiko) {
     if (thread->_jvm_state != 0) {
-      tty->print_cr("_HOTSPOT (%ld): method %s#%s has failed this city!", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string());
+      asm(
+        "callq _noop11\n"
+      );
+      if (TheGeneral) {
+        tty->print_cr("_HOTSPOT (%ld): method %s#%s has failed this city!", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string());
+      }
+      if (Sachiko) {
+        _jvm_transitions_clock(thread, 0);
+      }
+      if (Yuuichi) {
+        ShouldNotReachHere();
+      }
     }
   }
   return 0;

@@ -45,6 +45,8 @@
 #include "runtime/signature.hpp"
 #include "runtime/vframe.hpp"
 
+#include "runtime/_bdel.hpp"
+
 static void trace_class_resolution(Klass* to_class) {
   ResourceMark rm;
   int line_number = -1;
@@ -1074,7 +1076,9 @@ oop Reflection::invoke(instanceKlassHandle klass, methodHandle reflected_method,
   // All oops (including receiver) is passed in as Handles. An potential oop is returned as an
   // oop (i.e., NOT as an handle)
   JavaValue result(rtype);
+  _native_call_begin((JavaThread*) THREAD, NULL, 4);
   JavaCalls::call(&result, method, &java_args, THREAD);
+  _native_call_end((JavaThread*) THREAD, NULL, 4);
 
   if (HAS_PENDING_EXCEPTION) {
     // Method threw an exception; wrap it in an InvocationTargetException

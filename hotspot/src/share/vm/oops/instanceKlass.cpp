@@ -170,6 +170,8 @@ HS_DTRACE_PROBE_DECL5(hotspot, class__initialization__end,
 
 #endif //  ndef DTRACE_ENABLED
 
+#include "runtime/_bdel.hpp"
+
 volatile int InstanceKlass::_total_instanceKlass_count = 0;
 
 InstanceKlass* InstanceKlass::allocate_instance_klass(
@@ -1119,7 +1121,9 @@ instanceOop InstanceKlass::register_finalizer(instanceOop i, TRAPS) {
   JavaValue result(T_VOID);
   JavaCallArguments args(h_i);
   methodHandle mh (THREAD, Universe::finalizer_register_method());
+  _native_call_begin((JavaThread*) THREAD, mh(), 9);
   JavaCalls::call(&result, mh, &args, CHECK_NULL);
+  _native_call_end((JavaThread*) THREAD, mh(), 9);
   return h_i();
 }
 
@@ -1220,7 +1224,9 @@ void InstanceKlass::call_class_initializer_impl(instanceKlassHandle this_oop, TR
   if (h_method() != NULL) {
     JavaCallArguments args; // No arguments
     JavaValue result(T_VOID);
+    _native_call_begin((JavaThread*) THREAD, NULL, 10);
     JavaCalls::call(&result, h_method, &args, CHECK); // Static call (no args)
+    _native_call_end((JavaThread*) THREAD, NULL, 10);
   }
 }
 

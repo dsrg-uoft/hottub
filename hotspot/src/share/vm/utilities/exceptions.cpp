@@ -37,6 +37,8 @@
 
 PRAGMA_FORMAT_MUTE_WARNINGS_FOR_GCC
 
+#include "runtime/_bdel.hpp"
+
 // Implementation of ThreadShadow
 void check_ThreadShadow() {
   const ByteSize offset1 = byte_offset_of(ThreadShadow, _pending_exception);
@@ -273,12 +275,15 @@ Handle Exceptions::new_exception(Thread *thread, Symbol* name,
       if (!thread->has_pending_exception()) {
         JavaValue result(T_VOID);
         args->set_receiver(h_exception);
+
+        _native_call_begin((JavaThread*) thread, NULL, 5);
         // Call constructor
         JavaCalls::call_special(&result, klass,
                                          vmSymbols::object_initializer_name(),
                                          signature,
                                          args,
                                          thread);
+        _native_call_end((JavaThread*) thread, NULL, 5);
       }
     }
   }
@@ -308,11 +313,13 @@ Handle Exceptions::new_exception(Thread *thread, Symbol* name,
     JavaCallArguments args1;
     args1.set_receiver(h_exception);
     args1.push_oop(h_cause);
+    _native_call_begin((JavaThread*) thread, NULL, 6);
     JavaCalls::call_virtual(&result1, h_exception->klass(),
                                       vmSymbols::initCause_name(),
                                       vmSymbols::throwable_throwable_signature(),
                                       &args1,
                                       thread);
+    _native_call_end((JavaThread*) thread, NULL, 6);
   }
 
   // Check if another exception was thrown in the process, if so rethrow that one
