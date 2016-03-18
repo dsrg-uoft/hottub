@@ -1530,6 +1530,22 @@ void InterpreterMacroAssembler::verify_FPU(int stack_depth, TosState state) {
 #endif // !CC_INTERP
 
 
+void InterpreterMacroAssembler::_notify_native_entry() {
+  if (WildTurtle) {
+    get_method(c_rarg1);
+    xorptr(c_rarg2, c_rarg2);
+    call_VM_leaf(CAST_FROM_FN_PTR(address, _native_call_begin), r15_thread, c_rarg1, c_rarg2);
+  }
+}
+
+void InterpreterMacroAssembler::_notify_native_exit() {
+  if (WildTurtle) {
+    get_method(c_rarg1);
+    xorptr(c_rarg2, c_rarg2);
+    call_VM_leaf(CAST_FROM_FN_PTR(address, _native_call_end), r15_thread, c_rarg1, c_rarg2);
+  }
+}
+
 void InterpreterMacroAssembler::notify_method_entry() {
   // Whenever JVMTI is interp_only_mode, method entry/exit events are sent to
   // track stack depth.  If it is possible to enter interp_only_mode we add
@@ -1551,7 +1567,7 @@ void InterpreterMacroAssembler::notify_method_entry() {
                  r15_thread, c_rarg1);
   }
 
-  if (WildTurtle) {
+  if (TheGeneral || Sachiko) {
     get_method(c_rarg1);
     call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::_method_entry), r15_thread, c_rarg1);
   }
@@ -1599,7 +1615,7 @@ void InterpreterMacroAssembler::notify_method_exit(
     NOT_CC_INTERP(pop(state));
   }
 
-  if (WildTurtle) {
+  if (TheGeneral || Sachiko) {
     push(state);
     get_method(c_rarg1);
     call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::_method_exit), r15_thread, c_rarg1);

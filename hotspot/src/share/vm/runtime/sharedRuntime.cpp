@@ -539,7 +539,7 @@ JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
     return 0;
   }
   if (method->is_native()) {
-    _native_call_begin(thread, method, 0);
+    //_native_call_begin(thread, method, 0);
     return 0;
   }
   if (Dyrus) {
@@ -581,7 +581,7 @@ JRT_END
 
 JRT_LEAF(int, SharedRuntime::_method_exit(JavaThread* thread, Method* method))
   if (method->is_native()) {
-    _native_call_end(thread, method, 0);
+    //_native_call_end(thread, method, 0);
     return 0;
   }
   return 0;
