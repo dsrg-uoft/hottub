@@ -277,6 +277,13 @@ void frame::patch_pc(Thread* thread, address pc) {
                   pc_addr, *pc_addr, pc);
     //tty->print_cr("_HOTSPOT: in frame#patch_pc, should be deoptimized is %d", (int) this->should_be_deoptimized());
   }
+  /*
+  if ((void*) pc == (void*) &_i2c_ret_handler) {
+    tty->print_cr("_HOTSPOT: saw i2c ret handler");
+  } else if ((void*) pc == (void*) &_c2i_ret_handler) {
+    tty->print_cr("_HOTSPOT: saw c2i ret handler");
+  }
+  */
   // Either the return address is the original one or we are going to
   // patch in the same address that's already there.
   assert(_pc == *pc_addr || pc == *pc_addr, "must be");
@@ -470,8 +477,15 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
       sender_pc = (address) jt->_c2i_ret_stack[pos];
       jt->_c2i_repatch_stack[jt->_c2i_unpatch_pos++] = location;
     } else {
-      void* ret = _c2i_ret_verify_location_and_pop(jt, (void*) location, -2);
-      sender_pc = (address) ret;
+      //tty->print_cr("_HOTSPOT (%ld): bdel deopt is %d", _bdel_sys_gettid(), jt->_bdel_deopt);
+      if (!jt->_bdel_deopt) {
+        //tty->print_cr("_HOTSPOT (%ld): bdel deopt is 0, found c2i address", _bdel_sys_gettid());
+        void* ret = _c2i_ret_verify_location_and_pop(jt, (void*) location, -2);
+        sender_pc = (address) ret;
+      } else {
+        //tty->print_cr("_HOTSPOT (%ld): bdel deopt is 1, found c2i address", _bdel_sys_gettid());
+        //tty->print_cr("_HOTSPOT (%ld): bakana", _bdel_sys_gettid());
+      }
     }
     *location = sender_pc;
   }
@@ -536,8 +550,30 @@ frame frame::sender(RegisterMap* map) const {
   if (is_interpreted_frame()) return sender_for_interpreter_frame(map);
   assert(_cb == CodeCache::find_blob(pc()),"Must be the same");
 
+  if (_cb != CodeCache::find_blob(pc())) {
+    tty->print_cr("_HOTSPOT: assert failed, cb is not find blob pc, pc is %p, i2c %p, c2i %p", pc(), (void*) &_i2c_ret_handler, (void*) &_c2i_ret_handler);
+    ShouldNotReachHere();
+  }
+
   if (_cb != NULL) {
     return sender_for_compiled_frame(map);
+  }
+
+  if (sender_sp() == NULL) {
+    asm(
+      "callq _noop12\n"
+    );
+    ShouldNotReachHere();
+  } else if (link() == NULL) {
+    asm(
+      "callq _noop13\n"
+    );
+    ShouldNotReachHere();
+  } else if (sender_pc() == NULL) {
+    asm(
+      "callq _noop14\n"
+    );
+    ShouldNotReachHere();
   }
   // Must be native-compiled frame, i.e. the marshaling code for native
   // methods that exists in the core system.

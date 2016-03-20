@@ -60,6 +60,7 @@ extern "C" {
   void _i2c_ret_handler();
   void _i2c_unpatch(JavaThread*, const char*);
   void _i2c_repatch(JavaThread*, const char*);
+  void _i2c_patch_pc(JavaThread*, void**, void*);
 }
 extern "C" {
   void* _c2i_ret_push(JavaThread*, void*, void*, Method*);
@@ -68,6 +69,7 @@ extern "C" {
   void _c2i_ret_handler();
   void _c2i_unpatch(JavaThread*, const char*);
   void _c2i_repatch(JavaThread*, const char*);
+  void _c2i_patch_pc(JavaThread*, void**, void*);
 }
 extern "C" {
   void _native_call_begin(JavaThread*, Method*, int);
@@ -75,8 +77,8 @@ extern "C" {
 }
 
 extern "C" {
-  void _i2c_dump_stack();
-  void _i2c_verify_stack();
+  void _i2c_dump_stack(JavaThread*);
+  void _i2c_verify_stack(JavaThread*);
   void _c2i_dump_stack(JavaThread*);
   void _c2i_verify_stack(JavaThread*);
 }
@@ -84,6 +86,10 @@ extern "C" {
 extern "C" {
   void _noop10();
   void _noop11();
+  void _noop12();
+  void _noop13();
+  void _noop14();
+  void _noop15();
 }
 
 #endif // SHARE_VM_RUNTIME__BDEL_HPP

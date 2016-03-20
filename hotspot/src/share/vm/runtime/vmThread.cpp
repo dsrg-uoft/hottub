@@ -48,6 +48,8 @@ HS_DTRACE_PROBE_DECL3(hotspot, vmops__end, char *, uintptr_t, int);
 
 PRAGMA_FORMAT_MUTE_WARNINGS_FOR_GCC
 
+#include "runtime/_bdel.hpp"
+
 // Dummy VM operation to act as first element in our circular double-linked list
 class VM_Dummy: public VM_Operation {
   VMOp_Type type() const { return VMOp_Dummy; }
@@ -458,11 +460,13 @@ void VMThread::loop() {
           // 'GuaranteedSafepointInterval' milliseconds.  This will run all
           // the clean-up processing that needs to be done regularly at a
           // safepoint
+          //tty->print_cr("_HOTSPOT (%ld): forcing safepoint", _bdel_sys_gettid());
           SafepointSynchronize::begin();
           #ifdef ASSERT
             if (GCALotAtAllSafepoints) InterfaceSupport::check_gc_alot();
           #endif
           SafepointSynchronize::end();
+          //tty->print_cr("_HOTSPOT (%ld): forcing safepoint done", _bdel_sys_gettid());
         }
         _cur_vm_operation = _vm_queue->remove_next();
 
@@ -498,6 +502,9 @@ void VMThread::loop() {
 
         _vm_queue->set_drain_list(safepoint_ops); // ensure ops can be scanned
 
+        //char* _saved = (char*) malloc(strlen(_cur_vm_operation->name() + 1));
+        //strcpy(_saved, _cur_vm_operation->name());
+        //tty->print_cr("_HOTSPOT (%ld): safepoint for task %s", _bdel_sys_gettid(), _saved);
         SafepointSynchronize::begin();
         evaluate_operation(_cur_vm_operation);
         // now process all queued safepoint ops, iteratively draining
@@ -541,6 +548,9 @@ void VMThread::loop() {
 
         // Complete safepoint synchronization
         SafepointSynchronize::end();
+        //tty->print_cr("_HOTSPOT (%ld): safepoint for task done %s", _bdel_sys_gettid(), _saved);
+        //free(_saved);
+        //tty->print_cr("_HOTSPOT: (%ld): safepoint for task done", _bdel_sys_gettid());
 
       } else {  // not a safepoint operation
         if (TraceLongCompiles) {

@@ -534,19 +534,29 @@ void vframeArray::unpack_to_stack(frame &unpack_frame, int exec_mode, int caller
   // Find the skeletal interpreter frames to unpack into
   JavaThread* THREAD = JavaThread::current();
   RegisterMap map(THREAD, false);
+  //tty->print_cr("_HOTSPOT (%ld): getting youngest frame", _bdel_sys_gettid());
   // Get the youngest frame we will unpack (last to be unpacked)
   frame me = unpack_frame.sender(&map);
+  //tty->print_cr("_HOTSPOT (%ld): frames is %d", _bdel_sys_gettid(), frames());
   int index;
   for (index = 0; index < frames(); index++ ) {
     *element(index)->iframe() = me;
+    if (index + 1 == frames()) {
+      THREAD->_bdel_deopt = 1;
+    }
+    //tty->print_cr("_HOTSPOT (%ld): getting %d", _bdel_sys_gettid(), index);
     // Get the caller frame (possibly skeletal)
     me = me.sender(&map);
+    //tty->print_cr("_HOTSPOT (%ld): got %d", _bdel_sys_gettid(), index);
   }
+  THREAD->_bdel_deopt = 0;
+  //tty->print_cr("_HOTSPOT (%ld): done", _bdel_sys_gettid());
 
   // Do the unpacking of interpreter frames; the frame at index 0 represents the top activation, so it has no callee
   // Unpack the frames from the oldest (frames() -1) to the youngest (0)
   frame* caller_frame = &me;
   for (index = frames() - 1; index >= 0 ; index--) {
+    //tty->print_cr("_HOTSPOT (%ld): loop for index %d", _bdel_sys_gettid(), index);
     vframeArrayElement* elem = element(index);  // caller
     int callee_parameters, callee_locals;
     if (index == 0) {
@@ -575,6 +585,7 @@ void vframeArray::unpack_to_stack(frame &unpack_frame, int exec_mode, int caller
     }
     caller_frame = elem->iframe();
     caller_actual_parameters = callee_parameters;
+    //tty->print_cr("_HOTSPOT (%ld): loop done for index %d", _bdel_sys_gettid(), index);
   }
   deallocate_monitor_chunks();
 }

@@ -45,6 +45,10 @@
 
 #define __ masm->
 
+void _deopt_blob_test() {
+  tty->print_cr("_HOTSPOT: saw deopt blob");
+}
+
 /*
 static void _gen_call(MacroAssembler* masm, void* fn) {
   __ push(rax);
@@ -3647,6 +3651,33 @@ void SharedRuntime::generate_deopt_blob() {
 #endif
 
   __ bind(cont);
+  /*
+  if (WildTurtle) {
+    __ push(rax);
+
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_blob_test)));
+
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+
+    __ pop(rax);
+  }
+  */
 
   // Call C code.  Need thread and this frame, but NOT official VM entry
   // crud.  We cannot block on this call, no GC can happen.

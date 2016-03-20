@@ -176,8 +176,6 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
   // the vframeArray is created.
   //
 
-  thread->_bdel_deopt = 1;
-
   // Allocate our special deoptimization ResourceMark
   DeoptResourceMark* dmark = new DeoptResourceMark(thread);
   assert(thread->deopt_mark() == NULL, "Pending deopt!");
@@ -482,9 +480,8 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
 
   frame_pcs[0] = deopt_sender.raw_pc();
   if (WildTurtle && deopt_sender.is_compiled_frame()) {
-    _c2i_ret_push(thread, (void*) frame_pcs[0], (void*) NULL, deopt_sender.cb()->as_nmethod_or_null()->method());
-    frame_pcs[0] = (address) &_c2i_ret_handler;
-    //tty->print_cr("_HOTSPOT: wow, this is a thing");
+    frame_pcs[0] = (address) _c2i_ret_push(thread, (void*) frame_pcs[0], (void*) NULL, deopt_sender.cb()->as_nmethod_or_null()->method());
+    //tty->print_cr("_HOTSPOT: wow, this is a thing, deoptimized sender is %d", deopt_sender.is_deoptimized_frame());
   }
   /*
   if ((void*) frame_pcs[0] == (void*) _i2c_ret_handler) {
@@ -517,7 +514,6 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
   }
 
   array->set_unroll_block(info);
-  thread->_bdel_deopt = 0;
   return info;
 }
 

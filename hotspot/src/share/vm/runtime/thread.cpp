@@ -3309,17 +3309,23 @@ bool        Threads::_vm_complete = false;
 #define ALL_JAVA_THREADS(X) for (JavaThread* X = _thread_list; X; X = X->next())
 
 void Threads::_bdel_safepoint_begin(VMThread* vm_thread) {
+  if (!Thread::current()->is_VM_thread()) {
+    tty->print_cr("_HOTSPOT: doing safepoint begin not vm thread");
+  }
   ALL_JAVA_THREADS(p) {
     if (!p->has_last_Java_frame()) {
       continue;
     }
     _i2c_unpatch(p, "bdel safepoint");
     vm_thread->_bdel_thread = p;
-    // BiasedLocking needs an updated RegisterMap for the revoke monitors pass
-    StackFrameStream fst(p, UseBiasedLocking);
-    for(; !fst.is_done(); fst.next()) {
+    for(StackFrameStream fst(p); !fst.is_done(); fst.next()) {
       continue;
     }
+    if (p->_c2i_unpatch_pos != p->_c2i_stack_pos) {
+      tty->print_cr("_HOTSPOT: in bdel safepoint begin, c2i unpatching no good");
+      ShouldNotReachHere();
+    }
+    p->_c2i_unpatch = 0;
   }
 }
 
@@ -3328,12 +3334,12 @@ void Threads::_bdel_safepoint_end(VMThread* vm_thread) {
     if (!p->has_last_Java_frame()) {
       continue;
     }
+    /*
     vm_thread->_bdel_thread = p;
-    // BiasedLocking needs an updated RegisterMap for the revoke monitors pass
-    StackFrameStream fst(p, UseBiasedLocking);
-    for(; !fst.is_done(); fst.next()) {
+    for(StackFrameStream fst(p); !fst.is_done(); fst.next()) {
       continue;
     }
+    */
     _i2c_repatch(p, "bdel safepoint");
   }
 }

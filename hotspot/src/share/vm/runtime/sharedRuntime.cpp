@@ -118,6 +118,14 @@ extern "C" {
   }
   void _noop11() {
   }
+  void _noop12() {
+  }
+  void _noop13() {
+  }
+  void _noop14() {
+  }
+  void _noop15() {
+  }
 }
 
 uint64_t _now() {
@@ -207,6 +215,10 @@ void _bdel_knell(const char* str) {
 
 extern "C" {
   void* _i2c_ret_push(JavaThread* jt, void* ret, void* rbp, Method* m) {
+    if (_unlikely(!jt->is_Java_thread())) {
+      tty->print_cr("_HOTSPOT: i2c push not in java thread");
+      ShouldNotReachHere();
+    }
     if (_unlikely(!jt->_jvm_state_ready)) {
       return ret;
     }
@@ -376,7 +388,7 @@ extern "C" {
     }
     if (badness) {
       tty->print_cr("_HOTSPOT %ld: i2c unpatch faulty (%s)", _bdel_sys_gettid(), where);
-      _i2c_dump_stack();
+      _i2c_dump_stack(jt);
     } else {
       if (Dyrus) {
         tty->print_cr("_HOTSPOT %ld: done i2c unpatch of %d levels (%s)", _bdel_sys_gettid(), jt->_i2c_stack_pos, where);
@@ -390,8 +402,12 @@ extern "C" {
     }
     for (int i = 0; i < jt->_c2i_unpatch_pos; i++) {
       void** location = (void**) jt->_c2i_repatch_stack[i];
-      if (_unlikely(*location != jt->_c2i_ret_stack[jt->_c2i_stack_pos - i - 1])) {
-        tty->print_cr("_HOTSPOT (%ld): c2i repatch at (%s) didn't match at pos (%d)", _bdel_sys_gettid(), where, i);
+      if (_unlikely(*location != jt->_c2i_ret_stack[jt->_c2i_unpatch_pos - i - 1])) {
+        tty->print_cr("_HOTSPOT (%ld): c2i repatch at (%s) didn't match at pos (%d), of %d", _bdel_sys_gettid(), where, i, jt->_c2i_unpatch_pos);
+        tty->print_cr("_HOTSPOT: found %p, expected %p, c2i is %p, i2c is %p", *location, jt->_c2i_ret_stack[jt->_c2i_unpatch_pos - i - 1], (void*) &_c2i_ret_handler, (void*) _i2c_ret_handler);
+        for (int j = -8; j < 8; j++) {
+          tty->print_cr("_HOTSPOT: nearby %d - %p: %p", j, location + j, *(location + j));
+        }
         ShouldNotReachHere();
       }
       *location = (void*) &_c2i_ret_handler;
@@ -416,7 +432,7 @@ extern "C" {
     }
     if (badness) {
       tty->print_cr("_HOTSPOT %ld: i2c unpatch faulty (%s)", _bdel_sys_gettid(), where);
-      _i2c_dump_stack();
+      _i2c_dump_stack(jt);
     } else {
       if (Dyrus) {
         tty->print_cr("_HOTSPOT %ld: done i2c repatch of %d levels (%s)", _bdel_sys_gettid(), jt->_i2c_stack_pos, where);
@@ -424,6 +440,10 @@ extern "C" {
     }
   }
   void* _c2i_ret_push(JavaThread* jt, void* ret, void* rbp, Method* m) {
+    if (_unlikely(!jt->is_Java_thread())) {
+      tty->print_cr("_HOTSPOT: c2i push not in java thread");
+      ShouldNotReachHere();
+    }
     if (_unlikely(!jt->_jvm_state_ready)) {
       return ret;
     }
@@ -453,7 +473,7 @@ extern "C" {
       tty->print_cr("_HOTSPOT %ld: returning c2i (source %d), %d levels", _bdel_sys_gettid(), where, jt->_c2i_stack_pos);
     }
     if (_unlikely(jt->_c2i_stack_pos <= 0)) {
-      tty->print_cr("_HOTSPOT: c2i stack underflowed");
+      tty->print_cr("_HOTSPOT %ld: c2i stack underflowed, c2i handler is %p", _bdel_sys_gettid(), (void*) &_c2i_ret_handler);
       ShouldNotReachHere();
     }
     _rax_rdx ret;
@@ -532,6 +552,54 @@ extern "C" {
     } else {
       tty->print_cr("_HOTSPOT %ld: done c2i repatch of %d levels (%s)", _bdel_sys_gettid(), jt->_c2i_stack_pos, where);
     }
+  }
+  // patch pc
+  void _i2c_patch_pc(JavaThread* jt, void** loc, void* target) {
+    for (int i = 0; i < jt->_i2c_stack_pos; i++) {
+      if (jt->_i2c_rbp_stack[i] == loc) {
+        if (*loc == jt->_i2c_ret_stack[i]) {
+          jt->_i2c_ret_stack[i] = target;
+        } else {
+          tty->print_cr(
+            "_HOTSPOT %ld: i2c patch pc bad at %d, loc %p, target %p, expected %p"
+            , _bdel_sys_gettid()
+            , loc
+            , target
+            , jt->_i2c_ret_stack[i]
+          );
+          ShouldNotReachHere();
+        }
+        return;
+      }
+    }
+    //tty->print_cr("_HOTSPOT %ld: i2c patch pc at %p not found", _bdel_sys_gettid(), loc);
+    //_i2c_dump_stack(jt);
+  }
+  void _c2i_patch_pc(JavaThread* jt, void** loc, void* target) {
+    if (jt->_c2i_unpatch_pos != jt->_c2i_stack_pos) {
+      //tty->print_cr("_HOTSPOT (%ld): doing c2i patch pc, unpatch pos %d didn't match stack pos %d", _bdel_sys_gettid(), jt->_c2i_unpatch_pos, jt->_c2i_stack_pos);
+      //ShouldNotReachHere();
+      return;
+    }
+    for (int i = 0; i < jt->_c2i_unpatch_pos; i++) {
+      if (jt->_c2i_repatch_stack[i] == loc) {
+        if (*loc == jt->_c2i_ret_stack[i]) {
+          jt->_c2i_ret_stack[i] = target;
+        } else {
+          tty->print_cr(
+            "_HOTSPOT %ld: c2i patch pc bad at %d, loc %p, target %p, expected %p"
+            , _bdel_sys_gettid()
+            , loc
+            , target
+            , jt->_c2i_ret_stack[i]
+          );
+          ShouldNotReachHere();
+        }
+        return;
+      }
+    }
+    //tty->print_cr("_HOTSPOT %ld: c2i patch pc at %p not found", _bdel_sys_gettid(), loc);
+    //_c2i_dump_stack(jt);
   }
 }
 JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
@@ -628,8 +696,7 @@ JRT_LEAF(int, SharedRuntime::_method_exit(JavaThread* thread, Method* method))
 JRT_END;
 
 extern "C" {
-  void _i2c_dump_stack() {
-    JavaThread* jt = JavaThread::current();
+  void _i2c_dump_stack(JavaThread* jt) {
     tty->print_cr("=== i2c ret stack for %ld (handler at %p, c2i at %p) ===", _bdel_sys_gettid(), (void*) &_i2c_ret_handler, (void*) &_c2i_ret_handler);
     for (int i = jt->_i2c_stack_pos - 1; i >= 0; i--) {
       tty->print_cr(" %d. %p: %p", i, jt->_i2c_rbp_stack[i], jt->_i2c_ret_stack[i]);
@@ -640,14 +707,17 @@ extern "C" {
     for (int i = jt->_c2i_stack_pos - 1; i >= 0; i--) {
       tty->print_cr(" %d. %p: %p", i, jt->_c2i_rbp_stack[i], jt->_c2i_ret_stack[i]);
     }
+    tty->print_cr("=== c2i repatch stack for %ld (size %d", _bdel_sys_gettid(), jt->_c2i_unpatch_pos);
+    for (int i = jt->_c2i_unpatch_pos - 1; i >= 0; i--) {
+      tty->print_cr(" %d. %p: %p", i, jt->_c2i_repatch_stack[i], jt->_c2i_ret_stack[i]);
+    }
   }
-  void _i2c_verify_stack() {
-    JavaThread* jt = JavaThread::current();
+  void _i2c_verify_stack(JavaThread* jt) {
     for (int i = jt->_i2c_stack_pos - 1; i >= 0; i--) {
       void* ret_addr = *((void**) jt->_i2c_rbp_stack[i]);
       if (_unlikely(ret_addr != (void*) &_i2c_ret_handler)) {
         tty->print_cr("_HOTSPOT %ld: failed i2c stack check at position %d", _bdel_sys_gettid(), i);
-        _i2c_dump_stack();
+        _i2c_dump_stack(jt);
         ShouldNotReachHere();
       }
     }
