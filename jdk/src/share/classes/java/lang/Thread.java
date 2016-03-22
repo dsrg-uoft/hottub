@@ -420,6 +420,17 @@ class Thread implements Runnable {
 
         /* Set thread ID */
         tid = nextThreadID();
+
+        if (System.out != null) {
+            System.out.println("[tid" + tid + "] init name = " + name + " | target = " + target);
+            System.out.println("[tid" + tid + "] this getName = " + this.getClass().getName());
+            StackTraceElement[] stackTrace = new Throwable().getStackTrace();
+            String stackTraceString = "";
+            for (int i = 0; i < stackTrace.length; i++) {
+                stackTraceString += "[tid" + tid + "] " + i + " " + stackTrace[i] + "\n";
+            }
+            System.out.println("[tid" + tid + "] init trace:\n" + stackTraceString);
+        }
     }
 
     /**
@@ -701,6 +712,17 @@ class Thread implements Runnable {
          *
          * A zero status value corresponds to state "NEW".
          */
+
+        if (System.out != null) {
+            System.out.println("[tid" + tid + "] start name = " + name + " | target = " + target);
+            StackTraceElement[] stackTrace = new Throwable().getStackTrace();
+            String stackTraceString = "";
+            for (int i = 0; i < stackTrace.length; i++) {
+                stackTraceString += "[tid" + tid + "] " + i + " " + stackTrace[i] + "\n";
+            }
+            System.out.println("[tid" + tid + "] start trace:\n" + stackTraceString);
+        }
+
         if (threadStatus != 0)
             throw new IllegalThreadStateException();
 
@@ -755,14 +777,6 @@ class Thread implements Runnable {
      * a chance to clean up before it actually exits.
      */
     private void exit() {
-        // print out class loading performance counters
-        System.out.println("[thread exit] "+sun.misc.PerfCounter.getClassNameLockSync());
-        System.out.println("[thread exit] "+sun.misc.PerfCounter.getParentDelegationTime());
-        System.out.println("[thread exit] "+sun.misc.PerfCounter.getFindClassTime());
-        System.out.println("[thread exit] "+sun.misc.PerfCounter.getFindClasses());
-        System.out.println("[thread exit] "+sun.misc.PerfCounter.getNullFindClassTime());
-        System.out.println("[thread exit] "+sun.misc.PerfCounter.getNullFindClasses());
-
         if (group != null) {
             group.threadTerminated(this);
             group = null;
