@@ -420,17 +420,6 @@ class Thread implements Runnable {
 
         /* Set thread ID */
         tid = nextThreadID();
-
-        if (System.out != null) {
-            System.out.println("[tid" + tid + "] init name = " + name + " | target = " + target);
-            System.out.println("[tid" + tid + "] this getName = " + this.getClass().getName());
-            StackTraceElement[] stackTrace = new Throwable().getStackTrace();
-            String stackTraceString = "";
-            for (int i = 0; i < stackTrace.length; i++) {
-                stackTraceString += "[tid" + tid + "] " + i + " " + stackTrace[i] + "\n";
-            }
-            System.out.println("[tid" + tid + "] init trace:\n" + stackTraceString);
-        }
     }
 
     /**
@@ -712,17 +701,6 @@ class Thread implements Runnable {
          *
          * A zero status value corresponds to state "NEW".
          */
-
-        if (System.out != null) {
-            System.out.println("[tid" + tid + "] start name = " + name + " | target = " + target);
-            StackTraceElement[] stackTrace = new Throwable().getStackTrace();
-            String stackTraceString = "";
-            for (int i = 0; i < stackTrace.length; i++) {
-                stackTraceString += "[tid" + tid + "] " + i + " " + stackTrace[i] + "\n";
-            }
-            System.out.println("[tid" + tid + "] start trace:\n" + stackTraceString);
-        }
-
         if (threadStatus != 0)
             throw new IllegalThreadStateException();
 
