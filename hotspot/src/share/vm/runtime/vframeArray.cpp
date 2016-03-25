@@ -295,8 +295,8 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
   // exact interpreter address we should use.
 
   /*
-  if (is_top_frame) {
-    tty->print_cr("_HOTSPOT: sender pc is %p, i2c is %p, c2i is %p", (void*) pc, (void*) &_i2c_ret_handler, (void*) &_c2i_ret_handler);
+  if (is_bottom_frame) {
+    tty->print_cr("_HOTSPOT: sender pc is %p, i2c is %p, c2i is %p, caller is compiled %d", (void*) pc, (void*) &_i2c_ret_handler, (void*) &_c2i_ret_handler, caller->is_compiled_frame());
   }
   */
   _frame.patch_pc(thread, pc);

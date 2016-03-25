@@ -476,6 +476,8 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
       int64_t actual = (int64_t) location;
       sender_pc = (address) jt->_c2i_ret_stack[pos];
       jt->_c2i_repatch_stack[jt->_c2i_unpatch_pos++] = location;
+      //tty->print_cr("_HOTSPOT (%ld): difference is %d, actual is %p", _bdel_sys_gettid(), expected - actual, actual);
+      //_c2i_dump_stack(jt);
     } else {
       //tty->print_cr("_HOTSPOT (%ld): bdel deopt is %d", _bdel_sys_gettid(), jt->_bdel_deopt);
       if (!jt->_bdel_deopt) {

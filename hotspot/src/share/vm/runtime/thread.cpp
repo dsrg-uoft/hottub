@@ -1427,6 +1427,7 @@ void JavaThread::initialize() {
   // Initialize fields
 
   _bdel_thread = this;
+  _bdel_safepoint = 0;
   _bdel_deopt = 0;
   _jvm_state = 0;
   _jvm_state_ready = 0;
@@ -4307,8 +4308,8 @@ void Threads::gc_prologue() {
 }
 
 void Threads::deoptimized_wrt_marked_nmethods() {
-  JavaThread* _jt = JavaThread::current();
-  if (_unlikely(!_jt->is_VM_thread())) {
+  Thread* _t = Thread::current();
+  if (_unlikely(!_t->is_VM_thread())) {
     tty->print_cr("_HOTSPOT (%ld): in Threads::deoptimized_wrt_marked_nmethods, current thread is not VM thread", _bdel_sys_gettid());
     ShouldNotReachHere();
   }

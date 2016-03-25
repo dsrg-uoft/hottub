@@ -738,7 +738,7 @@ void InterpreterMacroAssembler::remove_activation(
     bind(_after);
     pop(rscratch1);
   }
-  if (false && WildTurtle) {
+  if (WildTurtle) {
     push(rscratch1);
     Label _after;
     lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));

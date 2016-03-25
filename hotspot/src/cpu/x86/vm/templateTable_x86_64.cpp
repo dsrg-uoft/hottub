@@ -41,6 +41,8 @@
 
 #define __ _masm->
 
+#include "runtime/_bdel.hpp"
+
 // Platform-dependent initialization
 
 void TemplateTable::pd_initialize() {
@@ -1594,6 +1596,7 @@ void TemplateTable::branch(bool is_jsr, bool is_wide) {
     // Pre-load the next target bytecode into rbx
     __ load_unsigned_byte(rbx, Address(r13, rdx, Address::times_1, 0));
 
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop11)));
     // compute return address as bci in rax
     __ lea(rax, at_bcp((is_wide ? 5 : 3) -
                         in_bytes(ConstMethod::codes_offset())));

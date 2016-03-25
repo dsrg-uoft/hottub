@@ -502,8 +502,8 @@ void VMThread::loop() {
 
         _vm_queue->set_drain_list(safepoint_ops); // ensure ops can be scanned
 
-        //char* _saved = (char*) malloc(strlen(_cur_vm_operation->name() + 1));
-        //strcpy(_saved, _cur_vm_operation->name());
+        char* _saved = (char*) malloc(strlen(_cur_vm_operation->name() + 1));
+        strcpy(_saved, _cur_vm_operation->name());
         //tty->print_cr("_HOTSPOT (%ld): safepoint for task %s", _bdel_sys_gettid(), _saved);
         SafepointSynchronize::begin();
         evaluate_operation(_cur_vm_operation);
@@ -549,8 +549,7 @@ void VMThread::loop() {
         // Complete safepoint synchronization
         SafepointSynchronize::end();
         //tty->print_cr("_HOTSPOT (%ld): safepoint for task done %s", _bdel_sys_gettid(), _saved);
-        //free(_saved);
-        //tty->print_cr("_HOTSPOT: (%ld): safepoint for task done", _bdel_sys_gettid());
+        free(_saved);
 
       } else {  // not a safepoint operation
         if (TraceLongCompiles) {

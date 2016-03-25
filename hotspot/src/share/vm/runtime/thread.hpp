@@ -831,6 +831,9 @@ class JavaThread: public Thread {
   // bdel
  public:
   int8_t _bdel_deopt;
+  int8_t _bdel_safepoint;
+  //int64_t _n[_I2C_STACK_SIZE];
+  //int64_t _m[_I2C_STACK_SIZE];
   // 0 for interpreted, 1 for compiled
   int8_t _jvm_state;
   int8_t _jvm_state_ready;
@@ -842,6 +845,7 @@ class JavaThread: public Thread {
   void* _c2i_ret_stack[_I2C_STACK_SIZE];
   void* _c2i_rbp_stack[_I2C_STACK_SIZE];
   void* _c2i_repatch_stack[_I2C_STACK_SIZE];
+  Method* _c2i_method_stack[_I2C_STACK_SIZE];
   volatile int32_t _i2c_stack_pos;
   volatile int32_t _c2i_stack_pos;
   volatile int32_t _c2i_unpatch_pos;
