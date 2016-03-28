@@ -468,7 +468,7 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
 
   address* location = sender_pc_addr();
   address sender_pc = *location;
-  if (WildTurtle && (void*) sender_pc == (void*) &_c2i_ret_handler) {
+  if (WildTurtle && ((void*) sender_pc == (void*) &_c2i_ret_handler || (void*) sender_pc == (void*) 0xdeadc0de)) {
     JavaThread* jt = Thread::current()->_bdel_thread;
     if (jt->_c2i_unpatch) {
       int pos = jt->_c2i_stack_pos - jt->_c2i_unpatch_pos - 1;
@@ -481,11 +481,11 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
     } else {
       //tty->print_cr("_HOTSPOT (%ld): bdel deopt is %d", _bdel_sys_gettid(), jt->_bdel_deopt);
       if (!jt->_bdel_deopt) {
-        //tty->print_cr("_HOTSPOT (%ld): bdel deopt is 0, found c2i address", _bdel_sys_gettid());
+        //tty->print_cr("_HOTSPOT (%ld): bdel deopt is 0, found c2i address %p", _bdel_sys_gettid(), sender_pc);
         void* ret = _c2i_ret_verify_location_and_pop(jt, (void*) location, -2);
         sender_pc = (address) ret;
       } else {
-        //tty->print_cr("_HOTSPOT (%ld): bdel deopt is 1, found c2i address", _bdel_sys_gettid());
+        //tty->print_cr("_HOTSPOT (%ld): bdel deopt is 1, found c2i address %p", _bdel_sys_gettid(), sender_pc);
         //tty->print_cr("_HOTSPOT (%ld): bakana", _bdel_sys_gettid());
       }
     }

@@ -3317,16 +3317,8 @@ void Threads::_bdel_safepoint_begin(VMThread* vm_thread) {
     if (!p->has_last_Java_frame()) {
       continue;
     }
-    _i2c_unpatch(p, "bdel safepoint");
     vm_thread->_bdel_thread = p;
-    for(StackFrameStream fst(p); !fst.is_done(); fst.next()) {
-      continue;
-    }
-    if (p->_c2i_unpatch_pos != p->_c2i_stack_pos) {
-      tty->print_cr("_HOTSPOT: in bdel safepoint begin, c2i unpatching no good");
-      ShouldNotReachHere();
-    }
-    p->_c2i_unpatch = 0;
+    _i2c_unpatch(p, "bdel safepoint");
   }
 }
 
@@ -3335,12 +3327,6 @@ void Threads::_bdel_safepoint_end(VMThread* vm_thread) {
     if (!p->has_last_Java_frame()) {
       continue;
     }
-    /*
-    vm_thread->_bdel_thread = p;
-    for(StackFrameStream fst(p); !fst.is_done(); fst.next()) {
-      continue;
-    }
-    */
     _i2c_repatch(p, "bdel safepoint");
   }
 }

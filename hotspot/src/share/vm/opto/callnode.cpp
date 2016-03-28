@@ -931,6 +931,7 @@ uint CallStaticJavaNode::cmp( const Node &n ) const {
 // If this is an uncommon trap, return the request code, else zero.
 int CallStaticJavaNode::uncommon_trap_request() const {
   if (_name != NULL && !strcmp(_name, "uncommon_trap")) {
+    //tty->print_cr("_HOTSPOT: uncommon trap request");
     return extract_uncommon_trap_request(this);
   }
   return 0;

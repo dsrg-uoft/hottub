@@ -887,6 +887,7 @@ public abstract class ResourceBundle {
     @CallerSensitive
     public static final ResourceBundle getBundle(String baseName, Locale targetLocale,
                                                  Control control) {
+        //System.out.print("_JDK: in ResourceBundle get bundle\n");
         return getBundleImpl(baseName, targetLocale,
                              getLoader(Reflection.getCallerClass()),
                              control);

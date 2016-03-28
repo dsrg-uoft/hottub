@@ -351,7 +351,7 @@ class StubGenerator: public StubCodeGenerator {
       __ pop(c_rarg0);
       __ pop(rax);
     }
-    */
+    //*/
     __ call(c_rarg1);
     /*
     if (WildTurtle) {
@@ -377,10 +377,11 @@ class StubGenerator: public StubCodeGenerator {
       __ pop(c_rarg0);
       __ pop(rax);
     }
-    */
+    //*/
 
     BLOCK_COMMENT("call_stub_return_address:");
     return_address = __ pc();
+    //tty->print_cr("_HOTSPOT: call stub return address is %p", (void*) return_address);
 
     // store result depending on type (everything that is not
     // T_OBJECT, T_LONG, T_FLOAT or T_DOUBLE is treated as T_INT)
@@ -444,6 +445,33 @@ class StubGenerator: public StubCodeGenerator {
 
     // return
     __ pop(rbp);
+    //*
+    if (false && WildTurtle) {
+      __ movptr(rscratch1, Address(rsp, 0));
+      __ push(rax);
+      __ push(c_rarg0);
+      __ push(c_rarg1);
+      __ push(c_rarg2);
+      __ push(c_rarg3);
+      __ push(c_rarg4);
+      __ push(c_rarg5);
+      __ push(rscratch1);
+      __ push(rscratch2);
+
+      __ movptr(c_rarg0, rscratch1);
+      __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _saw_call_stub3)));
+
+      __ pop(rscratch2);
+      __ pop(rscratch1);
+      __ pop(c_rarg5);
+      __ pop(c_rarg4);
+      __ pop(c_rarg3);
+      __ pop(c_rarg2);
+      __ pop(c_rarg1);
+      __ pop(c_rarg0);
+      __ pop(rax);
+    }
+    //*/
     __ ret(0);
 
     // handle return types different from T_INT
@@ -1652,6 +1680,44 @@ class StubGenerator: public StubCodeGenerator {
     inc_counter_np(SharedRuntime::_jbyte_array_copy_ctr); // Update counter after rscratch1 is free
     __ xorptr(rax, rax); // return 0
     __ leave(); // required for proper stackwalking of RuntimeStub frame
+
+    if (false && WildTurtle) {
+      __ push(rscratch1);
+      Label _after;
+      __ movptr(rdi, Address(rsp, 8));
+      __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, 0xdeadc0de)));
+      __ cmpptr(rscratch1, rdi);
+      __ jcc(Assembler::notEqual, _after);
+      // my isle; hajimemashou
+      __ push(rax);
+      __ push(c_rarg0);
+      __ push(c_rarg1);
+      __ push(c_rarg2);
+      __ push(c_rarg3);
+      __ push(c_rarg4);
+      __ push(c_rarg5);
+      // no rscratch1
+      __ push(rscratch2);
+
+      // 8 caller saved registers + rax - already popped
+      __ movptr(c_rarg0, r15_thread);
+      __ lea(c_rarg1, Address(rsp, 8 * wordSize));
+      __ lea(c_rarg2, RuntimeAddress((address) -11));
+      __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, 0xdeadbabe)));
+      __ pop(rscratch2);
+      // no rscratch1
+      __ pop(c_rarg5);
+      __ pop(c_rarg4);
+      __ pop(c_rarg3);
+      __ pop(c_rarg2);
+      __ pop(c_rarg1);
+      __ pop(c_rarg0);
+      __ movptr(rdi, rax);
+      __ pop(rax);
+      // my isle; chu chu
+      __ bind(_after);
+      __ pop(rscratch1);
+    }
     __ ret(0);
 
     // Copy in multi-bytes chunks

@@ -390,6 +390,9 @@ void JavaCalls::call_helper(JavaValue* result, methodHandle* m, JavaCallArgument
     os::bang_stack_shadow_pages();
   }
 
+  if (thread->_jvm_state_ready) {
+    //tty->print_cr("_HOTSPOT %p: call stub for %s#%s", thread, method->klass_name()->as_C_string(), method->name()->as_C_string());
+  }
   // do call
   { JavaCallWrapper link(method, receiver, result, CHECK);
     { HandleMark hm(thread);  // HandleMark used by HandleMarkCleaner
@@ -413,6 +416,9 @@ void JavaCalls::call_helper(JavaValue* result, methodHandle* m, JavaCallArgument
       }
     }
   } // Exit JavaCallWrapper (can block - potential return oop must be preserved)
+  if (thread->_jvm_state_ready) {
+    //tty->print_cr("_HOTSPOT: call stub returning %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
+  }
 
   // Check if a thread stop or suspend should be executed
   // The following assert was not realistic.  Thread.stop can set that bit at any moment.

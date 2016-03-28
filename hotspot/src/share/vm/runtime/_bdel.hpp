@@ -71,7 +71,7 @@ extern "C" {
   void _c2i_repatch(JavaThread*, const char*);
   void _c2i_patch_pc(JavaThread*, void**, void*);
   void* _c2i_ret_verify_and_update_location(JavaThread*, void*, int64_t, Method*);
-  void _c2i_deopt_bless(JavaThread*, void*, void*);
+  void _c2i_deopt_bless(JavaThread*, void*, void*, int, int, int);
 }
 extern "C" {
   void _native_call_begin(JavaThread*, Method*, int);
@@ -95,6 +95,9 @@ extern "C" {
   void _deopt_blob_test(void*);
   void _saw_string_a();
   void _saw_string_b();
+  void _saw_call_stub();
+  void _saw_call_stub2();
+  void _saw_call_stub3(void*);
 }
 
 #endif // SHARE_VM_RUNTIME__BDEL_HPP

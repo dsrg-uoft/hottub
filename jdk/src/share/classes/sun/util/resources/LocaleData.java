@@ -163,6 +163,7 @@ public class LocaleData {
         return AccessController.doPrivileged(new PrivilegedAction<ResourceBundle>() {
             @Override
             public ResourceBundle run() {
+                //System.out.print("_JDK: in LocaleData#getBundle resource bundle run\n");
                 return ResourceBundle
                         .getBundle(baseName, locale, LocaleDataResourceBundleControl.INSTANCE);
             }

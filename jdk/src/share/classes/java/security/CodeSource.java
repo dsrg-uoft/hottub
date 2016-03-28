@@ -135,14 +135,29 @@ public class CodeSource implements java.io.Serializable {
      */
     @Override
     public boolean equals(Object obj) {
+        //System.out.print("_JDK: in code source equals\n");
+        /*
         if (obj == this)
             return true;
+        */
+        if (obj == this) {
+            //System.out.print("_JDK: in code source equals 1\n");
+            return true;
+        }
 
+        /*
         // objects types must be equal
         if (!(obj instanceof CodeSource))
             return false;
+        */
+        if (!(obj instanceof CodeSource)) {
+            //System.out.print("_JDK: in code source equals 2\n");
+            return false;
+        }
 
         CodeSource cs = (CodeSource) obj;
+
+        //System.out.print("_JDK: in code source equals 3\n");
 
         // URLs must match
         if (location == null) {
@@ -152,6 +167,7 @@ public class CodeSource implements java.io.Serializable {
             // if location is not null, then it must equal cs.location
             if (!location.equals(cs.location)) return false;
         }
+        //System.out.print("_JDK: in code source equals 4\n");
 
         // certs must match
         return matchCerts(cs, true);

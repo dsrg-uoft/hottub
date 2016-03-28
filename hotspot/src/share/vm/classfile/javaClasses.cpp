@@ -1617,6 +1617,7 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, methodHandle met
     return;
   }
 
+  //tty->print_cr("_HOTSPOT: current thread is %p, thread is %p, active is %p", JavaThread::current(), thread, JavaThread::active());
   _i2c_unpatch(thread, "fill in stack trace");
 
   // Instead of using vframe directly, this version of fill_in_stack_trace

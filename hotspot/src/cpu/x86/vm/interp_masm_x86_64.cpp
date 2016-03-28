@@ -775,6 +775,43 @@ void InterpreterMacroAssembler::remove_activation(
     bind(_after);
     pop(rscratch1);
   }
+  if (WildTurtle) {
+    push(rscratch1);
+    Label _after;
+    lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, 0xdeadc0de)));
+    cmpptr(rscratch1, ret_addr);
+    jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    push(rax);
+    push(c_rarg0);
+    push(c_rarg1);
+    push(c_rarg2);
+    push(c_rarg3);
+    push(c_rarg4);
+    push(c_rarg5);
+    // no rscratch1
+    push(rscratch2);
+
+    // 8 caller saved registers + rax - already popped
+    movptr(c_rarg0, r15_thread);
+    lea(c_rarg1, Address(rsp, 8 * wordSize));
+    //movptr(c_rarg1, rbx);
+    lea(c_rarg2, RuntimeAddress((address) -3));
+    call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop)));
+    pop(rscratch2);
+    // no rscratch1
+    pop(c_rarg5);
+    pop(c_rarg4);
+    pop(c_rarg3);
+    pop(c_rarg2);
+    pop(c_rarg1);
+    pop(c_rarg0);
+    movptr(ret_addr, rax);
+    pop(rax);
+    // my isle; chu chu
+    bind(_after);
+    pop(rscratch1);
+  }
   mov(rsp, rbx);                     // set sp to sender sp
 }
 

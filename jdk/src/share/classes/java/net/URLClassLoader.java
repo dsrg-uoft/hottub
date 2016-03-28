@@ -362,7 +362,9 @@ public class URLClassLoader extends SecureClassLoader implements Closeable {
                 new PrivilegedExceptionAction<Class<?>>() {
                     public Class<?> run() throws ClassNotFoundException {
                         String path = name.replace('.', '/').concat(".class");
+                        //System.out.print("_JDK: defining class " + path + "\n");
                         Resource res = ucp.getResource(path, false);
+                        //System.out.print("_JDK: defining class " + path + " 2\n");
                         if (res != null) {
                             try {
                                 return defineClass(name, res);

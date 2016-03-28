@@ -190,6 +190,43 @@ address AbstractInterpreterGenerator::generate_slow_signature_handler() {
   // restore rsp
   __ addptr(rsp, 14 * wordSize);
 
+  if (false && WildTurtle) {
+    __ push(rscratch1);
+    Label _after;
+    __ movptr(rdi, Address(rsp, 8));
+    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, 0xdeadc0de)));
+    __ cmpptr(rscratch1, rdi);
+    __ jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    __ push(rax);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    // no rscratch1
+    __ push(rscratch2);
+
+    // 8 caller saved registers + rax - already popped
+    __ movptr(c_rarg0, r15_thread);
+    __ lea(c_rarg1, Address(rsp, 8 * wordSize));
+    __ lea(c_rarg2, RuntimeAddress((address) -11));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, 0xdeadbabe)));
+    __ pop(rscratch2);
+    // no rscratch1
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ movptr(rdi, rax);
+    __ pop(rax);
+    // my isle; chu chu
+    __ bind(_after);
+    __ pop(rscratch1);
+  }
   __ ret(0);
 
   return entry;
@@ -349,6 +386,42 @@ address InterpreterGenerator::generate_empty_entry(void) {
   // _return
   // return w/o popping parameters
   __ pop(rax);
+  if (false && WildTurtle) {
+    __ push(rscratch1);
+    Label _after;
+    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, 0xdeadc0de)));
+    __ cmpptr(rscratch1, rax);
+    __ jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    __ push(rax);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    // no rscratch1
+    __ push(rscratch2);
+
+    // 8 caller saved registers + rax - already popped
+    __ movptr(c_rarg0, r15_thread);
+    __ lea(c_rarg1, Address(rsp, 8 * wordSize));
+    __ lea(c_rarg2, RuntimeAddress((address) -11));
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, 0xdeadbabe)));
+    __ pop(rscratch2);
+    // no rscratch1
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ movptr(rdi, rax);
+    __ pop(rax);
+    // my isle; chu chu
+    __ bind(_after);
+    __ pop(rscratch1);
+  }
   __ mov(rsp, r13);
   __ jmp(rax);
 

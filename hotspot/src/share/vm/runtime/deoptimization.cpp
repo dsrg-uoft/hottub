@@ -387,6 +387,7 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
   // than simply use array->sender.pc(). This requires us to walk the current set of frames
   //
   frame deopt_sender = stub_frame.sender(&dummy_map); // First is the deoptee frame
+  frame _deopt = deopt_sender;
   deopt_sender = deopt_sender.sender(&dummy_map);     // Now deoptee caller
 
   // It's possible that the number of paramters at the call site is
@@ -480,8 +481,12 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
 
   frame_pcs[0] = deopt_sender.raw_pc();
   if (WildTurtle && deopt_sender.is_compiled_frame()) {
-    frame_pcs[0] = (address) _c2i_ret_push(thread, (void*) frame_pcs[0], (void*) NULL, deopt_sender.cb()->as_nmethod_or_null()->method());
-    //tty->print_cr("_HOTSPOT: wow, this is a thing, deoptimized sender is %d, is %p", deopt_sender.is_deoptimized_frame(), (void*) frame_pcs[0]);
+    Method* _m = _deopt.cb()->as_nmethod_or_null()->method();
+    Method* _n = deopt_sender.cb()->as_nmethod_or_null()->method();
+    //if (_deopt.is_deoptimized_frame()) {
+      frame_pcs[0] = (address) _c2i_ret_push(thread, (void*) frame_pcs[0], (void*) NULL, _m);
+    //}
+    //tty->print_cr("_HOTSPOT: wow, this is a thing, deoptimized sender is %d, is %p, %s#%s, %d, called by %s#%s", deopt_sender.is_deoptimized_frame(), (void*) frame_pcs[0], _m->klass_name()->as_C_string(), _m->name()->as_C_string(), _deopt.is_deoptimized_frame(), _n->klass_name()->as_C_string(), _n->name()->as_C_string());
   }
   /*
   if ((void*) frame_pcs[0] == (void*) _i2c_ret_handler) {
@@ -1776,6 +1781,7 @@ Deoptimization::update_method_data_from_interpreter(MethodData* trap_mdo, int tr
 
 Deoptimization::UnrollBlock* Deoptimization::uncommon_trap(JavaThread* thread, jint trap_request) {
 
+  //tty->print_cr("_HOTSPOT: uncommon trap found");
   // Still in Java no safepoints
   {
     // This enters VM and may safepoint
