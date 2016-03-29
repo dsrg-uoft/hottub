@@ -2400,6 +2400,20 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     restore_args(masm, total_c_args, c_arg, out_regs);
   }
 
+  // WILDTURTLE: native call
+  if (WildTurtle) {
+    __ push(rax);
+    save_args(masm, total_c_args, c_arg, out_regs);
+
+    __ movptr(c_rarg0, r15_thread);
+    __ mov_metadata(c_rarg1, method());
+    __ xorptr(c_rarg2, c_rarg2);
+
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _native_call_begin)));
+
+    restore_args(masm, total_c_args, c_arg, out_regs);
+    __ pop(rax);
+  }
   // Lock a synchronized method
 
   // Register definitions used by locking and unlocking
@@ -2484,44 +2498,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   // Now set thread in native
   __ movl(Address(r15_thread, JavaThread::thread_state_offset()), _thread_in_native);
 
-  // WILDTURTLE: native call
-  if (WildTurtle) {
-    __ push(rax);
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    __ push(rscratch1);
-    __ push(rscratch2);
-    __ movptr(c_rarg0, r15_thread);
-    __ lea(c_rarg1, RuntimeAddress((address) method()));
-    __ mov_metadata(c_rarg1, method());
-    __ xorptr(c_rarg2, c_rarg2);
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _native_call_begin)));
-    __ pop(rscratch2);
-    __ pop(rscratch1);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-    __ pop(rax);
-  }
   __ call(RuntimeAddress(native_func));
-  if (WildTurtle) {
-    __ push(rax);
-    __ push(rdx);
-    __ movptr(c_rarg0, r15_thread);
-    __ lea(c_rarg1, RuntimeAddress((address) method()));
-    __ mov_metadata(c_rarg1, method());
-    __ xorptr(c_rarg2, c_rarg2);
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _native_call_end)));
-    __ pop(rdx);
-    __ pop(rax);
-  }
 
   // Verify or restore cpu control state after JNI call
   __ restore_cpu_control_state_after_jni();
@@ -2671,6 +2648,16 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
     __ bind(done);
 
+  }
+  if (WildTurtle) {
+    save_native_result(masm, ret_type, stack_slots);
+
+    __ movptr(c_rarg0, r15_thread);
+    __ mov_metadata(c_rarg1, method());
+    __ xorptr(c_rarg2, c_rarg2);
+
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _native_call_end)));
+    restore_native_result(masm, ret_type, stack_slots);
   }
   {
     SkipIfEqual skip(masm, &DTraceMethodProbes, false);

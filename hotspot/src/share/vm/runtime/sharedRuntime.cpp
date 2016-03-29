@@ -152,7 +152,6 @@ extern "C" {
 uint64_t _now() {
   struct timespec ts;
   int status = clock_gettime(CLOCK_MONOTONIC, &ts);
-  assert(status == 0, "gettime error");
   return (uint64_t) ts.tv_sec * (1000 * 1000 * 1000) + (uint64_t) ts.tv_nsec;
 }
 void _jvm_transitions_clock(JavaThread* jt, int8_t s2) {
@@ -160,6 +159,14 @@ void _jvm_transitions_clock(JavaThread* jt, int8_t s2) {
     tty->print_cr("_HOTSPOT (%ld): transitioning %d to %d", _bdel_sys_gettid(), jt->_jvm_state, s2);
   }
   uint64_t t = _now();
+  if (_unlikely(jt->_jvm_state < 0 || jt->_jvm_state > 1)) {
+    tty->print_cr("_HOTSPOT: jvm state %d", jt->_jvm_state);
+    ShouldNotReachHere();
+  }
+  if (_unlikely(t < jt->_jvm_state_last_timestamp)) {
+    tty->print_cr("_HOTSPOT: transitioning %lu, %lu", t, jt->_jvm_state_last_timestamp);
+    ShouldNotReachHere();
+  }
   jt->_jvm_state_times[jt->_jvm_state] += t - jt->_jvm_state_last_timestamp;
   jt->_jvm_state_last_timestamp = t;
   jt->_jvm_state = s2;
@@ -309,6 +316,7 @@ extern "C" {
         }
         tty->print_cr("_HOTSPOT: checked close");
       }
+      _i2c_dump_stack(jt);
       ShouldNotReachHere();
     }
     return ret.rax;
@@ -345,7 +353,7 @@ extern "C" {
     if (_unlikely(!jt->_jvm_state_ready)) {
       return;
     }
-    if (Dyrus) {
+    if (Dyrus || (m != NULL && !strcmp(m->klass_name()->as_C_string(), "AccessController"))) {
       jio_fprintf(defaultStream::output_stream()
         , "_HOTSPOT (%ld): calling %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth)\n"
         , _bdel_sys_gettid()
@@ -377,7 +385,7 @@ extern "C" {
     } else {
       _i2n_levels--;
     }
-    if (Dyrus) {
+    if (Dyrus || (m != NULL && !strcmp(m->klass_name()->as_C_string(), "AccessController"))) {
       jio_fprintf(defaultStream::output_stream()
         , "_HOTSPOT (%ld): returning %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth)\n"
         , _bdel_sys_gettid()
@@ -698,6 +706,9 @@ extern "C" {
   }
 }
 JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
+  if (method != NULL && !strcmp(method->klass_name()->as_C_string(), "AccessController")) {
+    tty->print_cr("_HOTSPOT (%ld): dyrus ganked by %s#%s", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string());
+  }
   if (_unlikely(!thread->_jvm_state_ready)) {
     return 0;
   }
@@ -743,6 +754,9 @@ JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
 JRT_END
 
 JRT_LEAF(int, SharedRuntime::_method_exit(JavaThread* thread, Method* method))
+  if (method != NULL && !strcmp(method->klass_name()->as_C_string(), "AccessController")) {
+    tty->print_cr("_HOTSPOT (%ld): dyrus ganked by %s#%s", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string());
+  }
   if (method->is_native()) {
     //_native_call_end(thread, method, 0);
     return 0;

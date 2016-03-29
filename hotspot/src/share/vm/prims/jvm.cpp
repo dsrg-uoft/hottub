@@ -1423,8 +1423,15 @@ class RegisterArrayForGC {
 };
 
 
+//__thread int _foo = 0;
 JVM_ENTRY(jobject, JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls))
   JVMWrapper("JVM_GetStackAccessControlContext");
+  //tty->print_cr("_HOTSPOT: in get stack access control context, use privileged stack is %d, jvm state is %d", UsePrivilegedStack, JavaThread::current()->_jvm_state);
+  /*
+  if (_foo++ == 35) {
+    ShouldNotReachHere();
+  }
+  */
   if (!UsePrivilegedStack) return NULL;
 
   ResourceMark rm(THREAD);
