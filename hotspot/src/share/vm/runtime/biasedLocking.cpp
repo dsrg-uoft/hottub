@@ -32,6 +32,8 @@
 #include "runtime/vmThread.hpp"
 #include "runtime/vm_operations.hpp"
 
+#include "runtime/_bdel.hpp"
+
 static bool _biased_locking_enabled = false;
 BiasedLockingCounters BiasedLocking::_counters;
 
@@ -115,6 +117,7 @@ static GrowableArray<MonitorInfo*>* get_or_compute_monitor_info(JavaThread* thre
     return info;
   }
 
+  _i2c_unpatch(thread, "get or compute monitor info");
   info = new GrowableArray<MonitorInfo*>();
 
   // It's possible for the thread to not have any Java frames on it,
@@ -137,6 +140,7 @@ static GrowableArray<MonitorInfo*>* get_or_compute_monitor_info(JavaThread* thre
       }
     }
   }
+  _i2c_repatch(thread, "get or compute monitor info");
 
   thread->set_cached_monitor_info(info);
   return info;

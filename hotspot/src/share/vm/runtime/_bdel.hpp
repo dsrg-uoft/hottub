@@ -14,6 +14,7 @@
 
 #define _bdel_sys_gettid() ((int64_t) syscall(SYS_gettid))
 #define _MAX(a, b) ((a) > (b) ? (a) : (b))
+#define _MIN(a, b) ((a) <= (b) ? (a) : (b))
 
 /**
  * Notes

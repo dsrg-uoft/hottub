@@ -353,9 +353,11 @@ extern "C" {
     if (_unlikely(!jt->_jvm_state_ready)) {
       return;
     }
-    if (Dyrus || (m != NULL && !strcmp(m->klass_name()->as_C_string(), "AccessController"))) {
-      jio_fprintf(defaultStream::output_stream()
-        , "_HOTSPOT (%ld): calling %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth)\n"
+    //if (Dyrus || (m != NULL && !strcmp(m->klass_name()->as_C_string(), "java/security/AccessController") && strcmp(m->name()->as_C_string(), "doPrivileged"))) {
+    if (Dyrus) {
+      //jio_fprintf(defaultStream::output_stream()
+      tty->print_cr(
+        "_HOTSPOT (%ld): calling %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth, current %d)\n"
         , _bdel_sys_gettid()
         , opposite ? "n2i" : "i2n"
         , m == NULL ? "<nil" : m->klass_name()->as_C_string()
@@ -363,6 +365,7 @@ extern "C" {
         , opposite
         , jt->_native_levels
         , jt->_jvm_transitions_pos
+        , jt->_jvm_state
       );
     }
     if (opposite) {
@@ -385,9 +388,11 @@ extern "C" {
     } else {
       _i2n_levels--;
     }
-    if (Dyrus || (m != NULL && !strcmp(m->klass_name()->as_C_string(), "AccessController"))) {
-      jio_fprintf(defaultStream::output_stream()
-        , "_HOTSPOT (%ld): returning %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth)\n"
+    //if (Dyrus || (m != NULL && !strcmp(m->klass_name()->as_C_string(), "java/security/AccessController") && strcmp(m->name()->as_C_string(), "doPrivileged"))) {
+    if (Dyrus) {
+      //jio_fprintf(defaultStream::output_stream()
+      tty->print_cr(
+        "_HOTSPOT (%ld): returning %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth, current %d)\n"
         , _bdel_sys_gettid()
         , opposite ? "n2i" : "i2n"
         , m == NULL ? "<nil" : m->klass_name()->as_C_string()
@@ -395,6 +400,7 @@ extern "C" {
         , opposite
         , jt->_native_levels
         , jt->_jvm_transitions_pos
+        , jt->_jvm_state
       );
     }
     _jvm_transitions_pop(jt);
@@ -706,9 +712,11 @@ extern "C" {
   }
 }
 JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
-  if (method != NULL && !strcmp(method->klass_name()->as_C_string(), "AccessController")) {
-    tty->print_cr("_HOTSPOT (%ld): dyrus ganked by %s#%s", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string());
+  /*
+  if (method != NULL && !strcmp(method->klass_name()->as_C_string(), "java/security/AccessController")) {
+    tty->print_cr("_HOTSPOT (%ld): dyrone ganked by %s#%s, %d, %p, ready is %d, native is %d", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string(), thread->_jvm_state, thread, thread->_jvm_state_ready, method->is_native());
   }
+  */
   if (_unlikely(!thread->_jvm_state_ready)) {
     return 0;
   }
@@ -725,7 +733,7 @@ JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
         "callq _noop11\n"
       );
       if (TheGeneral) {
-        tty->print_cr("_HOTSPOT (%ld): method %s#%s has failed this city!", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string());
+        tty->print_cr("_HOTSPOT (%ld): method %s#%s has failed this city!, %p, %d", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string(), thread, thread->_jvm_state);
       }
       if (Sachiko) {
         _jvm_transitions_clock(thread, 0);
@@ -754,9 +762,11 @@ JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
 JRT_END
 
 JRT_LEAF(int, SharedRuntime::_method_exit(JavaThread* thread, Method* method))
-  if (method != NULL && !strcmp(method->klass_name()->as_C_string(), "AccessController")) {
-    tty->print_cr("_HOTSPOT (%ld): dyrus ganked by %s#%s", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string());
+  /*
+  if (method != NULL && !strcmp(method->klass_name()->as_C_string(), "java/security/AccessController")) {
+    tty->print_cr("_HOTSPOT (%ld): dyrone 1v2s %s#%s, %d, %p, ready is %d", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string(), thread->_jvm_state, thread, thread->_jvm_state_ready);
   }
+  */
   if (method->is_native()) {
     //_native_call_end(thread, method, 0);
     return 0;
@@ -820,7 +830,7 @@ extern "C" {
   }
   void _c2i_dump_stack(JavaThread* jt) {
     tty->print_cr("=== c2i ret stack for %ld (%p, handler at %p, i2c at %p) ===", _bdel_sys_gettid(), jt, (void*) &_c2i_ret_handler, (void*) &_i2c_ret_handler);
-    for (int i = jt->_c2i_stack_pos - 1; i >= 0; i--) {
+    for (int i = _MIN(jt->_c2i_stack_pos, 128) - 1; i >= 0; i--) {
       Method* m = jt->_c2i_method_stack[i];
       nmethod* nm = CodeCache::find_nmethod(jt->_c2i_ret_stack[i]);
       tty->print_cr(

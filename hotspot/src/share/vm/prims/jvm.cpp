@@ -1316,9 +1316,11 @@ JVM_ENTRY(jobject, JVM_DoPrivileged(JNIEnv *env, jclass cls, jobject action, job
     THROW_MSG_0(vmSymbols::java_lang_NullPointerException(), "Null action");
   }
 
+  _i2c_unpatch(thread, "JVM_DoPrivileged");
   // Compute the frame initiating the do privileged operation and setup the privileged stack
   vframeStream vfst(thread);
   vfst.security_get_caller_frame(1);
+  _i2c_repatch(thread, "JVM_DoPrivileged");
 
   if (vfst.at_end()) {
     THROW_MSG_0(vmSymbols::java_lang_InternalError(), "no caller?");
@@ -1442,6 +1444,8 @@ JVM_ENTRY(jobject, JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls))
   // duplicate consecutive protection domains into a single one, as
   // well as stopping when we hit a privileged frame.
 
+  _i2c_unpatch(thread, "AccessController#getStackAccessControlContext");
+
   // Use vframeStream to iterate through Java frames
   vframeStream vfst(thread);
 
@@ -1472,6 +1476,7 @@ JVM_ENTRY(jobject, JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls))
 
     if (is_privileged) break;
   }
+  _i2c_repatch(thread, "AccessController#getStackAccessControlContext");
 
 
   // either all the domains on the stack were system domains, or
