@@ -264,45 +264,6 @@ address TemplateInterpreterGenerator::generate_result_handler_for(
     break;
   default       : ShouldNotReachHere();
   }
-  /*
-  if (WildTurtle) {
-    __ push(rscratch1);
-    Label _after;
-    __ movptr(rdi, Address(rsp, 8));
-    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, 0xdeadc0de)));
-    __ cmpptr(rscratch1, rdi);
-    __ jcc(Assembler::notEqual, _after);
-    // my isle; hajimemashou
-    __ push(rax);
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    // no rscratch1
-    __ push(rscratch2);
-
-    // 8 caller saved registers + rax - already popped
-    __ movptr(c_rarg0, r15_thread);
-    __ lea(c_rarg1, Address(rsp, 8 * wordSize));
-    __ lea(c_rarg2, RuntimeAddress((address) -11));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, 0xdeadbabe)));
-    __ pop(rscratch2);
-    // no rscratch1
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-    __ movptr(rdi, rax);
-    __ pop(rax);
-    // my isle; chu chu
-    __ bind(_after);
-    __ pop(rscratch1);
-  }
-  */
   __ ret(0);                                   // return from result handler
   return entry;
 }
@@ -636,11 +597,6 @@ void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
     __ pop(c_rarg2);
     __ pop(c_rarg1);
     __ pop(c_rarg0);
-    //__ movptr(Address(rsp, wordSize), rax);
-    if (false && !native_call) {
-      __ lea(rscratch1, RuntimeAddress((address) 0xdeadc0de));
-      __ movptr(Address(rsp, wordSize), rscratch1);
-    }
 
     __ bind(_after);
     __ pop(rscratch1);
@@ -812,45 +768,6 @@ address InterpreterGenerator::generate_accessor_entry(void) {
 
     // _ireturn/_areturn
     __ pop(rdi);
-    /*
-    if (WildTurtle) {
-      __ push(rscratch1);
-      Label _after;
-      __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));
-      __ cmpptr(rscratch1, rdi);
-      __ jcc(Assembler::notEqual, _after);
-      // my isle; hajimemashou
-      __ push(rax);
-      __ push(c_rarg0);
-      __ push(c_rarg1);
-      __ push(c_rarg2);
-      __ push(c_rarg3);
-      __ push(c_rarg4);
-      __ push(c_rarg5);
-      // no rscratch1
-      __ push(rscratch2);
-
-      // 8 caller saved registers + rax - already popped
-      __ movptr(c_rarg0, r15_thread);
-      __ lea(c_rarg1, Address(rsp, 8 * wordSize));
-      __ lea(c_rarg2, RuntimeAddress((address) -11));
-      __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop)));
-      __ pop(rscratch2);
-      // no rscratch1
-      __ pop(c_rarg5);
-      __ pop(c_rarg4);
-      __ pop(c_rarg3);
-      __ pop(c_rarg2);
-      __ pop(c_rarg1);
-      __ pop(c_rarg0);
-      __ movptr(rdi, rax);
-      __ pop(rax);
-      __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, 0xdeadbabe)));
-      // my isle; chu chu
-      __ bind(_after);
-      __ pop(rscratch1);
-    }
-    */
     __ mov(rsp, r13);
     __ jmp(rdi);
     __ ret(0);
@@ -1512,42 +1429,6 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
     __ push(rscratch1);
     Label _after;
     __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));
-    __ cmpptr(rscratch1, rdi);
-    __ jcc(Assembler::notEqual, _after);
-    // my isle; hajimemashou
-    __ push(rax);
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    // no rscratch1
-    __ push(rscratch2);
-
-    // 8 caller saved registers + rax - already popped
-    __ movptr(c_rarg0, r15_thread);
-    __ lea(c_rarg1, Address(rsp, 8 * wordSize));
-    __ lea(c_rarg2, RuntimeAddress((address) -11));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop)));
-    __ pop(rscratch2);
-    // no rscratch1
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-    __ movptr(rdi, rax);
-    __ pop(rax);
-    // my isle; chu chu
-    __ bind(_after);
-    __ pop(rscratch1);
-  }
-  if (WildTurtle) {
-    __ push(rscratch1);
-    Label _after;
-    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, 0xdeadc0de)));
     __ cmpptr(rscratch1, rdi);
     __ jcc(Assembler::notEqual, _after);
     // my isle; hajimemashou

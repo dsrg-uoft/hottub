@@ -6228,29 +6228,6 @@ void MacroAssembler::string_indexofC8(Register str1, Register str2,
   // if (substr.count == 0) return 0;
   assert(int_cnt2 >= 8, "this code isused only for cnt2 >= 8 chars");
 
-  /*
-    if (WildTurtle) {
-      push(rax);
-      push(c_rarg0);
-      push(c_rarg1);
-      push(c_rarg2);
-      push(c_rarg3);
-      push(c_rarg4);
-      push(c_rarg5);
-      push(rscratch1);
-      push(rscratch2);
-      call(RuntimeAddress(CAST_FROM_FN_PTR(address, _saw_string_a)));
-      pop(rscratch2);
-      pop(rscratch1);
-      pop(c_rarg5);
-      pop(c_rarg4);
-      pop(c_rarg3);
-      pop(c_rarg2);
-      pop(c_rarg1);
-      pop(c_rarg0);
-      pop(rax);
-    }
-  */
   // Load substring.
   movdqu(vec, Address(str2, 0));
   movl(cnt2, int_cnt2);
@@ -6413,29 +6390,6 @@ void MacroAssembler::string_indexof(Register str1, Register str2,
     Label BIG_STRINGS, CHECK_STR, COPY_SUBSTR, COPY_STR;
 
     movptr(tmp, rsp); // save old SP
-    /*
-    if (WildTurtle) {
-      push(rax);
-      push(c_rarg0);
-      push(c_rarg1);
-      push(c_rarg2);
-      push(c_rarg3);
-      push(c_rarg4);
-      push(c_rarg5);
-      push(rscratch1);
-      push(rscratch2);
-      call(RuntimeAddress(CAST_FROM_FN_PTR(address, _saw_string_a)));
-      pop(rscratch2);
-      pop(rscratch1);
-      pop(c_rarg5);
-      pop(c_rarg4);
-      pop(c_rarg3);
-      pop(c_rarg2);
-      pop(c_rarg1);
-      pop(c_rarg0);
-      pop(rax);
-    }
-    */
 
     if (int_cnt2 > 0) {     // small (< 8 chars) constant substring
       if (int_cnt2 == 1) {  // One char

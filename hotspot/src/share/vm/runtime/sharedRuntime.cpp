@@ -127,26 +127,6 @@ extern "C" {
   }
   void _noop15() {
   }
-  void _deopt_blob_test(void* p) {
-    tty->print_cr("_HOTSPOT: saw %p", p);
-  }
-  void _saw_string_a() {
-    tty->print_cr("_HOTSPOT: saw a");
-  }
-  void _saw_string_b() {
-    tty->print_cr("_HOTSPOT: saw b");
-  }
-  void _saw_call_stub() {
-    tty->print_cr("_HOTSPOT: saw cs");
-  }
-  void _saw_call_stub2() {
-    tty->print_cr("_HOTSPOT: saw cs2");
-  }
-  void _saw_call_stub3(void* p) {
-    if (p == (void*) 0xdeadc0de) {
-      tty->print_cr("_HOTSPOT: saw cs3");
-    }
-  }
 }
 
 uint64_t _now() {
@@ -252,10 +232,6 @@ extern "C" {
     }
     if (_unlikely(!jt->_jvm_state_ready)) {
       return ret;
-    }
-    if (_unlikely(ret == (void*) 0xdeadc0de || ret == (void*) &_c2i_ret_handler)) {
-      tty->print_cr("_HOTSPOT: here");
-      ShouldNotReachHere();
     }
     _i2c_levels++;
     if (Dyrus) {

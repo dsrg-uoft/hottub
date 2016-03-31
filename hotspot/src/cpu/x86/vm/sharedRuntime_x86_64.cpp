@@ -45,32 +45,6 @@
 
 #define __ masm->
 
-/*
-static void _gen_call(MacroAssembler* masm, void* fn) {
-  __ push(rax);
-  __ push(c_rarg0);
-  __ push(c_rarg1);
-  __ push(c_rarg2);
-  __ push(c_rarg3);
-  __ push(c_rarg4);
-  __ push(c_rarg5);
-  __ push(rscratch1);
-  __ push(rscratch2);
-
-  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, fn)));
-
-  __ pop(rscratch2);
-  __ pop(rscratch1);
-  __ pop(c_rarg5);
-  __ pop(c_rarg4);
-  __ pop(c_rarg3);
-  __ pop(c_rarg2);
-  __ pop(c_rarg1);
-  __ pop(c_rarg0);
-  __ pop(rax);
-}
-//*/
-
 const int StackAlignmentInSlots = StackAlignmentInBytes / VMRegImpl::stack_slot_size;
 
 class SimpleRuntimeFrame {
@@ -3502,35 +3476,6 @@ void SharedRuntime::generate_deopt_blob() {
   // already been captured in the vframeArray at the time the return PC was
   // patched.
   address start = __ pc();
-  /*
-  if (WildTurtle) {
-    __ push(rax);
-
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    __ push(rscratch1);
-    __ push(rscratch2);
-
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_blob_start)));
-    //__ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_and_pop)));
-    //__ movptr(Address(rdx, 0), rax);
-
-    __ pop(rscratch2);
-    __ pop(rscratch1);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-
-    __ pop(rax);
-  }
-  //*/
   Label cont;
 
   // Prolog for non exception case!
@@ -3539,33 +3484,6 @@ void SharedRuntime::generate_deopt_blob() {
   map = RegisterSaver::save_live_registers(masm, 0, &frame_size_in_words);
 
   // Normal deoptimization.  Save exec mode for unpack_frames.
-  /*
-  if (WildTurtle) {
-    __ push(rax);
-
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    __ push(rscratch1);
-    __ push(rscratch2);
-
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_blob_normal)));
-
-    __ pop(rscratch2);
-    __ pop(rscratch1);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-
-    __ pop(rax);
-  }
-  */
   __ movl(r14, Deoptimization::Unpack_deopt); // callee-saved
   __ jmp(cont);
 
@@ -3637,33 +3555,6 @@ void SharedRuntime::generate_deopt_blob() {
 #endif
 
   __ bind(cont);
-  /*
-  if (WildTurtle) {
-    __ push(rax);
-
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    __ push(rscratch1);
-    __ push(rscratch2);
-
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_blob_test)));
-
-    __ pop(rscratch2);
-    __ pop(rscratch1);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-
-    __ pop(rax);
-  }
-  */
 
   // Call C code.  Need thread and this frame, but NOT official VM entry
   // crud.  We cannot block on this call, no GC can happen.
@@ -3843,35 +3734,6 @@ void SharedRuntime::generate_deopt_blob() {
   __ decrementl(rdx);                   // Decrement counter
   __ jcc(Assembler::notZero, loop);
   __ pushptr(Address(rcx, 0));          // Save final return address
-  /*
-  if (WildTurtle) {
-    __ push(rax);
-
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    __ push(rscratch1);
-    __ push(rscratch2);
-
-
-    __ movptr(c_rarg0, Address(rcx, 0));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_blob_test)));
-
-    __ pop(rscratch2);
-    __ pop(rscratch1);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-
-    __ pop(rax);
-  }
-  */
 
   // Re-push self-frame
   __ enter();                           // Save old & set new ebp
@@ -3921,34 +3783,6 @@ void SharedRuntime::generate_deopt_blob() {
   __ leave();                           // Epilog
 
   // Jump to interpreter
-  /*
-  if (WildTurtle) {
-    __ push(rax);
-
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    __ push(rscratch1);
-    __ push(rscratch2);
-
-    __ movptr(c_rarg0, Address(rsp, 9 * sizeof(void*)));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _deopt_blob_test)));
-
-    __ pop(rscratch2);
-    __ pop(rscratch1);
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-
-    __ pop(rax);
-  }
-  */
   __ ret(0);
 
   // Make sure all code is generated
@@ -4328,42 +4162,6 @@ RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const cha
 
   // We are back the the original state on entry and ready to go.
 
-  if (WildTurtle) {
-    __ push(rscratch1);
-    Label _after;
-    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, 0xdeadc0de)));
-    __ cmpptr(rscratch1, rax);
-    __ jcc(Assembler::notEqual, _after);
-    // my isle; hajimemashou
-    __ push(rax);
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    // no rscratch1
-    __ push(rscratch2);
-
-    // 8 caller saved registers + rax - already popped
-    __ movptr(c_rarg0, r15_thread);
-    __ lea(c_rarg1, Address(rsp, 8 * wordSize));
-    __ lea(c_rarg2, RuntimeAddress((address) -11));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, 0xdeadbabe)));
-    __ pop(rscratch2);
-    // no rscratch1
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-    __ movptr(rdi, rax);
-    __ pop(rax);
-    // my isle; chu chu
-    __ bind(_after);
-    __ pop(rscratch1);
-  }
   __ jmp(rax);
 
   // Pending exception after the safepoint

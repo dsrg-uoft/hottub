@@ -1574,16 +1574,6 @@ void Assembler::jmp(Label& L, bool maybe_short) {
 }
 
 void Assembler::jmp(Register entry) {
-  if (false && WildTurtle) {
-    push(rscratch1);
-    Label _after;
-    mov64(rscratch1, 0xdeadc0de);
-    cmpq(rscratch1, entry);
-    jcc(Assembler::notEqual, _after);
-    mov64(entry, 0xcafebabe);
-    bind(_after);
-    pop(rscratch1);
-  }
   int encode = prefix_and_encode(entry->encoding());
   emit_int8((unsigned char)0xFF);
   emit_int8((unsigned char)(0xE0 | encode));
@@ -2730,18 +2720,6 @@ void Assembler::repne_scanl() { // repne_scan
 #endif
 
 void Assembler::ret(int imm16) {
-  if (false && WildTurtle) {
-    //push(rscratch1);
-    Label _after;
-    mov64(rscratch1, 0xdeadc0de);
-    movq(rscratch2, Address(rsp, imm16 * 8));
-    cmpq(rscratch1, rscratch2);
-    jcc(Assembler::notEqual, _after);
-    mov64(rscratch1, 0xcafec0de);
-    jmp(rscratch1);
-    bind(_after);
-    //pop(rscratch1);
-  }
   if (imm16 == 0) {
     emit_int8((unsigned char)0xC3);
   } else {
