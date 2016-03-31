@@ -756,9 +756,8 @@ class Thread implements Runnable {
      * a chance to clean up before it actually exits.
      */
     private void exit() {
-
-        String print_jvm_init = System.getProperty("PrintClassLoading");
-        if (print_jvm_init != null && print_jvm_init.equals("true")) {
+        String print_class_loading = System.getProperty("PrintClassLoading");
+        if (print_class_loading != null && print_class_loading.equals("true")) {
             // print out class loading performance counters
             System.out.println("[thread exit] "+sun.misc.PerfCounter.getClassNameLockSync());
             System.out.println("[thread exit] "+sun.misc.PerfCounter.getParentDelegationTime());
