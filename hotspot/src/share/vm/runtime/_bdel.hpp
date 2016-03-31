@@ -62,6 +62,7 @@ extern "C" {
   void _i2c_unpatch(JavaThread*, const char*);
   void _i2c_repatch(JavaThread*, const char*);
   void _i2c_patch_pc(JavaThread*, void**, void*);
+  void* _i2c_osr(JavaThread*, void*, void*, void*, nmethod*);
 }
 extern "C" {
   void* _c2i_ret_push(JavaThread*, void*, void*, Method*);

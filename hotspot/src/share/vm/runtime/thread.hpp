@@ -830,6 +830,7 @@ class JavaThread: public Thread {
 
   // bdel
  public:
+  uint64_t _blocking_compile_time;
   int8_t _bdel_deopt;
   int8_t _bdel_safepoint;
   //int64_t _n[_I2C_STACK_SIZE];

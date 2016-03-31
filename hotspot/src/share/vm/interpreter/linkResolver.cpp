@@ -90,6 +90,7 @@ void CallInfo::set_handle(methodHandle resolved_method, Handle resolved_appendix
   _resolved_method_type = resolved_method_type;
 }
 
+#include "runtime/_bdel.hpp"
 void CallInfo::set_common(KlassHandle resolved_klass,
                           KlassHandle selected_klass,
                           methodHandle resolved_method,
@@ -127,9 +128,21 @@ void CallInfo::set_common(KlassHandle resolved_klass,
       // even before classes are initialized.
       return;
     }
+    uint64_t t0 = _now();
     CompileBroker::compile_method(selected_method, InvocationEntryBci,
                                   CompilationPolicy::policy()->initial_compile_level(),
                                   methodHandle(), 0, "must_be_compiled", CHECK);
+    uint64_t t1 = _now();
+    if (_unlikely(!THREAD->is_Java_thread())) {
+      tty->print_cr("_HOTSPOT: what");
+      ShouldNotReachHere();
+    }
+    if (_unlikely(t1 < t0)) {
+      tty->print_cr("_HOTSPOT: clock not monotonic - t0 %lu, t1 %lu", t0, t1);
+      ShouldNotReachHere();
+    }
+    JavaThread* _jt = (JavaThread*) THREAD;
+    _jt->_blocking_compile_time += (t1 - t0);
   }
 }
 

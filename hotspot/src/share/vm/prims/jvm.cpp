@@ -739,6 +739,7 @@ JVM_ENTRY(jclass, JVM_GetCallerClass(JNIEnv* env, int depth))
     return (k == NULL) ? NULL : (jclass) JNIHandles::make_local(env, k->java_mirror());
   }
 
+  _i2c_unpatch(thread, "JVM_GetCallerClass");
   // Getting the class of the caller frame.
   //
   // The call stack at this point looks something like this:
@@ -756,23 +757,27 @@ JVM_ENTRY(jclass, JVM_GetCallerClass(JNIEnv* env, int depth))
     case 0:
       // This must only be called from Reflection.getCallerClass
       if (m->intrinsic_id() != vmIntrinsics::_getCallerClass) {
+        _i2c_repatch(thread, "JVM_GetCallerClass/throw exception 0");
         THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), "JVM_GetCallerClass must only be called from Reflection.getCallerClass");
       }
       // fall-through
     case 1:
       // Frame 0 and 1 must be caller sensitive.
       if (!m->caller_sensitive()) {
+        _i2c_repatch(thread, "JVM_GetCallerClass/throw exception 1");
         THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), err_msg("CallerSensitive annotation expected at frame %d", n));
       }
       break;
     default:
       if (!m->is_ignored_by_security_stack_walk()) {
+        _i2c_repatch(thread, "JVM_GetCallerClass/early return");
         // We have reached the desired frame; return the holder class.
         return (jclass) JNIHandles::make_local(env, m->method_holder()->java_mirror());
       }
       break;
     }
   }
+  _i2c_repatch(thread, "JVM_GetCallerClass/null return");
   return NULL;
 JVM_END
 
@@ -3088,6 +3093,14 @@ JVM_ENTRY(void, JVM_StopThread(JNIEnv* env, jobject jthread, jobject throwable))
   }
 JVM_END
 
+JVM_ENTRY(jlong, JVM_BdelGetBlockingCompileTime(JNIEnv* env, jobject jthread))
+  JVMWrapper("JVM_BdelGetBlockingCompileTime");
+  oop java_thread = JNIHandles::resolve_non_null(jthread);
+  JavaThread* receiver = java_lang_Thread::thread(java_thread);
+  _jvm_transitions_clock(receiver, receiver->_jvm_state);
+  return (jlong) receiver->_blocking_compile_time;
+JVM_END
+
 JVM_ENTRY(void, JVM_BdelReset(JNIEnv* env, jobject jthread))
   JVMWrapper("JVM_BdelReset");
   oop java_thread = JNIHandles::resolve_non_null(jthread);
@@ -3476,6 +3489,7 @@ JVM_ENTRY(jobjectArray, JVM_GetClassContext(JNIEnv *env))
   JVMWrapper("JVM_GetClassContext");
   ResourceMark rm(THREAD);
   JvmtiVMObjectAllocEventCollector oam;
+  _i2c_unpatch(thread, "JVM_GetClassContext");
   vframeStream vfst(thread);
 
   if (SystemDictionary::reflect_CallerSensitive_klass() != NULL) {
@@ -3484,6 +3498,7 @@ JVM_ENTRY(jobjectArray, JVM_GetClassContext(JNIEnv *env))
     if (!(m->method_holder() == SystemDictionary::SecurityManager_klass() &&
           m->name()          == vmSymbols::getClassContext_name() &&
           m->signature()     == vmSymbols::void_class_array_signature())) {
+      _i2c_repatch(thread, "JVM_GetClassContext/throw exception");
       THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), "JVM_GetClassContext must only be called from SecurityManager.getClassContext");
     }
   }
@@ -3499,6 +3514,7 @@ JVM_ENTRY(jobjectArray, JVM_GetClassContext(JNIEnv *env))
       klass_array->append(holder);
     }
   }
+  _i2c_repatch(thread, "JVM_GetClassContext");
 
   // Create result array of type [Ljava/lang/Class;
   objArrayOop result = oopFactory::new_objArray(SystemDictionary::Class_klass(), klass_array->length(), CHECK_NULL);
@@ -3698,14 +3714,25 @@ JVM_END
 // if only code from the null class loader is on the stack.
 
 JVM_ENTRY(jobject, JVM_LatestUserDefinedLoader(JNIEnv *env))
+  _i2c_unpatch(thread, "JVM_LatestUserDefinedLoader");
+  if (thread != Thread::current()) {
+    tty->print_cr("_HOTSPOT: what");
+    ShouldNotReachHere();
+  }
+  if (thread->_bdel_thread != thread) {
+    tty->print_cr("_HOTSPOT: why");
+    ShouldNotReachHere();
+  }
   for (vframeStream vfst(thread); !vfst.at_end(); vfst.next()) {
     // UseNewReflection
     vfst.skip_reflection_related_frames(); // Only needed for 1.4 reflection
     oop loader = vfst.method()->method_holder()->class_loader();
     if (loader != NULL) {
+      _i2c_repatch(thread, "JVM_LatestUserDefinedLoader/early return");
       return JNIHandles::make_local(env, loader);
     }
   }
+  _i2c_repatch(thread, "JVM_LatestUserDefinedLoader/null return");
   return NULL;
 JVM_END
 

@@ -951,6 +951,9 @@ class CommandLineFlags {
   product(bool, PrintCompilation, false,                                    \
           "Print compilations")                                             \
                                                                             \
+  product(bool, PrintForcedCompileTime, false,                              \
+          "-Xcomp flag")                                                    \
+                                                                            \
   product(bool, WildTurtle, false,                                          \
           "BibleThump")                                                     \
                                                                             \

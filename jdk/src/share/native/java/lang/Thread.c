@@ -42,7 +42,8 @@
 
 static JNINativeMethod methods[] = {
     {"start0",           "()V",        (void *)&JVM_StartThread},
-    {"resetIntCompTimes", "()V",        (void *)&JVM_BdelReset},
+    {"getBlockingCompileTime", "()J",  (void *)&JVM_BdelGetBlockingCompileTime},
+    {"resetIntCompTimes", "()V",       (void *)&JVM_BdelReset},
     {"getIntTime",       "()J",        (void *)&JVM_BdelGetInt},
     {"getCompTime",      "()J",        (void *)&JVM_BdelGetComp},
     {"stop0",            "(" OBJ ")V", (void *)&JVM_StopThread},

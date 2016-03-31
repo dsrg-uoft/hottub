@@ -1426,6 +1426,7 @@ void WatcherThread::print_on(outputStream* st) const {
 void JavaThread::initialize() {
   // Initialize fields
 
+  _blocking_compile_time = 0;
   _bdel_thread = this;
   _bdel_safepoint = 0;
   _bdel_deopt = 0;

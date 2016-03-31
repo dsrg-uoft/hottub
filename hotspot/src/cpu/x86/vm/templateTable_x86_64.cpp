@@ -1783,6 +1783,40 @@ void TemplateTable::branch(bool is_jsr, bool is_wide) {
       __ movptr(sender_sp, Address(rbp, frame::interpreter_frame_sender_sp_offset * wordSize)); // get sender sp
       __ leave();                                // remove frame anchor
       __ pop(retaddr);                           // get return address
+      // retaddr = j_rarg2 = c_rarg3 = rcx
+      // sender_sp = j_rarg1 = c_rarg2 = rdx
+      // r13 = nmethod
+      if (WildTurtle) {
+        __ push(rax);
+        __ push(c_rarg0);
+        __ push(c_rarg1);
+        __ push(c_rarg2);
+        __ push(c_rarg3);
+        __ push(c_rarg4);
+        __ push(c_rarg5);
+        __ push(rscratch1);
+        __ push(rscratch2);
+
+        // 8 caller saved registers + rax - already popped
+        // retaddr is c_rarg3
+        __ movptr(c_rarg1, retaddr);
+        // sender_sp is c_rarg2
+        __ movptr(c_rarg3, sender_sp);
+        __ movptr(c_rarg0, r15_thread);
+        __ lea(c_rarg2, Address(rsp, 8 * wordSize));
+        __ movptr(c_rarg4, r13);
+        __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_osr)));
+        __ pop(rscratch2);
+        __ pop(rscratch1);
+        __ pop(c_rarg5);
+        __ pop(c_rarg4);
+        __ pop(c_rarg3);
+        __ pop(c_rarg2);
+        __ pop(c_rarg1);
+        __ pop(c_rarg0);
+        __ movptr(retaddr, rax);
+        __ pop(rax);
+      }
       __ mov(rsp, sender_sp);                   // set sp to sender sp
       // Ensure compiled code always sees stack at proper alignment
       __ andptr(rsp, -(StackAlignmentInBytes));

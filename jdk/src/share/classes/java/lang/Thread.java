@@ -727,6 +727,7 @@ class Thread implements Runnable {
 
     private native void start0();
 
+    public native long getBlockingCompileTime();
     public native void resetIntCompTimes();
     public native long getIntTime();
     public native long getCompTime();
@@ -756,7 +757,7 @@ class Thread implements Runnable {
      */
     private void exit() {
 
-        String print_jvm_init = System.getProperty("PrintJVMInit");
+        String print_jvm_init = System.getProperty("PrintClassLoading");
         if (print_jvm_init != null && print_jvm_init.equals("true")) {
             // print out class loading performance counters
             System.out.println("[thread exit] "+sun.misc.PerfCounter.getClassNameLockSync());
