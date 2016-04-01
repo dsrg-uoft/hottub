@@ -1805,7 +1805,7 @@ void TemplateTable::branch(bool is_jsr, bool is_wide) {
         __ movptr(c_rarg0, r15_thread);
         __ lea(c_rarg2, Address(rsp, 8 * wordSize));
         __ movptr(c_rarg4, r13);
-        __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_osr)));
+        __ call_VM_leaf(CAST_FROM_FN_PTR(address, _i2c_osr));
         __ pop(rscratch2);
         __ pop(rscratch1);
         __ pop(c_rarg5);

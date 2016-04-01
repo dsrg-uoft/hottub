@@ -139,15 +139,11 @@ void _jvm_transitions_clock(JavaThread* jt, int8_t s2) {
     tty->print_cr("_HOTSPOT (%ld): transitioning %d to %d", _bdel_sys_gettid(), jt->_jvm_state, s2);
   }
   uint64_t t = _now();
-  if (_unlikely(jt->_jvm_state < 0 || jt->_jvm_state > 1)) {
-    tty->print_cr("_HOTSPOT: jvm state %d", jt->_jvm_state);
-    ShouldNotReachHere();
-  }
   if (_unlikely(t < jt->_jvm_state_last_timestamp)) {
     tty->print_cr("_HOTSPOT: transitioning %lu, %lu", t, jt->_jvm_state_last_timestamp);
     ShouldNotReachHere();
   }
-  jt->_jvm_state_times[jt->_jvm_state] += t - jt->_jvm_state_last_timestamp;
+  jt->_jvm_state_times[jt->_jvm_state & 1] += t - jt->_jvm_state_last_timestamp;
   jt->_jvm_state_last_timestamp = t;
   jt->_jvm_state = s2;
 }
@@ -235,13 +231,18 @@ extern "C" {
     }
     _i2c_levels++;
     if (Dyrus) {
-      jio_fprintf(defaultStream::output_stream()
-        , "_HOTSPOT %ld: calling i2c %s#%s, from %d levels\n"
+      //jio_fprintf(defaultStream::output_stream()
+      //tty->print_cr("_HOTSPOT: i2c");
+      //tty->ADRIAN("i2c push\n");
+      //*
+      tty->print_cr(
+        "_HOTSPOT %ld: calling i2c %s#%s, from %d levels"
         , _bdel_sys_gettid()
         , m->klass_name()->as_C_string()
         , m->name()->as_C_string()
         , jt->_i2c_stack_pos
       );
+      //*/
     }
     if (_unlikely(jt->_i2c_stack_pos >= _I2C_STACK_SIZE)) {
       tty->print_cr("_HOTSPOT: i2c stack overflowed");
@@ -257,7 +258,16 @@ extern "C" {
   _rax_rdx _i2c_ret_pop(JavaThread* jt) {
     _i2c_levels--;
     if (Dyrus) {
-      jio_fprintf(defaultStream::output_stream(), "_HOTSPOT %ld: returning i2c, from %d levels\n", _bdel_sys_gettid(), jt->_i2c_stack_pos);
+      //jio_fprintf(
+      //  defaultStream::output_stream(),
+      //tty->ADRIAN("i2c pop\n");
+      //*
+      tty->print_cr(
+        "_HOTSPOT %ld: returning i2c, from %d levels"
+        , _bdel_sys_gettid()
+        , jt->_i2c_stack_pos
+      );
+      //*/
     }
     if (_unlikely(jt->_i2c_stack_pos <= 0)) {
       tty->print_cr("_HOTSPOT: i2c stack underflowed");
@@ -315,14 +325,24 @@ extern "C" {
     // - calling functions is okay because any caller saved registers could have been mangled
     //   by the called compiled function we are returning from anyways
     asm(
+      // save return registers
       "push %rax\n"
       "\tpush %rdx\n"
+      // align stack
+      "\tlea -8(%rsp), %rsp\n"
+      // arguments
       "\tmov %r15, %rdi\n"
       "\tmov %rbp, %rsi\n"
+      // call
       "\tcallq _i2c_ret_verify_location_and_pop\n"
+      // save return address
       "\tmov %rax, %r11\n"
+      // fix stack
+      "\tlea 8(%rsp), %rsp\n"
+      // restore return registers
       "\tpop %rdx\n"
       "\tpop %rax\n"
+      // slip return address where expected
       "\tpop %rbp\n"
       "\tpush %r11\n"
       "\tpush %rbp\n"
@@ -332,6 +352,7 @@ extern "C" {
     if (_unlikely(!jt->_jvm_state_ready)) {
       return ret;
     }
+    tty->print_cr("_HOTSPOT: i2c osr");
     if (ret == (void*) &_c2i_ret_handler) {
       return _c2i_ret_verify_location_and_pop(jt, rbp, -42);
     } else {
@@ -344,9 +365,9 @@ extern "C" {
     }
     //if (Dyrus || (m != NULL && !strcmp(m->klass_name()->as_C_string(), "java/security/AccessController") && strcmp(m->name()->as_C_string(), "doPrivileged"))) {
     if (Dyrus) {
-      //jio_fprintf(defaultStream::output_stream()
+      //io_fprintf(defaultStream::output_stream()
       tty->print_cr(
-        "_HOTSPOT (%ld): calling %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth, current %d)\n"
+        "_HOTSPOT (%ld): calling %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth, current %d)"
         , _bdel_sys_gettid()
         , opposite ? "n2i" : "i2n"
         , m == NULL ? "<nil" : m->klass_name()->as_C_string()
@@ -364,7 +385,7 @@ extern "C" {
     } else {
       _i2n_levels++;
       // i2n
-      _jvm_transitions_push(jt, 1);
+      _jvm_transitions_push(jt, 3);
     }
     jt->_native_levels++;
   }
@@ -381,7 +402,7 @@ extern "C" {
     if (Dyrus) {
       //jio_fprintf(defaultStream::output_stream()
       tty->print_cr(
-        "_HOTSPOT (%ld): returning %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth, current %d)\n"
+        "_HOTSPOT (%ld): returning %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth, current %d)"
         , _bdel_sys_gettid()
         , opposite ? "n2i" : "i2n"
         , m == NULL ? "<nil" : m->klass_name()->as_C_string()
@@ -466,8 +487,6 @@ extern "C" {
     }
     _c2i_repatch(jt, where);
   }
-  __thread int _counter = 0;
-  __thread int _c2 = 0;
   void* _c2i_ret_push(JavaThread* jt, void* ret, void* rbp, Method* m) {
     if (_unlikely(!jt->is_Java_thread())) {
       tty->print_cr("_HOTSPOT: c2i push not in java thread");
@@ -476,43 +495,27 @@ extern "C" {
     if (_unlikely(!jt->_jvm_state_ready)) {
       return ret;
     }
-    //tty->print_cr("_HOTSPOT %ld: c2i pushing %p at location %p", _bdel_sys_gettid(), ret, rbp);
-    if (_counter >= 5740) {
-      /*
-      tty->print_cr("_HOTSPOT %ld: c2i pushing %p at location %p", _bdel_sys_gettid(), ret, rbp);
-      jio_fprintf(defaultStream::output_stream()
-        , "_HOTSPOT %ld: calling c2i %s#%s, %d levels\n"
-        , _bdel_sys_gettid()
-        , m == NULL ? "<null" : m->klass_name()->as_C_string()
-        , m == NULL ? "null>" : m->name()->as_C_string()
-        , jt->_c2i_stack_pos
-      );
-      */
-      asm(
-        "call _noop14\n"
-      );
-    }
-    nmethod* nb = CodeCache::find_nmethod(ret);
-    /*
-    if (nb != NULL && !strcmp(nb->method()->name()->as_C_string(), "parseURL") && _c2++ > 180) {
-      tty->print_cr("_HOTSPOT %ld: c2i pushing %p at location %p, %d", _bdel_sys_gettid(), ret, rbp, _c2);
-      asm(
-        "call _noop15\n"
-      );
-    }
-    */
     asm(
       "call _noop10\n"
     );
     _c2i_levels++;
     if (Dyrus) {
-      jio_fprintf(defaultStream::output_stream()
-        , "_HOTSPOT %ld: calling c2i %s#%s, %d levels\n"
+      //tty->print_cr("_HOTSPOT: c2i");
+      //jio_fprintf(defaultStream::output_stream()
+      //tty->ADRIAN("c2i push\n");
+      //*
+      tty->print_cr(
+        "_HOTSPOT %ld: calling c2i %s#%s, %d levels"
         , _bdel_sys_gettid()
         , m == NULL ? "<null" : m->klass_name()->as_C_string()
         , m == NULL ? "null>" : m->name()->as_C_string()
         , jt->_c2i_stack_pos
       );
+      //*/
+    }
+    if (_unlikely(jt->_jvm_state == 0)) {
+      tty->print_cr("_HOTSPOT: c2i but jvm state already interpreted");
+      //ShouldNotReachHere();
     }
     if (_unlikely(jt->_c2i_stack_pos >= _I2C_STACK_SIZE)) {
       tty->print_cr("_HOTSPOT: c2i stack overflowed");
@@ -528,7 +531,17 @@ extern "C" {
   _rax_rdx _c2i_ret_pop(JavaThread* jt, int where) {
     _c2i_levels--;
     if (Dyrus) {
-      jio_fprintf(defaultStream::output_stream(), "_HOTSPOT %ld: returning c2i (source %d), %d levels\n", _bdel_sys_gettid(), where, jt->_c2i_stack_pos);
+      //jio_fprintf(
+      //  defaultStream::output_stream(),
+      //tty->ADRIAN("c2i pop\n");
+      //*
+      tty->print_cr(
+        "_HOTSPOT %ld: returning c2i (source %d), %d levels"
+        , _bdel_sys_gettid()
+        , where
+        , jt->_c2i_stack_pos
+      );
+      //*/
     }
     if (_unlikely(jt->_c2i_stack_pos <= 0)) {
       tty->print_cr("_HOTSPOT %ld: c2i stack underflowed, c2i handler is %p", _bdel_sys_gettid(), (void*) &_c2i_ret_handler);
@@ -542,10 +555,9 @@ extern "C" {
     return ret;
   }
   void* _c2i_ret_verify_location_and_pop(JavaThread* jt, void* rbp, int where) {
-    _counter++;
     _rax_rdx ret = _c2i_ret_pop(jt, where);
     if (where == -1) {
-      tty->print_cr("_HOTSPOT (%ld): possible last of dunedain %d, rbp %p", _bdel_sys_gettid(), _counter, rbp);
+      tty->print_cr("_HOTSPOT (%ld): possible last of dunedain, rbp %p", _bdel_sys_gettid(), rbp);
       jt->_c2i_stack_pos += 1;
       _c2i_dump_stack(jt);
       jt->_c2i_stack_pos -= 1;
@@ -571,21 +583,8 @@ extern "C" {
     return ret.rax;
   }
   void _c2i_ret_handler() {
-    asm(
-      "push %rax\n"
-      "\tpush %rdx\n"
-      "\tmov %r15, %rdi\n"
-      "\tmov %rbp, %rsi\n"
-      //"\tlea -8(%rsi), %rsi\n"
-      "\tlea -1, %rdx\n"
-      "\tcallq _c2i_ret_verify_location_and_pop\n"
-      "\tmov %rax, %r11\n"
-      "\tpop %rdx\n"
-      "\tpop %rax\n"
-      "\tpop %rbp\n"
-      "\tpush %r11\n"
-      "\tpush %rbp\n"
-    );
+    tty->print_cr("_HOTSPOT: in c2i ret handler");
+    ShouldNotReachHere();
   }
   void* _c2i_ret_verify_and_update_location(JavaThread* jt, void* rbp, int64_t locals, Method* m) {
     _rax_rdx ret = _c2i_ret_pop(jt, -10);
@@ -605,11 +604,8 @@ extern "C" {
     return ret.rax;
   }
   void _c2i_deopt_bless(JavaThread* jt, void* ret, void* rbp, int where, int frame, int total) {
-    if (where == 2) {
-      //tty->print_cr("_HOTSPOT: c2i deopt bless from 2");
-    }
     if (ret == (void*) &_c2i_ret_handler) {
-      //tty->print_cr("_HOTSPOT: c2i deopt bless got c2i handler %d, at %p", where, rbp);
+      tty->print_cr("_HOTSPOT: c2i deopt bless got c2i handler %d, at %p", where, rbp);
       _rax_rdx ret = _c2i_ret_pop(jt, -11);
       if (_unlikely(ret.rdx != 0)) {
         tty->print_cr("_HOTSPOT %ld: c2i deopt bless found handler, but popped expected location nonzero %p with return address %p, %d, %d, rbp %p", _bdel_sys_gettid(), ret.rdx, ret.rax, frame, total, rbp);

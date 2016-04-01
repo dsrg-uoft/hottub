@@ -769,6 +769,7 @@ JNU_GetStringPlatformChars(JNIEnv *env, jstring jstr, jboolean *isCopy)
 {
     char *result = nativeGetStringPlatformChars(env, jstr, isCopy);
     if (result == NULL) {
+        //printf("_JDK: here\n");
 
         jbyteArray hab = 0;
 
@@ -809,6 +810,8 @@ JNU_GetStringPlatformChars(JNIEnv *env, jstring jstr, jboolean *isCopy)
         }
 
         (*env)->DeleteLocalRef(env, hab);
+    } else {
+        //printf("_JDK: there\n");
     }
     return result;
 }

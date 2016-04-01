@@ -588,7 +588,7 @@ void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
     // rscratch2 <- rdx is num extra locals (2 for native), see `generate_normal_entry` and `generate_native_entry
     __ movptr(c_rarg2, rscratch2);
     __ movptr(c_rarg3, rbx);
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_verify_and_update_location)));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_ret_verify_and_update_location));
     __ pop(rscratch2);
     // no rscratch1
     __ pop(c_rarg5);
@@ -1446,7 +1446,7 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
     __ movptr(c_rarg0, r15_thread);
     __ lea(c_rarg1, Address(rsp, 8 * wordSize));
     __ lea(c_rarg2, RuntimeAddress((address) -11));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop)));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop));
     __ pop(rscratch2);
     // no rscratch1
     __ pop(c_rarg5);

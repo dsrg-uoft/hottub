@@ -830,7 +830,7 @@ void Runtime1::generate_unwind_exception(StubAssembler *sasm) {
     // 8 caller saved registers + rax
     __ movptr(c_rarg0, r15_thread);
     __ lea(c_rarg1, Address(rsp, 9 * wordSize));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop)));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop));
     __ pop(rscratch2);
     // no rscratch1
     __ pop(c_rarg5);
@@ -867,7 +867,7 @@ void Runtime1::generate_unwind_exception(StubAssembler *sasm) {
     __ movptr(c_rarg0, r15_thread);
     __ lea(c_rarg1, Address(rsp, 9 * wordSize));
     __ lea(c_rarg2, RuntimeAddress((address) -4));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop)));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop));
     __ pop(rscratch2);
     // no rscratch1
     __ pop(c_rarg5);

@@ -44,6 +44,8 @@ HS_DTRACE_PROBE_DECL8(hotspot, mem__pool__gc__end, char*, int, char*, int,
   size_t, size_t, size_t, size_t);
 #endif /* !USDT2 */
 
+#include "runtime/_bdel.hpp"
+
 MemoryManager::MemoryManager() {
   _num_pools = 0;
   (void)const_cast<instanceOop&>(_memory_mgr_obj = NULL);
@@ -125,12 +127,14 @@ instanceOop MemoryManager::get_memory_manager_instance(TRAPS) {
       signature = vmSymbols::createMemoryManager_signature();
     }
 
+    _native_call_begin((JavaThread*) THREAD, NULL, 20);
     JavaCalls::call_static(&result,
                            ik,
                            method_name,
                            signature,
                            &args,
                            CHECK_0);
+    _native_call_end((JavaThread*) THREAD, NULL, 20);
 
     instanceOop m = (instanceOop) result.get_jobject();
     instanceHandle mgr(THREAD, m);

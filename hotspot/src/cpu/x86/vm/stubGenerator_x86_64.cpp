@@ -522,7 +522,7 @@ class StubGenerator: public StubCodeGenerator {
       __ movptr(c_rarg0, r15_thread);
       __ lea(c_rarg1, Address(rsp, 8 * wordSize));
       __ lea(c_rarg2, RuntimeAddress((address) -7));
-      __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop)));
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop));
       __ pop(rscratch2);
       // no rscratch1
       __ pop(c_rarg5);
@@ -558,7 +558,7 @@ class StubGenerator: public StubCodeGenerator {
       // 8 caller saved registers + rax
       __ movptr(c_rarg0, r15_thread);
       __ lea(c_rarg1, Address(rsp, 8 * wordSize));
-      __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop)));
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop));
       __ pop(rscratch2);
       // no rscratch1
       __ pop(c_rarg5);

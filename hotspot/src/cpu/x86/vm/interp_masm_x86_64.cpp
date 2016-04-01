@@ -700,7 +700,7 @@ void InterpreterMacroAssembler::remove_activation(
     // 8 caller saved registers + rax - already popped
     movptr(c_rarg0, r15_thread);
     lea(c_rarg1, Address(rsp, 8 * sizeof(void*)));
-    call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop)));
+    call_VM_leaf(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop));
     pop(rscratch2);
     // no rscratch1
     pop(c_rarg5);
@@ -737,7 +737,7 @@ void InterpreterMacroAssembler::remove_activation(
     lea(c_rarg1, Address(rsp, 8 * wordSize));
     //movptr(c_rarg1, rbx);
     lea(c_rarg2, RuntimeAddress((address) -3));
-    call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop)));
+    call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop));
     pop(rscratch2);
     // no rscratch1
     pop(c_rarg5);
@@ -1509,17 +1509,39 @@ void InterpreterMacroAssembler::verify_FPU(int stack_depth, TosState state) {
 
 void InterpreterMacroAssembler::_notify_native_entry() {
   if (WildTurtle) {
+    movptr(c_rarg0, r15_thread);
     get_method(c_rarg1);
     xorptr(c_rarg2, c_rarg2);
-    call_VM_leaf(CAST_FROM_FN_PTR(address, _native_call_begin), r15_thread, c_rarg1, c_rarg2);
+    call_VM_leaf(CAST_FROM_FN_PTR(address, _native_call_begin));
   }
 }
 
 void InterpreterMacroAssembler::_notify_native_exit() {
   if (WildTurtle) {
+    push(rax);
+    push(c_rarg0);
+    push(c_rarg1);
+    push(c_rarg2);
+    push(c_rarg3);
+    push(c_rarg4);
+    push(c_rarg5);
+    push(rscratch1);
+    push(rscratch2);
+
+    movptr(c_rarg0, r15_thread);
     get_method(c_rarg1);
     xorptr(c_rarg2, c_rarg2);
-    call_VM_leaf(CAST_FROM_FN_PTR(address, _native_call_end), r15_thread, c_rarg1, c_rarg2);
+    call_VM_leaf(CAST_FROM_FN_PTR(address, _native_call_end));
+
+    pop(rscratch2);
+    pop(rscratch1);
+    pop(c_rarg5);
+    pop(c_rarg4);
+    pop(c_rarg3);
+    pop(c_rarg2);
+    pop(c_rarg1);
+    pop(c_rarg0);
+    pop(rax);
   }
 }
 

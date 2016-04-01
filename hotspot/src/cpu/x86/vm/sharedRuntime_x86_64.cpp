@@ -482,7 +482,7 @@ static void patch_callers_callsite(MacroAssembler *masm) {
     // 8 caller saved registers
     __ movptr(c_rarg0, r15_thread);
     __ lea(c_rarg1, Address(rsp, 8 * wordSize));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop)));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop));
     __ pop(rscratch2);
     // no rscratch1
     __ pop(c_rarg5);
@@ -518,7 +518,7 @@ static void patch_callers_callsite(MacroAssembler *masm) {
     __ movptr(c_rarg0, r15_thread);
     __ lea(c_rarg1, Address(rsp, 8 * wordSize));
     __ lea(c_rarg2, RuntimeAddress((address) -5));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop)));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop));
     __ pop(rscratch2);
     // no rscratch1
     __ pop(c_rarg5);
@@ -612,7 +612,7 @@ static void gen_c2i_adapter(MacroAssembler *masm,
     __ movptr(c_rarg3, rbx);
     //__ lea(c_rarg4, RuntimeAddress((address) (int64_t) total_args_passed));
     //__ lea(c_rarg5, RuntimeAddress((address) (int64_t) comp_args_on_stack));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_push)));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_ret_push));
     __ pop(rscratch2);
     __ pop(rscratch1);
     __ pop(c_rarg5);
@@ -837,7 +837,7 @@ static void gen_i2c_adapter(MacroAssembler *masm,
     __ movptr(c_rarg1, rax);
     __ lea(c_rarg2, Address(rsp, 7 * wordSize));
     __ movptr(c_rarg3, rbx);
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_push)));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _i2c_ret_push));
 
     __ pop(rscratch2);
     __ pop(rscratch1);
@@ -2376,17 +2376,15 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
   // WILDTURTLE: native call
   if (WildTurtle) {
-    __ push(rax);
     save_args(masm, total_c_args, c_arg, out_regs);
 
     __ movptr(c_rarg0, r15_thread);
     __ mov_metadata(c_rarg1, method());
     __ xorptr(c_rarg2, c_rarg2);
 
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _native_call_begin)));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _native_call_begin));
 
     restore_args(masm, total_c_args, c_arg, out_regs);
-    __ pop(rax);
   }
   // Lock a synchronized method
 
@@ -2630,7 +2628,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     __ mov_metadata(c_rarg1, method());
     __ xorptr(c_rarg2, c_rarg2);
 
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _native_call_end)));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _native_call_end));
     restore_native_result(masm, ret_type, stack_slots);
   }
   {
@@ -3704,7 +3702,7 @@ void SharedRuntime::generate_deopt_blob() {
     __ movptr(c_rarg1, Address(rcx, 0));
     __ lea(c_rarg2, Address(rsp, 9 * wordSize));
     __ lea(c_rarg3, RuntimeAddress((address) 1));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_deopt_bless)));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_deopt_bless));
 
     __ pop(rscratch2);
     __ pop(rscratch1);
@@ -3927,7 +3925,7 @@ void SharedRuntime::generate_uncommon_trap_blob() {
     __ movptr(c_rarg1, Address(rcx, 0));
     __ lea(c_rarg2, Address(rsp, 9 * wordSize));
     __ lea(c_rarg3, RuntimeAddress((address) 2));
-    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_deopt_bless)));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_deopt_bless));
 
     __ pop(rscratch2);
     __ pop(rscratch1);

@@ -81,6 +81,7 @@ class outputStream : public ResourceObj {
    void set_position(int pos)   { _position = pos; }
 
    // printing
+   void ADRIAN(const char* format, ...) ATTRIBUTE_PRINTF(2, 3);
    void print(const char* format, ...) ATTRIBUTE_PRINTF(2, 3);
    void print_cr(const char* format, ...) ATTRIBUTE_PRINTF(2, 3);
    void vprint(const char *format, va_list argptr) ATTRIBUTE_PRINTF(2, 0);
