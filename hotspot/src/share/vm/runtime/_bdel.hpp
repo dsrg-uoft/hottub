@@ -38,9 +38,6 @@
  * Before it does this, we need to unpatch the return addresses and (re)patch them afterwards,
  * so it knows what nmethods are active.
  *
- * ## TODO
- * - race conditions for safepoints
- *
  * Hmmm.
  */
 
@@ -85,21 +82,6 @@ extern "C" {
   void _i2c_verify_stack(JavaThread*);
   void _c2i_dump_stack(JavaThread*);
   void _c2i_verify_stack(JavaThread*);
-}
-
-extern "C" {
-  void _noop10();
-  void _noop11();
-  void _noop12();
-  void _noop13();
-  void _noop14();
-  void _noop15();
-  void _deopt_blob_test(void*);
-  void _saw_string_a();
-  void _saw_string_b();
-  void _saw_call_stub();
-  void _saw_call_stub2();
-  void _saw_call_stub3(void*);
 }
 
 #endif // SHARE_VM_RUNTIME__BDEL_HPP

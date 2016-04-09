@@ -104,30 +104,13 @@ UncommonTrapBlob*   SharedRuntime::_uncommon_trap_blob;
 #include "runtime/_bdel.hpp"
 #include "utilities/defaultStream.hpp"
 
-__thread int actually_patch = 1;
-
 static __thread int _method_levels = 0;
-static __thread Method* _call_stack[128];
+static __thread Method* _call_stack[256];
 static __thread int _i2c_levels;
 static __thread int _c2i_levels;
 static __thread int _i2n_levels;
 static __thread int _n2i_levels;
 static __thread int _i_levels;
-
-extern "C" {
-  void _noop10() {
-  }
-  void _noop11() {
-  }
-  void _noop12() {
-  }
-  void _noop13() {
-  }
-  void _noop14() {
-  }
-  void _noop15() {
-  }
-}
 
 uint64_t _now() {
   struct timespec ts;
@@ -147,9 +130,18 @@ void _jvm_transitions_clock(JavaThread* jt, int8_t s2) {
   jt->_jvm_state_last_timestamp = t;
   jt->_jvm_state = s2;
 }
+static void _jvm_transitions_dump(JavaThread* jt) {
+  tty->print_cr("_HOTSPOT: dumping jvm transitions for %p", jt);
+  for (int i = jt->_jvm_transitions_pos - 1; i >= 0; i++) {
+    tty->print_cr("%d: %d", i, jt->_jvm_transitions[i]);
+  }
+  _i2c_dump_stack(jt);
+  _c2i_dump_stack(jt);
+}
 static void _jvm_transitions_push(JavaThread* jt, int8_t to_state) {
   if (_unlikely(jt->_jvm_transitions_pos >= _JVM_TRANSITIONS_SIZE)) {
     tty->print_cr("_HOTSPOT: jvm transitions overflowed");
+    _jvm_transitions_dump(jt);
     ShouldNotReachHere();
   }
   //tty->print_cr("_HOTSPOT (%ld): pushing %d", _bdel_sys_gettid(), to_state);
@@ -313,7 +305,7 @@ extern "C" {
   void _i2c_ret_handler() {
     // ===============================
     // | bottom of stack/top address |
-    // | ...                         | _<- rsp entering this
+    // | ...                         | _<- rsp entering this, aligned 16 bytes
     // | rbp pushed by gcc (was callee's return address, this's address) | _<- current rbp
     // | (was callee's rbp)
     // | ...
@@ -352,7 +344,7 @@ extern "C" {
     if (_unlikely(!jt->_jvm_state_ready)) {
       return ret;
     }
-    tty->print_cr("_HOTSPOT: i2c osr");
+    //tty->print_cr("_HOTSPOT: i2c osr");
     if (ret == (void*) &_c2i_ret_handler) {
       return _c2i_ret_verify_location_and_pop(jt, rbp, -42);
     } else {
@@ -363,9 +355,7 @@ extern "C" {
     if (_unlikely(!jt->_jvm_state_ready)) {
       return;
     }
-    //if (Dyrus || (m != NULL && !strcmp(m->klass_name()->as_C_string(), "java/security/AccessController") && strcmp(m->name()->as_C_string(), "doPrivileged"))) {
     if (Dyrus) {
-      //io_fprintf(defaultStream::output_stream()
       tty->print_cr(
         "_HOTSPOT (%ld): calling %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth, current %d)"
         , _bdel_sys_gettid()
@@ -398,9 +388,7 @@ extern "C" {
     } else {
       _i2n_levels--;
     }
-    //if (Dyrus || (m != NULL && !strcmp(m->klass_name()->as_C_string(), "java/security/AccessController") && strcmp(m->name()->as_C_string(), "doPrivileged"))) {
     if (Dyrus) {
-      //jio_fprintf(defaultStream::output_stream()
       tty->print_cr(
         "_HOTSPOT (%ld): returning %s %s#%s (opposite is %d) (from %d native levels, to %d transition depth, current %d)"
         , _bdel_sys_gettid()
@@ -417,13 +405,7 @@ extern "C" {
     jt->_native_levels--;
   }
   void _i2c_unpatch(JavaThread* jt, const char* where) {
-    /*
-    if (!strcmp(where, "JVM_LatestUserDefinedLoader")) {
-      tty->print_cr("_HOTSPOT %ld, %p: i2c unpatch at latest user defined loader, safepoint %d, i2c pos %d, c2i pos %d", _bdel_sys_gettid(), jt, jt->_bdel_safepoint, jt->_i2c_stack_pos, jt->_c2i_stack_pos);
-    }
-    */
     if (jt->_bdel_safepoint++) {
-      //tty->print_cr("_HOTSPOT: unpatch already in safepoint, to %d", jt->_bdel_safepoint);
       return;
     }
     if (jt->_i2c_stack_pos != 0) {
@@ -450,16 +432,23 @@ extern "C" {
         tty->print_cr("_HOTSPOT %ld: done i2c unpatch of %d levels (%s)", _bdel_sys_gettid(), jt->_i2c_stack_pos, where);
       }
     }
-    _c2i_unpatch(jt, where);
+    for (int i = 0; i < jt->_c2i_stack_pos; i++) {
+      void** location = (void**) jt->_c2i_rbp_stack[i];
+      if (_likely(*location == (void*) &_c2i_ret_handler)) {
+        *location = jt->_c2i_ret_stack[i];
+      } else {
+        badness = 1;
+        tty->print_cr("_HOTSPOT: c2i unpatch bad at %d", i);
+      }
+    }
+    if (badness) {
+      tty->print_cr("_HOTSPOT %ld: c2i unpatch faulty (%s)", _bdel_sys_gettid(), where);
+      _c2i_dump_stack(jt);
+      ShouldNotReachHere();
+    }
   }
   void _i2c_repatch(JavaThread* jt, const char* where) {
-    /*
-    if (!strcmp(where, "JVM_LatestUserDefinedLoader/early return") || !strcmp(where, "JVM_LatestUserDefinedLoader/null return")) {
-      tty->print_cr("_HOTSPOT %ld, %p: i2c repatch at latest user defined loader, safepoint %d, i2c pos %d, c2i pos %d", _bdel_sys_gettid(), jt, jt->_bdel_safepoint, jt->_i2c_stack_pos, jt->_c2i_stack_pos);
-    }
-    */
     if (--jt->_bdel_safepoint) {
-      //tty->print_cr("_HOTSPOT: repatch already in safepoint, to %d", jt->_bdel_safepoint);
       return;
     }
     if (jt->_i2c_stack_pos != 0) {
@@ -485,7 +474,19 @@ extern "C" {
         tty->print_cr("_HOTSPOT %ld: done i2c repatch of %d levels (%s)", _bdel_sys_gettid(), jt->_i2c_stack_pos, where);
       }
     }
-    _c2i_repatch(jt, where);
+    for (int i = 0; i < jt->_c2i_stack_pos; i++) {
+      void** location = (void**) jt->_c2i_rbp_stack[i];
+      if (_likely(*location == (void*) jt->_c2i_ret_stack[i])) {
+        *location = (void*) &_c2i_ret_handler;
+      } else {
+        badness = 1;
+      }
+    }
+    if (badness) {
+      tty->print_cr("_HOTSPOT %ld: c2i unpatch faulty (%s)", _bdel_sys_gettid(), where);
+      _c2i_dump_stack(jt);
+      ShouldNotReachHere();
+    }
   }
   void* _c2i_ret_push(JavaThread* jt, void* ret, void* rbp, Method* m) {
     if (_unlikely(!jt->is_Java_thread())) {
@@ -495,15 +496,8 @@ extern "C" {
     if (_unlikely(!jt->_jvm_state_ready)) {
       return ret;
     }
-    asm(
-      "call _noop10\n"
-    );
     _c2i_levels++;
     if (Dyrus) {
-      //tty->print_cr("_HOTSPOT: c2i");
-      //jio_fprintf(defaultStream::output_stream()
-      //tty->ADRIAN("c2i push\n");
-      //*
       tty->print_cr(
         "_HOTSPOT %ld: calling c2i %s#%s, %d levels"
         , _bdel_sys_gettid()
@@ -511,10 +505,9 @@ extern "C" {
         , m == NULL ? "null>" : m->name()->as_C_string()
         , jt->_c2i_stack_pos
       );
-      //*/
     }
     if (_unlikely(jt->_jvm_state == 0)) {
-      tty->print_cr("_HOTSPOT: c2i but jvm state already interpreted");
+      //tty->print_cr("_HOTSPOT: c2i but jvm state already interpreted");
       //ShouldNotReachHere();
     }
     if (_unlikely(jt->_c2i_stack_pos >= _I2C_STACK_SIZE)) {
@@ -531,17 +524,12 @@ extern "C" {
   _rax_rdx _c2i_ret_pop(JavaThread* jt, int where) {
     _c2i_levels--;
     if (Dyrus) {
-      //jio_fprintf(
-      //  defaultStream::output_stream(),
-      //tty->ADRIAN("c2i pop\n");
-      //*
       tty->print_cr(
         "_HOTSPOT %ld: returning c2i (source %d), %d levels"
         , _bdel_sys_gettid()
         , where
         , jt->_c2i_stack_pos
       );
-      //*/
     }
     if (_unlikely(jt->_c2i_stack_pos <= 0)) {
       tty->print_cr("_HOTSPOT %ld: c2i stack underflowed, c2i handler is %p", _bdel_sys_gettid(), (void*) &_c2i_ret_handler);
@@ -567,19 +555,11 @@ extern "C" {
         ShouldNotReachHere();
       }
     }
-    //*
-    //int64_t n = jt->_n[jt->_c2i_stack_pos];
-    //int64_t m = jt->_m[jt->_c2i_stack_pos];
     if (_unlikely(rbp != ret.rdx)) {
       tty->print_cr("_HOTSPOT: c2i ret verify location and pop check failed (%d); rbp is %p, expected is %p, was %ld bytes deeper", where, rbp, ret.rdx, (int64_t) rbp - (int64_t) ret.rdx);
       _c2i_dump_stack(jt);
-      if (where != -1) {
-        ShouldNotReachHere();
-      }
-    } else {
-      //tty->print_cr("_HOTSPOT: c2i ret verify location and pop check was good (%d), n %ld m %ld", where, n, m);
+      ShouldNotReachHere();
     }
-    //*/
     return ret.rax;
   }
   void _c2i_ret_handler() {
@@ -605,7 +585,7 @@ extern "C" {
   }
   void _c2i_deopt_bless(JavaThread* jt, void* ret, void* rbp, int where, int frame, int total) {
     if (ret == (void*) &_c2i_ret_handler) {
-      tty->print_cr("_HOTSPOT: c2i deopt bless got c2i handler %d, at %p", where, rbp);
+      //tty->print_cr("_HOTSPOT: c2i deopt bless got c2i handler %d, at %p", where, rbp);
       _rax_rdx ret = _c2i_ret_pop(jt, -11);
       if (_unlikely(ret.rdx != 0)) {
         tty->print_cr("_HOTSPOT %ld: c2i deopt bless found handler, but popped expected location nonzero %p with return address %p, %d, %d, rbp %p", _bdel_sys_gettid(), ret.rdx, ret.rax, frame, total, rbp);
@@ -617,42 +597,6 @@ extern "C" {
     } else {
       //tty->print_cr("_HOTSPOT: c2i deopt bless here with %p: %p", rbp, ret);
     }
-  }
-  void _c2i_unpatch(JavaThread* jt, const char* where) {
-    if (jt->_c2i_stack_pos == 0) {
-      return;
-    }
-    jt->_c2i_unpatch = 1;
-    jt->_c2i_unpatch_pos = 0;
-    for(StackFrameStream fst(jt); !fst.is_done(); fst.next()) {
-      continue;
-    }
-    jt->_c2i_unpatch = 0;
-    if (jt->_c2i_unpatch_pos != jt->_c2i_stack_pos) {
-      tty->print_cr("_HOTSPOT %ld: c2i unpatch unpatch pos %d didn't match stack pos %d", jt->_c2i_unpatch_pos, jt->_c2i_stack_pos);
-      _c2i_dump_stack(jt);
-      ShouldNotReachHere();
-    }
-  }
-  void _c2i_repatch(JavaThread* jt, const char* where) {
-    if (_unlikely(jt->_c2i_unpatch_pos != jt->_c2i_stack_pos)) {
-      tty->print_cr("_HOTSPOT (%ld): doing c2i repatch, unpatch pos %d didn't match stack pos %d", _bdel_sys_gettid(), jt->_c2i_unpatch_pos, jt->_c2i_stack_pos);
-      ShouldNotReachHere();
-    }
-    for (int i = 0; i < jt->_c2i_unpatch_pos; i++) {
-      void** location = (void**) jt->_c2i_repatch_stack[i];
-      if (_unlikely(*location != jt->_c2i_ret_stack[jt->_c2i_unpatch_pos - i - 1])) {
-        tty->print_cr("_HOTSPOT (%ld): c2i repatch at (%s) didn't match at pos (%d), of %d", _bdel_sys_gettid(), where, i, jt->_c2i_unpatch_pos);
-        tty->print_cr("_HOTSPOT: found %p, expected %p, c2i is %p, i2c is %p", *location, jt->_c2i_ret_stack[jt->_c2i_unpatch_pos - i - 1], (void*) &_c2i_ret_handler, (void*) _i2c_ret_handler);
-        for (int j = -8; j < 8; j++) {
-          tty->print_cr("_HOTSPOT: nearby %d - %p: %p", j, location + j, *(location + j));
-        }
-        ShouldNotReachHere();
-      }
-      *location = (void*) &_c2i_ret_handler;
-    }
-    jt->_c2i_unpatch_pos = 0;
-    jt->_c2i_unpatch = 0;
   }
   // patch pc
   void _i2c_patch_pc(JavaThread* jt, void** loc, void* target) {
@@ -710,11 +654,6 @@ extern "C" {
   }
 }
 JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
-  /*
-  if (method != NULL && !strcmp(method->klass_name()->as_C_string(), "java/security/AccessController")) {
-    tty->print_cr("_HOTSPOT (%ld): dyrone ganked by %s#%s, %d, %p, ready is %d, native is %d", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string(), thread->_jvm_state, thread, thread->_jvm_state_ready, method->is_native());
-  }
-  */
   if (_unlikely(!thread->_jvm_state_ready)) {
     return 0;
   }
@@ -722,26 +661,6 @@ JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
     //_native_call_begin(thread, method, 0);
     return 0;
   }
-  if (Froggen) {
-    tty->print_cr("_HOTSPOT (%ld): dyrus ganked by %s#%s", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string());
-  }
-  if (TheGeneral || Sachiko) {
-    if (thread->_jvm_state != 0) {
-      asm(
-        "callq _noop11\n"
-      );
-      if (TheGeneral) {
-        tty->print_cr("_HOTSPOT (%ld): method %s#%s has failed this city!, %p, %d", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string(), thread, thread->_jvm_state);
-      }
-      if (Sachiko) {
-        _jvm_transitions_clock(thread, 0);
-      }
-      if (Yuuichi) {
-        ShouldNotReachHere();
-      }
-    }
-  }
-  return 0;
   if (Froggen) {
     Symbol* kname = method->klass_name();
     Symbol* name = method->name();
@@ -754,25 +673,30 @@ JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
       , thread->_jvm_transitions_pos
     );
   }
-  _jvm_transitions_push(thread, 0);
-  _call_stack[_method_levels++] = method;
+  if (TheGeneral || Sachiko) {
+    if (thread->_jvm_state != 0) {
+      if (TheGeneral) {
+        tty->print_cr("_HOTSPOT (%ld): method %s#%s has failed this city!, %p, %d", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string(), thread, thread->_jvm_state);
+      }
+      if (Sachiko) {
+        _jvm_transitions_clock(thread, 0);
+      }
+      if (Yuuichi) {
+        ShouldNotReachHere();
+      }
+    }
+  }
   return 0;
 JRT_END
 
 JRT_LEAF(int, SharedRuntime::_method_exit(JavaThread* thread, Method* method))
-  /*
-  if (method != NULL && !strcmp(method->klass_name()->as_C_string(), "java/security/AccessController")) {
-    tty->print_cr("_HOTSPOT (%ld): dyrone 1v2s %s#%s, %d, %p, ready is %d", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string(), thread->_jvm_state, thread, thread->_jvm_state_ready);
+  if (_unlikely(!thread->_jvm_state_ready)) {
+    return 0;
   }
-  */
   if (method->is_native()) {
     //_native_call_end(thread, method, 0);
     return 0;
   }
-  if (Froggen) {
-    tty->print_cr("_HOTSPOT (%ld): dyrus 1v2s %s#%s", _bdel_sys_gettid(), method->klass_name()->as_C_string(), method->name()->as_C_string());
-  }
-  return 0;
   if (Froggen) {
     Symbol* kname = method->klass_name();
     Symbol* name = method->name();
@@ -785,35 +709,8 @@ JRT_LEAF(int, SharedRuntime::_method_exit(JavaThread* thread, Method* method))
       , thread->_jvm_transitions_pos
     );
   }
-  _jvm_transitions_pop(thread);
-  while (true) {
-    _method_levels--;
-    if (_method_levels < 0) {
-      tty->print_cr(
-        "_HOTSPOT %ld: unknown method exit %s#%s"
-        , _bdel_sys_gettid()
-        , method->klass_name()->as_C_string()
-        , method->name()->as_C_string()
-      );
-      //ShouldNotReachHere();
-      break;
-    }
-    if (_call_stack[_method_levels] != method) {
-      tty->print_cr(
-        "_HOTSPOT %ld: bad call stack %s#%s, expected %s#%s, depth %d"
-        , _bdel_sys_gettid()
-        , method->klass_name()->as_C_string()
-        , method->name()->as_C_string()
-        , _call_stack[_method_levels]->klass_name()->as_C_string()
-        , _call_stack[_method_levels]->name()->as_C_string()
-        , _method_levels
-      );
-    } else {
-      break;
-    }
-  }
   return 0;
-JRT_END;
+JRT_END
 
 extern "C" {
   void _i2c_dump_stack(JavaThread* jt) {

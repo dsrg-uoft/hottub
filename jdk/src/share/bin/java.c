@@ -491,7 +491,7 @@ JavaMain(void * _args)
     struct timespec jvm_init_end;
     clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_end);
     unsigned long diff = 1e9 * (jvm_init_end.tv_sec - jvm_init_start.tv_sec) + jvm_init_end.tv_nsec - jvm_init_start.tv_nsec;
-    printf("[jvm_init] time(ns) = %lu\n", diff);
+    //printf("[jvm_init] time(ns) = %lu\n", diff);
 
     ifn.CallingJavaMain();
     /* Invoke main method. */

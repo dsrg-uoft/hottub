@@ -562,22 +562,6 @@ frame frame::sender(RegisterMap* map) const {
     return sender_for_compiled_frame(map);
   }
 
-  if (sender_sp() == NULL) {
-    asm(
-      "callq _noop12\n"
-    );
-    ShouldNotReachHere();
-  } else if (link() == NULL) {
-    asm(
-      "callq _noop13\n"
-    );
-    ShouldNotReachHere();
-  } else if (sender_pc() == NULL) {
-    asm(
-      "callq _noop14\n"
-    );
-    ShouldNotReachHere();
-  }
   // Must be native-compiled frame, i.e. the marshaling code for native
   // methods that exists in the core system.
   return frame(sender_sp(), link(), sender_pc());

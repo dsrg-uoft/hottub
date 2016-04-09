@@ -1512,7 +1512,6 @@ address InterpreterGenerator::generate_normal_entry(bool synchronized) {
   // get return address
   __ pop(rax);
 
-  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, _noop12)));
   // compute beginning of parameters (r14)
   __ lea(r14, Address(rsp, rcx, Address::times_8, -wordSize));
 

@@ -58,7 +58,7 @@
 #endif
 
 #define _I2C_STACK_SIZE 128
-#define _JVM_TRANSITIONS_SIZE 128
+#define _JVM_TRANSITIONS_SIZE 256
 
 class ThreadSafepointState;
 class ThreadProfiler;

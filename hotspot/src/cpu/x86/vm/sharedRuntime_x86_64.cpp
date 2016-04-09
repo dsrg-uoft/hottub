@@ -497,42 +497,6 @@ static void patch_callers_callsite(MacroAssembler *masm) {
     __ bind(_after);
     __ pop(rscratch1);
   }
-  if (WildTurtle) {
-    __ push(rscratch1);
-    Label _after;
-    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));
-    __ cmpptr(rscratch1, rax);
-    __ jcc(Assembler::notEqual, _after);
-    // my isle; hajimemashou
-    // no rax
-    __ push(c_rarg0);
-    __ push(c_rarg1);
-    __ push(c_rarg2);
-    __ push(c_rarg3);
-    __ push(c_rarg4);
-    __ push(c_rarg5);
-    // no rscratch1
-    __ push(rscratch2);
-
-    // 8 caller saved registers
-    __ movptr(c_rarg0, r15_thread);
-    __ lea(c_rarg1, Address(rsp, 8 * wordSize));
-    __ lea(c_rarg2, RuntimeAddress((address) -5));
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop));
-    __ pop(rscratch2);
-    // no rscratch1
-    __ pop(c_rarg5);
-    __ pop(c_rarg4);
-    __ pop(c_rarg3);
-    __ pop(c_rarg2);
-    __ pop(c_rarg1);
-    __ pop(c_rarg0);
-    __ movptr(Address(rsp, wordSize), rax);
-    // no rax
-    // my isle; chu chu
-    __ bind(_after);
-    __ pop(rscratch1);
-  }
 
   // align stack so push_CPU_state doesn't fault
   __ andptr(rsp, -(StackAlignmentInBytes));
