@@ -3719,10 +3719,6 @@ JVM_ENTRY(jobject, JVM_LatestUserDefinedLoader(JNIEnv *env))
     tty->print_cr("_HOTSPOT: what");
     ShouldNotReachHere();
   }
-  if (thread->_bdel_thread != thread) {
-    tty->print_cr("_HOTSPOT: why");
-    ShouldNotReachHere();
-  }
   for (vframeStream vfst(thread); !vfst.at_end(); vfst.next()) {
     // UseNewReflection
     vfst.skip_reflection_related_frames(); // Only needed for 1.4 reflection

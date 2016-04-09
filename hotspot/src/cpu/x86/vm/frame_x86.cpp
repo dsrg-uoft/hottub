@@ -467,33 +467,24 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
 #endif // COMPILER2
 
   address* location = sender_pc_addr();
-  address sender_pc = *location;
-  if (WildTurtle && ((void*) sender_pc == (void*) &_c2i_ret_handler)) {
-    JavaThread* jt = Thread::current()->_bdel_thread;
-    if (jt->_c2i_unpatch) {
-      int pos = jt->_c2i_stack_pos - jt->_c2i_unpatch_pos - 1;
-      int64_t expected = (int64_t) jt->_c2i_rbp_stack[pos];
-      int64_t actual = (int64_t) location;
-      sender_pc = (address) jt->_c2i_ret_stack[pos];
-      jt->_c2i_repatch_stack[jt->_c2i_unpatch_pos++] = location;
-      //tty->print_cr("_HOTSPOT (%ld): difference is %d, actual is %p", _bdel_sys_gettid(), expected - actual, actual);
-      //_c2i_dump_stack(jt);
-    } else {
-      //tty->print_cr("_HOTSPOT (%ld): bdel deopt is %d", _bdel_sys_gettid(), jt->_bdel_deopt);
-      if (!jt->_bdel_deopt) {
-        tty->print_cr("_HOTSPOT (%ld): bdel deopt is 0, found c2i address %p", _bdel_sys_gettid(), sender_pc);
-        void* ret = _c2i_ret_verify_location_and_pop(jt, (void*) location, -2);
-        sender_pc = (address) ret;
-        ShouldNotReachHere();
-      } else {
-        //tty->print_cr("_HOTSPOT (%ld): bdel deopt is 1, found c2i address %p", _bdel_sys_gettid(), sender_pc);
-        //tty->print_cr("_HOTSPOT (%ld): bakana", _bdel_sys_gettid());
-      }
+  address ret_addr = *location;
+  if (WildTurtle && ((void*) ret_addr == (void*) &_c2i_ret_handler)) {
+    Thread* th = Thread::current();
+    if (_unlikely(!th->is_Java_thread())) {
+      tty->print_cr("_HOTSPOT: sender for interpreter frame from c2i handler, but current thread not java thread");
+      ShouldNotReachHere();
     }
-    *location = sender_pc;
+    JavaThread* jt = (JavaThread*) th;
+    if (!jt->_bdel_deopt) {
+      tty->print_cr("_HOTSPOT (%ld): bdel deopt is 0, found c2i address %p", _bdel_sys_gettid(), ret_addr);
+      void* ret = _c2i_ret_verify_location_and_pop(jt, (void*) location, -2);
+      ret_addr = (address) ret;
+      ShouldNotReachHere();
+    }
+    *location = ret_addr;
   }
 
-  return frame(sender_sp, unextended_sp, link(), sender_pc);
+  return frame(sender_sp, unextended_sp, link(), ret_addr);
   //return frame(sender_sp, unextended_sp, link(), sender_pc());
 }
 
@@ -511,9 +502,14 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   // On Intel the return_address is always the word on the stack
   address sender_pc = (address) *(sender_sp-1);
 
-  //if (WildTurtle && Thread::current()->is_Java_thread() && (void*) sender_pc == (void*) &_i2c_ret_handler) {
   if (WildTurtle && (void*) sender_pc == (void*) &_i2c_ret_handler) {
-    void* ret = _i2c_ret_verify_location_and_pop(JavaThread::current(), (void*) (sender_sp - 1));
+    Thread* th = Thread::current();
+    if (_unlikely(!th->is_Java_thread())) {
+      tty->print_cr("_HOTSPOT: sender for compiled frame found i2c handler, but current thread not java thread");
+      ShouldNotReachHere();
+    }
+    JavaThread* jt = (JavaThread*) th;
+    void* ret = _i2c_ret_verify_location_and_pop(jt, (void*) (sender_sp - 1));
     sender_pc = (address) ret;
     *((void**) (sender_sp - 1)) = ret;
   }

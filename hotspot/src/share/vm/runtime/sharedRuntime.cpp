@@ -624,13 +624,8 @@ extern "C" {
     //_i2c_dump_stack(jt);
   }
   void _c2i_patch_pc(JavaThread* jt, void** loc, void* target) {
-    if (jt->_c2i_unpatch_pos != jt->_c2i_stack_pos) {
-      //tty->print_cr("_HOTSPOT (%ld): doing c2i patch pc, unpatch pos %d didn't match stack pos %d", _bdel_sys_gettid(), jt->_c2i_unpatch_pos, jt->_c2i_stack_pos);
-      //ShouldNotReachHere();
-      return;
-    }
-    for (int i = 0; i < jt->_c2i_unpatch_pos; i++) {
-      if (jt->_c2i_repatch_stack[jt->_c2i_unpatch_pos - i - 1] == loc) {
+    for (int i = 0; i < jt->_c2i_stack_pos; i++) {
+      if (jt->_c2i_rbp_stack[i] == loc) {
         if (*loc == jt->_c2i_ret_stack[i]) {
           jt->_c2i_ret_stack[i] = target;
         } else {
@@ -742,10 +737,6 @@ extern "C" {
         , nm == NULL ? "null>" : nm->method()->name()->as_C_string()
         */
       );
-    }
-    tty->print_cr("=== c2i repatch stack for %ld (size %d)", _bdel_sys_gettid(), jt->_c2i_unpatch_pos);
-    for (int i = jt->_c2i_unpatch_pos - 1; i >= 0; i--) {
-      tty->print_cr(" %d. %p: %p", i, jt->_c2i_repatch_stack[i], jt->_c2i_ret_stack[i]);
     }
   }
   void _i2c_verify_stack(JavaThread* jt) {

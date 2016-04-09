@@ -116,7 +116,6 @@ class Thread: public ThreadShadow {
   // Support for forcing alignment of thread objects for biased locking
   void*       _real_malloc_address;
  public:
-  JavaThread* _bdel_thread;
   void* operator new(size_t size) throw() { return allocate(size, true); }
   void* operator new(size_t size, const std::nothrow_t& nothrow_constant) throw() {
     return allocate(size, false); }
@@ -833,9 +832,7 @@ class JavaThread: public Thread {
   uint64_t _blocking_compile_time;
   int8_t _bdel_deopt;
   int8_t _bdel_safepoint;
-  //int64_t _n[_I2C_STACK_SIZE];
-  //int64_t _m[_I2C_STACK_SIZE];
-  // 0 for interpreted, 1 for compiled
+  // 0 for interpreted, 1 for compiled, 3 for native
   int8_t _jvm_state;
   int8_t _jvm_state_ready;
   uint64_t _jvm_state_times[2];
@@ -845,14 +842,11 @@ class JavaThread: public Thread {
   void* _i2c_rbp_stack[_I2C_STACK_SIZE];
   void* _c2i_ret_stack[_I2C_STACK_SIZE];
   void* _c2i_rbp_stack[_I2C_STACK_SIZE];
-  void* _c2i_repatch_stack[_I2C_STACK_SIZE];
   Method* _c2i_method_stack[_I2C_STACK_SIZE];
   volatile int32_t _i2c_stack_pos;
   volatile int32_t _c2i_stack_pos;
-  volatile int32_t _c2i_unpatch_pos;
   int32_t _i2c_stack_max;
   int8_t _native_levels;
-  int8_t _c2i_unpatch;
 
   int8_t _jvm_transitions[_JVM_TRANSITIONS_SIZE];
   int32_t _jvm_transitions_pos;

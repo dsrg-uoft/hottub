@@ -216,7 +216,6 @@ void Thread::operator delete(void* p) {
 
 
 Thread::Thread() {
-  _bdel_thread = NULL;
   // stack and get_thread
   set_stack_base(NULL);
   set_stack_size(0);
@@ -1427,7 +1426,6 @@ void JavaThread::initialize() {
   // Initialize fields
 
   _blocking_compile_time = 0;
-  _bdel_thread = this;
   _bdel_safepoint = 0;
   _bdel_deopt = 0;
   _jvm_state = 0;
@@ -1437,10 +1435,8 @@ void JavaThread::initialize() {
   _jvm_state_last_timestamp = _now();
   _i2c_stack_pos = 0;
   _c2i_stack_pos = 0;
-  _c2i_unpatch_pos = 0;
   _i2c_stack_max = 0;
   _native_levels = 0;
-  _c2i_unpatch = 0;
   _jvm_transitions_pos = 0;
   _jvm_transitions_max = 0;
 
@@ -2825,13 +2821,10 @@ void JavaThread::nmethods_do(CodeBlobClosure* cf) {
           (has_last_Java_frame() && java_call_counter() > 0), "wrong java_sp info!");
 
   if (has_last_Java_frame()) {
-    //JavaThread::current()->_bdel_thread = this;
-    //_i2c_unpatch(this, "nmethods do");
     // Traverse the execution stack
     for(StackFrameStream fst(this); !fst.is_done(); fst.next()) {
       fst.current()->nmethods_do(cf);
     }
-    //_i2c_repatch(this, "nmethods do");
   }
 }
 
@@ -3318,7 +3311,6 @@ void Threads::_bdel_safepoint_begin(VMThread* vm_thread) {
     if (!p->has_last_Java_frame()) {
       continue;
     }
-    vm_thread->_bdel_thread = p;
     _i2c_unpatch(p, "bdel safepoint");
   }
 }
@@ -4301,7 +4293,6 @@ void Threads::deoptimized_wrt_marked_nmethods() {
     ShouldNotReachHere();
   }
   ALL_JAVA_THREADS(p) {
-    //_jt->_bdel_thread = p;
     p->deoptimized_wrt_marked_nmethods();
   }
 }
