@@ -481,6 +481,7 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
 
   frame_pcs[0] = deopt_sender.raw_pc();
   if (WildTurtle && deopt_sender.is_compiled_frame()) {
+    // see `_c2i_deopt_bless` for more details
     Method* _m = _deopt.cb()->as_nmethod_or_null()->method();
     Method* _n = deopt_sender.cb()->as_nmethod_or_null()->method();
     //if (_deopt.is_deoptimized_frame()) {

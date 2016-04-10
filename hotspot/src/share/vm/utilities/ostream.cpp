@@ -47,8 +47,6 @@
 # include "os_bsd.inline.hpp"
 #endif
 
-static FILE* _bdel = NULL;
-
 extern "C" void jio_print(const char* s); // Declarationtion of jvm method
 
 outputStream::outputStream(int width) {
@@ -130,20 +128,6 @@ void outputStream::print(const char* format, ...) {
   size_t len;
   const char* str = do_vsnprintf(buffer, O_BUFLEN, format, ap, false, len);
   write(str, len);
-  va_end(ap);
-}
-
-void outputStream::ADRIAN(const char* format, ...) {
-  //fprintf(_bdel, "%s", format);
-  //return;
-  char buffer[O_BUFLEN];
-  va_list ap;
-  va_start(ap, format);
-  size_t len;
-  const char* str = do_vsnprintf(buffer, O_BUFLEN, format, ap, false, len);
-  write(str, len);
-  //write(format, strlen(format));
-  //puts(format);
   va_end(ap);
 }
 
@@ -884,7 +868,6 @@ void defaultStream::init() {
   if (LogVMOutput || LogCompilation) {
     init_log();
   }
-  //_bdel = fopen("w.txt", "w");
 }
 
 bool defaultStream::has_log_file() {

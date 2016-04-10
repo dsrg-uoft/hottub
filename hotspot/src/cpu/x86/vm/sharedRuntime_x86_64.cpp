@@ -2336,7 +2336,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     restore_args(masm, total_c_args, c_arg, out_regs);
   }
 
-  // WILDTURTLE: native call
   if (WildTurtle) {
     save_args(masm, total_c_args, c_arg, out_regs);
 
@@ -3645,6 +3644,7 @@ void SharedRuntime::generate_deopt_blob() {
 #endif // CC_INTERP
   __ pushptr(Address(rcx, 0));          // Save return address
   if (WildTurtle) {
+    // see `_c2i_deopt_bless`, more explanation there
     __ push(rax);
 
     __ push(c_rarg0);
@@ -3656,13 +3656,16 @@ void SharedRuntime::generate_deopt_blob() {
     __ push(rscratch1);
     __ push(rscratch2);
 
-    // rdi is 1st argument register
+    // rdi is 1st argument register, c_rarg5 holds total number of frames
     __ movl(c_rarg5, Address(rdi, Deoptimization::UnrollBlock:: caller_adjustment_offset_in_bytes())); // (int)
-    // rdx is 3rd argument register
+    // rdx is 3rd argument register, c_rarg4 holds the current frame index
     __ movptr(c_rarg4, rdx);
     __ movptr(c_rarg0, r15_thread);
+    // return address
     __ movptr(c_rarg1, Address(rcx, 0));
-    __ lea(c_rarg2, Address(rsp, 9 * wordSize));
+    // where return address was stored
+    __ movptr(c_rarg2, rcx);
+    // where `_c2i_deopt_bless` called from (1 for uncommon trap blob)
     __ lea(c_rarg3, RuntimeAddress((address) 1));
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_deopt_bless));
 
@@ -3868,6 +3871,7 @@ void SharedRuntime::generate_uncommon_trap_blob() {
   __ subptr(rbx, 2 * wordSize);    // We'll push pc and rbp by hand
   __ pushptr(Address(rcx, 0));     // Save return address
   if (WildTurtle) {
+    // see same thing for `generate_deop_blob` - more comments there
     __ push(rax);
 
     __ push(c_rarg0);
@@ -3885,7 +3889,8 @@ void SharedRuntime::generate_uncommon_trap_blob() {
     __ movptr(c_rarg4, rdx);
     __ movptr(c_rarg0, r15_thread);
     __ movptr(c_rarg1, Address(rcx, 0));
-    __ lea(c_rarg2, Address(rsp, 9 * wordSize));
+    __ movptr(c_rarg2, rcx);
+    // where `_c2i_deopt_bless` called from, 1 for deopt blob
     __ lea(c_rarg3, RuntimeAddress((address) 2));
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_deopt_bless));
 

@@ -25,18 +25,18 @@
  * We patch the return address for compiled calls in i2c to point to our handler so we know when the function finishes.
  * We need to save the "real" return address so we know where to jump back to,
  * or what to repatch/unpatch the return address to in case of deoptimization or exception thrown.
- * We also save the location we placed the return address (for verification purposes).
+ * We also save the location we placed the return address for verification purposes and unpatching/repatching.
+ *
+ * ## c2i stack
+ * Same as i2c stack.
+ *
+ * ## Unpatching/repatching
+ * Operations in safepoints (e.g. marking active nmethods) and stuff like getting the call trace requires examining stack frames,
+ * and using return addresses to identify callers.
+ * We need to unpatch/redo our changes so these operations behave as normal.
  *
  * ## Transition stack
  * On function return, we need to transition back to the caller's state.
- * Technically, we should have compiled method returns, but sometimes we see two i2cs...
- * So, we treat interpreter entry, i2c, osr migration begin, and native wrapper, and n2i
- * only as entries, making no assumptions about the previous state.
- *
- * ## Marking activations in safepoints
- * At a safepoint, the JVM scans the stack, tracing call frames via rbp and building a call stack from return addresses.
- * Before it does this, we need to unpatch the return addresses and (re)patch them afterwards,
- * so it knows what nmethods are active.
  *
  * Hmmm.
  */

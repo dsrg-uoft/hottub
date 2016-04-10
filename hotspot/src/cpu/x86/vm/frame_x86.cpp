@@ -276,13 +276,6 @@ void frame::patch_pc(Thread* thread, address pc) {
     tty->print_cr("patch_pc at address " INTPTR_FORMAT " [" INTPTR_FORMAT " -> " INTPTR_FORMAT "]",
                   pc_addr, *pc_addr, pc);
   }
-  /*
-  if ((void*) pc == (void*) &_i2c_ret_handler) {
-    tty->print_cr("_HOTSPOT: saw i2c ret handler");
-  } else if ((void*) pc == (void*) &_c2i_ret_handler) {
-    tty->print_cr("_HOTSPOT: saw c2i ret handler");
-  }
-  */
   // Either the return address is the original one or we are going to
   // patch in the same address that's already there.
   assert(_pc == *pc_addr || pc == *pc_addr, "must be");

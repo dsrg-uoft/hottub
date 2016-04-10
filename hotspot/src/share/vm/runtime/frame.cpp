@@ -336,6 +336,7 @@ void frame::deoptimize(JavaThread* thread) {
     nm->deopt_mh_handler_begin() :
     nm->deopt_handler_begin();
 
+  // see x86 frame code for `patch_pc`
   address* _pc_addr = &(((address*) sp())[-1]);
   _i2c_patch_pc(thread, (void**) _pc_addr, (void*) deopt);
   _c2i_patch_pc(thread, (void**) _pc_addr, (void*) deopt);
