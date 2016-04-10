@@ -81,8 +81,6 @@ static Assembler::Condition reverse[] = {
 
 };
 
-#include "runtime/_bdel.hpp"
-
 
 // Implementation of MacroAssembler
 

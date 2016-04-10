@@ -102,11 +102,8 @@ public final class ClassFinder {
             try {
                 return Class.forName(name, false, loader);
             } catch (ClassNotFoundException exception) {
-                //System.out.println("not found");
-                // this path?
                 // use default class loader instead
             } catch (SecurityException exception) {
-                //System.out.println("seCURITY");
                 // use default class loader instead
             }
         }
