@@ -517,12 +517,10 @@ void SafepointSynchronize::do_cleanup_tasks() {
     TraceTime t2("updating inline caches", TraceSafepointCleanupTime);
     InlineCacheBuffer::update_inline_caches();
   }
-  //tty->print_cr("_HOTSPOT: safepoint cleanup, updated inline caches");
   {
     TraceTime t3("compilation policy safepoint handler", TraceSafepointCleanupTime);
     CompilationPolicy::policy()->do_safepoint_work();
   }
-  //tty->print_cr("_HOTSPOT: safepoint cleanup, compilation policy");
 
   Threads::_bdel_safepoint_begin((VMThread*) Thread::current());
 
@@ -530,19 +528,16 @@ void SafepointSynchronize::do_cleanup_tasks() {
     TraceTime t4("mark nmethods", TraceSafepointCleanupTime);
     NMethodSweeper::mark_active_nmethods();
   }
-  //tty->print_cr("_HOTSPOT: safepoint cleanup, marked active methods");
 
   if (SymbolTable::needs_rehashing()) {
     TraceTime t5("rehashing symbol table", TraceSafepointCleanupTime);
     SymbolTable::rehash_table();
   }
-  //tty->print_cr("_HOTSPOT: safepoint cleanup, rehashed symbol table");
 
   if (StringTable::needs_rehashing()) {
     TraceTime t6("rehashing string table", TraceSafepointCleanupTime);
     StringTable::rehash_table();
   }
-  //tty->print_cr("_HOTSPOT: safepoint cleanup, rehashed string table");
 
   // rotate log files?
   if (UseGCLogFileRotation) {

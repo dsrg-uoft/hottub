@@ -173,7 +173,6 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
                                          bool is_bottom_frame,
                                          int exec_mode) {
   JavaThread* thread = (JavaThread*) Thread::current();
-  //tty->print_cr("_HOTSPOT: in vframeArrayElement#unpack_on_stack");
 
   // Look at bci and decide on bcp and continuation pc
   address bcp;
@@ -352,11 +351,9 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
 
 
   // Unpack the locals
-  //tty->print_cr("_HOTSPOT: locals is %d", locals()->size());
   for(i = 0; i < locals()->size(); i++) {
     StackValue *value = locals()->at(i);
     intptr_t* addr  = iframe()->interpreter_frame_local_at(i);
-    //tty->print_cr("_HOTSPOT: i is %d, location is %p, value is %p", i, addr, (void*) *addr);
     switch(value->type()) {
       case T_INT:
         *addr = value->get_int();
@@ -371,8 +368,6 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
       default:
         ShouldNotReachHere();
     }
-    //_i2c_verify_stack();
-    //tty->print_cr("_HOTSPOT: still good after %d", i);
   }
 
   if (is_top_frame && JvmtiExport::can_pop_frame() && thread->popframe_forcing_deopt_reexecution()) {
@@ -534,29 +529,23 @@ void vframeArray::unpack_to_stack(frame &unpack_frame, int exec_mode, int caller
   // Find the skeletal interpreter frames to unpack into
   JavaThread* THREAD = JavaThread::current();
   RegisterMap map(THREAD, false);
-  //tty->print_cr("_HOTSPOT (%ld): getting youngest frame", _bdel_sys_gettid());
   // Get the youngest frame we will unpack (last to be unpacked)
   frame me = unpack_frame.sender(&map);
-  //tty->print_cr("_HOTSPOT (%ld): frames is %d", _bdel_sys_gettid(), frames());
   int index;
   for (index = 0; index < frames(); index++ ) {
     *element(index)->iframe() = me;
     if (index + 1 == frames()) {
       THREAD->_bdel_deopt = 1;
     }
-    //tty->print_cr("_HOTSPOT (%ld): getting %d", _bdel_sys_gettid(), index);
     // Get the caller frame (possibly skeletal)
     me = me.sender(&map);
-    //tty->print_cr("_HOTSPOT (%ld): got %d", _bdel_sys_gettid(), index);
   }
   THREAD->_bdel_deopt = 0;
-  //tty->print_cr("_HOTSPOT (%ld): done", _bdel_sys_gettid());
 
   // Do the unpacking of interpreter frames; the frame at index 0 represents the top activation, so it has no callee
   // Unpack the frames from the oldest (frames() -1) to the youngest (0)
   frame* caller_frame = &me;
   for (index = frames() - 1; index >= 0 ; index--) {
-    //tty->print_cr("_HOTSPOT (%ld): loop for index %d", _bdel_sys_gettid(), index);
     vframeArrayElement* elem = element(index);  // caller
     int callee_parameters, callee_locals;
     if (index == 0) {
@@ -572,7 +561,6 @@ void vframeArray::unpack_to_stack(frame &unpack_frame, int exec_mode, int caller
       callee_parameters = callee->size_of_parameters() + (has_member_arg ? 1 : 0);
       callee_locals     = callee->max_locals();
     }
-    //tty->print_cr("_HOTSPOT: in vFrameArray#unpack_to_stack");
     elem->unpack_on_stack(caller_actual_parameters,
                           callee_parameters,
                           callee_locals,
@@ -585,7 +573,6 @@ void vframeArray::unpack_to_stack(frame &unpack_frame, int exec_mode, int caller
     }
     caller_frame = elem->iframe();
     caller_actual_parameters = callee_parameters;
-    //tty->print_cr("_HOTSPOT (%ld): loop done for index %d", _bdel_sys_gettid(), index);
   }
   deallocate_monitor_chunks();
 }

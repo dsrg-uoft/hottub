@@ -331,7 +331,6 @@ class StubGenerator: public StubCodeGenerator {
 
     BLOCK_COMMENT("call_stub_return_address:");
     return_address = __ pc();
-    //tty->print_cr("_HOTSPOT: call stub return address is %p", (void*) return_address);
 
     // store result depending on type (everything that is not
     // T_OBJECT, T_LONG, T_FLOAT or T_DOUBLE is treated as T_INT)

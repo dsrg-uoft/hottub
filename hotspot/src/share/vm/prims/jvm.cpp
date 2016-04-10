@@ -550,7 +550,6 @@ JVM_END
 
 JVM_ENTRY(void, JVM_MonitorWait(JNIEnv* env, jobject handle, jlong ms))
   JVMWrapper("JVM_MonitorWait");
-  //tty->print_cr("_HOTSPOT: in jvm monitor wait");
   Handle obj(THREAD, JNIHandles::resolve_non_null(handle));
   JavaThreadInObjectWaitState jtiows(thread, ms != 0);
   if (JvmtiExport::should_post_monitor_wait()) {
@@ -562,9 +561,7 @@ JVM_ENTRY(void, JVM_MonitorWait(JNIEnv* env, jobject handle, jlong ms))
     // event handler cannot accidentally consume an unpark() meant for
     // the ParkEvent associated with this ObjectMonitor.
   }
-  //tty->print_cr("_HOTSPOT: about wait");
   ObjectSynchronizer::wait(obj, ms, CHECK);
-  //tty->print_cr("_HOTSPOT: after wait");
 JVM_END
 
 
@@ -1430,15 +1427,8 @@ class RegisterArrayForGC {
 };
 
 
-//__thread int _foo = 0;
 JVM_ENTRY(jobject, JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls))
   JVMWrapper("JVM_GetStackAccessControlContext");
-  //tty->print_cr("_HOTSPOT: in get stack access control context, use privileged stack is %d, jvm state is %d", UsePrivilegedStack, JavaThread::current()->_jvm_state);
-  /*
-  if (_foo++ == 35) {
-    ShouldNotReachHere();
-  }
-  */
   if (!UsePrivilegedStack) return NULL;
 
   ResourceMark rm(THREAD);
@@ -3105,7 +3095,6 @@ JVM_ENTRY(void, JVM_BdelReset(JNIEnv* env, jobject jthread))
   JVMWrapper("JVM_BdelReset");
   oop java_thread = JNIHandles::resolve_non_null(jthread);
   JavaThread* receiver = java_lang_Thread::thread(java_thread);
-  //tty->print_cr("_HOTSPOT (%ld): in bdel reset, ready is %d, times are %.6f and %.6f, %p, now is %lu", _bdel_sys_gettid(), receiver->_jvm_state_ready, receiver->_jvm_state_times[0] / 1e9, receiver->_jvm_state_times[1] / 1e9, receiver, _now());
   receiver->_jvm_state_times[0] = 0;
   receiver->_jvm_state_times[1] = 0;
   receiver->_jvm_state_last_timestamp = _now();
@@ -3116,7 +3105,6 @@ JVM_ENTRY(jlong, JVM_BdelGetInt(JNIEnv* env, jobject jthread))
   oop java_thread = JNIHandles::resolve_non_null(jthread);
   JavaThread* receiver = java_lang_Thread::thread(java_thread);
   _jvm_transitions_clock(receiver, receiver->_jvm_state);
-  //tty->print_cr("_HOTSPOT (%ld): getting comp %.6f, %p, now is %lu", _bdel_sys_gettid(), receiver->_jvm_state_times[0] / 1e9, receiver, _now());
   return (jlong) receiver->_jvm_state_times[0];
 JVM_END
 
@@ -3125,7 +3113,6 @@ JVM_ENTRY(jlong, JVM_BdelGetComp(JNIEnv* env, jobject jthread))
   oop java_thread = JNIHandles::resolve_non_null(jthread);
   JavaThread* receiver = java_lang_Thread::thread(java_thread);
   _jvm_transitions_clock(receiver, receiver->_jvm_state);
-  //tty->print_cr("_HOTSPOT (%ld): getting int %.6f, %p, now is %lu", _bdel_sys_gettid(), receiver->_jvm_state_times[1] / 1e9, receiver, _now());
   return (jlong) receiver->_jvm_state_times[1];
 JVM_END
 

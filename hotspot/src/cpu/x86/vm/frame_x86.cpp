@@ -275,7 +275,6 @@ void frame::patch_pc(Thread* thread, address pc) {
   if (TracePcPatching) {
     tty->print_cr("patch_pc at address " INTPTR_FORMAT " [" INTPTR_FORMAT " -> " INTPTR_FORMAT "]",
                   pc_addr, *pc_addr, pc);
-    //tty->print_cr("_HOTSPOT: in frame#patch_pc, should be deoptimized is %d", (int) this->should_be_deoptimized());
   }
   /*
   if ((void*) pc == (void*) &_i2c_ret_handler) {

@@ -241,7 +241,6 @@ void Method::mask_for(int bci, InterpreterOopMap* mask) {
 
 #include "runtime/_bdel.hpp"
 int Method::bci_from(address bcp) const {
-  //tty->print_cr("_HOTSPOT: in method bci from %p, i2c is %p, c2i is %p", (void*) bcp, (void*) &_i2c_ret_handler, (void*) &_c2i_ret_handler);
 #ifdef ASSERT
   { ResourceMark rm;
   assert(is_native() && bcp == code_base() || contains(bcp) || is_error_reported(),

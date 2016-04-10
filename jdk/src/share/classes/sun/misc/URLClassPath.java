@@ -209,9 +209,7 @@ public class URLClassPath {
         Loader loader;
         int[] cache = getLookupCache(name);
         for (int i = 0; (loader = getNextLoader(cache, i)) != null; i++) {
-            //System.out.print("_JDK: got loader " + i + " is " + loader.getClass().getName() + "\n");
             Resource res = loader.getResource(name, check);
-            //System.out.print("_JDK: got resource " + i + " is " + (res == null ? "null" : res.toString()) + "\n");
             if (res != null) {
                 return res;
             }
@@ -481,7 +479,6 @@ public class URLClassPath {
                     url = urls.pop();
                 }
             }
-            //System.out.print("_JDK: trying to get " + index + "\n");
             // Skip this URL if it already has a Loader. (Loader
             // may be null in the case where URL has not been opened
             // but is referenced by a JAR index.)
@@ -1222,24 +1219,19 @@ public class URLClassPath {
         Resource getResource(final String name, boolean check) {
             final URL url;
             try {
-                //System.out.print("_JDK: file get a\n");
                 URL normalizedBase = new URL(getBaseURL(), ".");
-                //System.out.print("_JDK: file get a2\n");
                 url = new URL(getBaseURL(), ParseUtil.encodePath(name, false));
-                //System.out.print("_JDK: file get a3\n");
 
                 if (url.getFile().startsWith(normalizedBase.getFile()) == false) {
                     // requested resource had ../..'s in path
                     return null;
                 }
-                //System.out.print("_JDK: file get b check is " + check + "\n");
 
                 if (check)
                     URLClassPath.check(url);
 
                 final File file;
                 if (name.indexOf("..") != -1) {
-                    //System.out.print("_JDK: file get e\n");
                     file = (new File(dir, name.replace('/', File.separatorChar)))
                           .getCanonicalFile();
                     if ( !((file.getPath()).startsWith(dir.getPath())) ) {
@@ -1247,10 +1239,8 @@ public class URLClassPath {
                         return null;
                     }
                 } else {
-                    //System.out.print("_JDK: file get f\n");
                     file = new File(dir, name.replace('/', File.separatorChar));
                 }
-                //System.out.print("_JDK: file get c\n");
 
                 if (file.exists()) {
                     return new Resource() {

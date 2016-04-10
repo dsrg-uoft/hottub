@@ -124,13 +124,11 @@ Java_java_lang_Class_forName0(JNIEnv *env, jclass this, jstring classname,
         /* slashes present in clname, use name b4 translation for exception */
         (*env)->GetStringUTFRegion(env, classname, 0, unicode_len, clname);
         JNU_ThrowClassNotFoundException(env, clname);
-        //printf("_jdk: throwing class not found\n");
         goto done;
     }
 
     if (!VerifyClassname(clname, JNI_TRUE)) {  /* expects slashed name */
         JNU_ThrowClassNotFoundException(env, clname);
-        //printf("_jdk: throwing class not found 2\n");
         goto done;
     }
 

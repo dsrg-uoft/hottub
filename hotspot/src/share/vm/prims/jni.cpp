@@ -732,8 +732,6 @@ JNI_ENTRY(jint, jni_ThrowNew(JNIEnv *env, jclass clazz, const char *message))
   jint ret = JNI_OK;
   DT_RETURN_MARK(ThrowNew, jint, (const jint&)ret);
 
-  //tty->print_cr("_HOTSPOT: in throw new with message %s", message);
-
   InstanceKlass* k = InstanceKlass::cast(java_lang_Class::as_Klass(JNIHandles::resolve_non_null(clazz)));
   Symbol*  name = k->name();
   Handle class_loader (THREAD,  k->class_loader());
@@ -5140,7 +5138,6 @@ void execute_internal_vm_tests() {
 
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CallingJavaMain() {
   JavaThread* jt = JavaThread::current();
-  //tty->print_cr("_HOTSPOT (%ld): calling java main, ready is %d, %p, now is %lu", _bdel_sys_gettid(), jt->_jvm_state_ready, jt, _now());
   if (WildTurtle) {
     jt->_jvm_state_ready = 1;
     jt->_jvm_state_times[0] = 0;

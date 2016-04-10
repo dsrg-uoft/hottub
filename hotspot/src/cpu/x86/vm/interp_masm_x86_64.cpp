@@ -166,7 +166,6 @@ void InterpreterMacroAssembler::load_earlyret_value(TosState state) {
 
 
 void InterpreterMacroAssembler::check_and_handle_earlyret(Register java_thread) {
-  //tty->print_cr("_HOTSPOT: in InterpreterMacroAssembler#check_and_handle_earlyret, can force early return is %d", (int) JvmtiExport::can_force_early_return());
   if (JvmtiExport::can_force_early_return()) {
     Label L;
     movptr(c_rarg0, Address(r15_thread, JavaThread::jvmti_thread_state_offset()));
@@ -454,9 +453,6 @@ void InterpreterMacroAssembler::jump_from_interpreted(Register method, Register 
     jmp(Address(method, Method::interpreter_entry_offset()));
     bind(run_compiled_code);
   }
-
-  // this doesn't seem accurate
-  //tty->print_cr("_HOTSPOT: entering interpreter?");
 
   jmp(Address(method, Method::from_interpreted_offset()));
 

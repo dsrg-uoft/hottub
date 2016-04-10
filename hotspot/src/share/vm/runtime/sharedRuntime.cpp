@@ -144,7 +144,6 @@ static void _jvm_transitions_push(JavaThread* jt, int8_t to_state) {
     _jvm_transitions_dump(jt);
     ShouldNotReachHere();
   }
-  //tty->print_cr("_HOTSPOT (%ld): pushing %d", _bdel_sys_gettid(), to_state);
   jt->_jvm_transitions[jt->_jvm_transitions_pos++] = jt->_jvm_state;
   if (_unlikely(to_state != jt->_jvm_state)) {
     _jvm_transitions_clock(jt, to_state);
@@ -157,7 +156,6 @@ static void _jvm_transitions_pop(JavaThread* jt) {
     ShouldNotReachHere();
   }
   int8_t from_state = jt->_jvm_transitions[--(jt->_jvm_transitions_pos)];
-  //tty->print_cr("_HOTSPOT (%ld): popping %d", _bdel_sys_gettid(), from_state);
   if (_unlikely(from_state != jt->_jvm_state)) {
     _jvm_transitions_clock(jt, from_state);
   }
@@ -206,8 +204,6 @@ void _bdel_knell(const char* str) {
         , _i_levels
       );
       //ShouldNotReachHere();
-    } else {
-      //tty->print_cr("_HOTSPOT: wildturtle happy");
     }
   }
 }
@@ -223,10 +219,6 @@ extern "C" {
     }
     _i2c_levels++;
     if (Dyrus) {
-      //jio_fprintf(defaultStream::output_stream()
-      //tty->print_cr("_HOTSPOT: i2c");
-      //tty->ADRIAN("i2c push\n");
-      //*
       tty->print_cr(
         "_HOTSPOT %ld: calling i2c %s#%s, from %d levels"
         , _bdel_sys_gettid()
@@ -234,7 +226,6 @@ extern "C" {
         , m->name()->as_C_string()
         , jt->_i2c_stack_pos
       );
-      //*/
     }
     if (_unlikely(jt->_i2c_stack_pos >= _I2C_STACK_SIZE)) {
       tty->print_cr("_HOTSPOT: i2c stack overflowed");
@@ -250,16 +241,11 @@ extern "C" {
   _rax_rdx _i2c_ret_pop(JavaThread* jt) {
     _i2c_levels--;
     if (Dyrus) {
-      //jio_fprintf(
-      //  defaultStream::output_stream(),
-      //tty->ADRIAN("i2c pop\n");
-      //*
       tty->print_cr(
         "_HOTSPOT %ld: returning i2c, from %d levels"
         , _bdel_sys_gettid()
         , jt->_i2c_stack_pos
       );
-      //*/
     }
     if (_unlikely(jt->_i2c_stack_pos <= 0)) {
       tty->print_cr("_HOTSPOT: i2c stack underflowed");
@@ -344,7 +330,6 @@ extern "C" {
     if (_unlikely(!jt->_jvm_state_ready)) {
       return ret;
     }
-    //tty->print_cr("_HOTSPOT: i2c osr");
     if (ret == (void*) &_c2i_ret_handler) {
       return _c2i_ret_verify_location_and_pop(jt, rbp, -42);
     } else {
@@ -585,17 +570,13 @@ extern "C" {
   }
   void _c2i_deopt_bless(JavaThread* jt, void* ret, void* rbp, int where, int frame, int total) {
     if (ret == (void*) &_c2i_ret_handler) {
-      //tty->print_cr("_HOTSPOT: c2i deopt bless got c2i handler %d, at %p", where, rbp);
       _rax_rdx ret = _c2i_ret_pop(jt, -11);
       if (_unlikely(ret.rdx != 0)) {
         tty->print_cr("_HOTSPOT %ld: c2i deopt bless found handler, but popped expected location nonzero %p with return address %p, %d, %d, rbp %p", _bdel_sys_gettid(), ret.rdx, ret.rax, frame, total, rbp);
         _c2i_dump_stack(jt);
         ShouldNotReachHere();
       }
-      //tty->print_cr("_HOTSPOT: c2i deopt bless is %p", ret.rax);
       _c2i_ret_push(jt, ret.rax, rbp, NULL);
-    } else {
-      //tty->print_cr("_HOTSPOT: c2i deopt bless here with %p: %p", rbp, ret);
     }
   }
   // patch pc
@@ -2003,7 +1984,6 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method_ic_miss(JavaThread* 
   JRT_BLOCK_END
   // return compiled code entry point after potential safepoints
   assert(callee_method->verified_code_entry() != NULL, " Jump to zero!");
-  //tty->print_cr("_HOTSPOT: in SharedRuntime::handle_wrong_method_ic_miss_helper for %s", callee_method->name()->as_C_string());
   return callee_method->verified_code_entry();
 JRT_END
 
@@ -2022,7 +2002,6 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method(JavaThread* thread))
   RegisterMap reg_map(thread, false);
   frame stub_frame = thread->last_frame();
   assert(stub_frame.is_runtime_frame(), "sanity check");
-  //tty->print_cr("_HOTSPOT: in handle wrong method a");
   frame caller_frame = stub_frame.sender(&reg_map);
 
   if (caller_frame.is_interpreted_frame() ||
@@ -2038,20 +2017,16 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method(JavaThread* thread))
   methodHandle callee_method;
   JRT_BLOCK
     // Force resolving of caller (if we called from compiled frame)
-    //tty->print_cr("_HOTSPOT: in handle wrong method, second block, about to reresolve call site");
     callee_method = SharedRuntime::reresolve_call_site(thread, CHECK_NULL);
-    //tty->print_cr("_HOTSPOT: in handle wrong method, second block, got method");
     thread->set_vm_result_2(callee_method());
   JRT_BLOCK_END
   // return compiled code entry point after potential safepoints
   assert(callee_method->verified_code_entry() != NULL, " Jump to zero!");
-  //tty->print_cr("_HOTSPOT: in handle wrong method, second block, for %s, return value is %p", callee_method->name()->as_C_string(), (void*) callee_method->verified_code_entry());
   return callee_method->verified_code_entry();
 JRT_END
 
 // Handle abstract method call
 JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method_abstract(JavaThread* thread))
-  //tty->print_cr("_HOTSPOT: in SharedRuntime::handle_wrong_method_abstract");
   return StubRoutines::throw_AbstractMethodError_entry();
 JRT_END
 
@@ -2379,7 +2354,6 @@ void SharedRuntime::check_member_name_argument_is_last_argument(methodHandle met
 // so he no longer calls into the interpreter.
 IRT_LEAF(void, SharedRuntime::fixup_callers_callsite(Method* method, address caller_pc))
   Method* moop(method);
-  //tty->print_cr("_HOTSPOT: in fixup callers callsite for %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
 
   address entry_point = moop->from_compiled_entry();
 
@@ -3148,7 +3122,6 @@ AdapterHandlerEntry* AdapterHandlerLibrary::get_adapter(methodHandle method) {
                                              sizeof(buffer_locs)/sizeof(relocInfo));
 
       MacroAssembler _masm(&buffer);
-      //tty->print_cr("_HOTSPOT: generating adapters for %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
       entry = SharedRuntime::generate_i2c2i_adapters(&_masm,
                                                      total_args_passed,
                                                      comp_args_on_stack,

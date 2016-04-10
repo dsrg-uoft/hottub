@@ -1330,8 +1330,6 @@ instanceKlassHandle SystemDictionary::load_instance_class(Symbol* class_name, Ha
     // Added MustCallLoadClassInternal in case we discover in the field
     // a customer that counts on this call
     _native_call_begin((JavaThread*) THREAD, NULL, 70);
-    //int _tag = _now() % 1000;
-    //tty->print_cr("_HOTSPOT (%ld): start tagsauce %d", _bdel_sys_gettid(), _tag);
 
     /*
      * # bdel notes
@@ -1339,7 +1337,6 @@ instanceKlassHandle SystemDictionary::load_instance_class(Symbol* class_name, Ha
      * `#define CHECK_(result) THREAD); if (HAS_PENDING_EXCEPTION) return result; (void)(0`
      */
     if (MustCallLoadClassInternal && has_loadClassInternal()) {
-      //tty->print_cr("_HOTSPOT (%ld): heresauce special, is %s#%s", _bdel_sys_gettid(), spec_klass->external_name(), vmSymbols::loadClassInternal_name()->as_C_string());
       JavaCalls::call_special(&result,
                               class_loader,
                               spec_klass,
@@ -1353,7 +1350,6 @@ instanceKlassHandle SystemDictionary::load_instance_class(Symbol* class_name, Ha
        return nh;
      }
     } else {
-      //tty->print_cr("_HOTSPOT (%ld): heresauce virtual, is %s#%s", _bdel_sys_gettid(), spec_klass->external_name(), vmSymbols::loadClass_name()->as_C_string());
       JavaCalls::call_virtual(&result,
                               class_loader,
                               spec_klass,
@@ -1367,7 +1363,6 @@ instanceKlassHandle SystemDictionary::load_instance_class(Symbol* class_name, Ha
        return nh;
      }
     }
-    //tty->print_cr("_HOTSPOT (%ld): end tagsauce %d", _bdel_sys_gettid(), _tag);
     _native_call_end((JavaThread*) THREAD, NULL, 70);
 
     assert(result.get_type() == T_OBJECT, "just checking");

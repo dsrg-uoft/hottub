@@ -1839,9 +1839,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
                                                 BasicType* in_sig_bt,
                                                 VMRegPair* in_regs,
                                                 BasicType ret_type) {
-  //tty->print_cr("_HOTSPOT: generating native wrapper for %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
   if (method->is_method_handle_intrinsic()) {
-    //tty->print_cr("_HOTSPOT: generating native wrapper for instrinsic method %s#%s", method->klass_name()->as_C_string(), method->name()->as_C_string());
     vmIntrinsics::ID iid = method->intrinsic_id();
     intptr_t start = (intptr_t)__ pc();
     int vep_offset = ((intptr_t)__ pc()) - start;
@@ -4072,8 +4070,6 @@ SafepointBlob* SharedRuntime::generate_handler_blob(address call_ptr, int poll_t
 //
 RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const char* name) {
   assert (StubRoutines::forward_exception_entry() != NULL, "must be generated before");
-
-  //tty->print_cr("_HOTSPOT: in SharedRuntime::generate_resolve_blob for %s", name);
 
   // allocate space for the code
   ResourceMark rm;
