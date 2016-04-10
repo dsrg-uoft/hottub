@@ -484,17 +484,8 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
     // see `_c2i_deopt_bless` for more details
     Method* _m = _deopt.cb()->as_nmethod_or_null()->method();
     Method* _n = deopt_sender.cb()->as_nmethod_or_null()->method();
-    //if (_deopt.is_deoptimized_frame()) {
-      frame_pcs[0] = (address) _c2i_ret_push(thread, (void*) frame_pcs[0], (void*) NULL, _m);
-    //}
-    //tty->print_cr("_HOTSPOT: wow, this is a thing, deoptimized sender is %d, is %p, %s#%s, %d, called by %s#%s", deopt_sender.is_deoptimized_frame(), (void*) frame_pcs[0], _m->klass_name()->as_C_string(), _m->name()->as_C_string(), _deopt.is_deoptimized_frame(), _n->klass_name()->as_C_string(), _n->name()->as_C_string());
+    frame_pcs[0] = (address) _c2i_ret_push(thread, (void*) frame_pcs[0], (void*) NULL, _m);
   }
-  /*
-  if ((void*) frame_pcs[0] == (void*) _i2c_ret_handler) {
-    frame_pcs[0] = (address) _i2c_ret_peek();
-    tty->print_cr("_HOTSPOT: aww, they changed our hours AGAIN %p, handler is %p", frame_pcs[0], (void*) _i2c_ret_handler);
-  }
-  */
 
 #ifndef SHARK
   assert(CodeCache::find_blob_unsafe(frame_pcs[0]) != NULL, "bad pc");
@@ -1782,7 +1773,6 @@ Deoptimization::update_method_data_from_interpreter(MethodData* trap_mdo, int tr
 
 Deoptimization::UnrollBlock* Deoptimization::uncommon_trap(JavaThread* thread, jint trap_request) {
 
-  //tty->print_cr("_HOTSPOT: uncommon trap found");
   // Still in Java no safepoints
   {
     // This enters VM and may safepoint

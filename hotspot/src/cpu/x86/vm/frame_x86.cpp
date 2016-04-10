@@ -549,7 +549,6 @@ frame frame::sender(RegisterMap* map) const {
   if (_cb != NULL) {
     return sender_for_compiled_frame(map);
   }
-
   // Must be native-compiled frame, i.e. the marshaling code for native
   // methods that exists in the core system.
   return frame(sender_sp(), link(), sender_pc());

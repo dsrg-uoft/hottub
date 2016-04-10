@@ -5,3 +5,6 @@ nbproject/private/
 ^.hgtip
 ^.bridge2
 .DS_Store
+^old/
+^j2sdk-image
+^.git/

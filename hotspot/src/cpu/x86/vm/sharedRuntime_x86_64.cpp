@@ -782,6 +782,7 @@ static void gen_i2c_adapter(MacroAssembler *masm,
     __ subptr(rsp, comp_words_on_stack * wordSize);
   }
 
+
   // Ensure compiled code always sees stack at proper alignment
   __ andptr(rsp, -16);
 
@@ -3991,10 +3992,6 @@ SafepointBlob* SharedRuntime::generate_handler_blob(address call_ptr, int poll_t
   int frame_size_in_words;
   bool cause_return = (poll_type == POLL_AT_RETURN);
   bool save_vectors = (poll_type == POLL_AT_VECTOR_LOOP);
-
-  if (cause_return) {
-    //_gen_call(masm, (void*) &_saw_safepoint_return_handler);
-  }
 
   if (UseRTMLocking) {
     // Abort RTM transaction before calling runtime
