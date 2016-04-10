@@ -460,7 +460,7 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
 
   address* location = sender_pc_addr();
   address ret_addr = *location;
-  if (WildTurtle && ((void*) ret_addr == (void*) &_c2i_ret_handler)) {
+  if (ProfileIntComp && ((void*) ret_addr == (void*) &_c2i_ret_handler)) {
     Thread* th = Thread::current();
     if (_unlikely(!th->is_Java_thread())) {
       tty->print_cr("_HOTSPOT: sender for interpreter frame from c2i handler, but current thread not java thread");
@@ -494,7 +494,7 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   // On Intel the return_address is always the word on the stack
   address sender_pc = (address) *(sender_sp-1);
 
-  if (WildTurtle && (void*) sender_pc == (void*) &_i2c_ret_handler) {
+  if (ProfileIntComp && (void*) sender_pc == (void*) &_i2c_ret_handler) {
     Thread* th = Thread::current();
     if (_unlikely(!th->is_Java_thread())) {
       tty->print_cr("_HOTSPOT: sender for compiled frame found i2c handler, but current thread not java thread");

@@ -462,7 +462,7 @@ static void patch_callers_callsite(MacroAssembler *masm) {
   // Call into the VM to patch the caller, then jump to compiled callee
   // rax isn't live so capture return address while we easily can
   __ movptr(rax, Address(rsp, 0));
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     __ push(rscratch1);
     Label _after;
     __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
@@ -560,7 +560,7 @@ static void gen_c2i_adapter(MacroAssembler *masm,
 
   __ subptr(rsp, extraspace);
 
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     // see below; as if rax already pushed; // 8
     __ push(c_rarg0); // 7
     __ push(c_rarg1); // 6
@@ -787,7 +787,7 @@ static void gen_i2c_adapter(MacroAssembler *masm,
 
   // push the return address and misalign the stack that youngest frame always sees
   // as far as the placement of the call instruction
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     __ push(c_rarg0);
     __ push(c_rarg1);
     __ push(c_rarg2);
@@ -2336,7 +2336,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     restore_args(masm, total_c_args, c_arg, out_regs);
   }
 
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     save_args(masm, total_c_args, c_arg, out_regs);
 
     __ movptr(c_rarg0, r15_thread);
@@ -2582,7 +2582,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     __ bind(done);
 
   }
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     save_native_result(masm, ret_type, stack_slots);
 
     __ movptr(c_rarg0, r15_thread);
@@ -3643,7 +3643,7 @@ void SharedRuntime::generate_deopt_blob() {
   __ subptr(rbx, 2*wordSize);           // We'll push pc and ebp by hand
 #endif // CC_INTERP
   __ pushptr(Address(rcx, 0));          // Save return address
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     // see `_c2i_deopt_bless`, more explanation there
     __ push(rax);
 
@@ -3664,7 +3664,7 @@ void SharedRuntime::generate_deopt_blob() {
     // return address
     __ movptr(c_rarg1, Address(rcx, 0));
     // where return address was stored
-    __ movptr(c_rarg2, rcx);
+    __ lea(c_rarg2, Address(rsp, 9 * wordSize));
     // where `_c2i_deopt_bless` called from (1 for uncommon trap blob)
     __ lea(c_rarg3, RuntimeAddress((address) 1));
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_deopt_bless));
@@ -3870,7 +3870,7 @@ void SharedRuntime::generate_uncommon_trap_blob() {
   __ movptr(rbx, Address(rsi, 0)); // Load frame size
   __ subptr(rbx, 2 * wordSize);    // We'll push pc and rbp by hand
   __ pushptr(Address(rcx, 0));     // Save return address
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     // see same thing for `generate_deop_blob` - more comments there
     __ push(rax);
 
@@ -3889,7 +3889,7 @@ void SharedRuntime::generate_uncommon_trap_blob() {
     __ movptr(c_rarg4, rdx);
     __ movptr(c_rarg0, r15_thread);
     __ movptr(c_rarg1, Address(rcx, 0));
-    __ movptr(c_rarg2, rcx);
+    __ lea(c_rarg2, Address(rsp, 9 * wordSize));
     // where `_c2i_deopt_bless` called from, 1 for deopt blob
     __ lea(c_rarg3, RuntimeAddress((address) 2));
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_deopt_bless));

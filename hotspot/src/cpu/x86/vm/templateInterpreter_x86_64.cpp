@@ -567,7 +567,7 @@ void InterpreterGenerator::lock_method(void) {
 void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
   // initialize fixed part of activation frame
   __ push(rax);        // save return address
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     __ push(rscratch1);
     Label _after;
     __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));
@@ -1425,7 +1425,7 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
                        wordSize)); // get sender sp
   __ leave();                                // remove frame anchor
   __ pop(rdi);                               // get return address
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     __ push(rscratch1);
     Label _after;
     __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));

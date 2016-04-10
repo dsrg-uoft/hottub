@@ -807,7 +807,7 @@ void Runtime1::generate_unwind_exception(StubAssembler *sasm) {
   NOT_LP64(__ get_thread(thread);)
   // Get return address (is on top of stack after leave).
   __ movptr(exception_pc, Address(rsp, 0));
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     if (exception_pc == rax) {
       ShouldNotReachHere();
     }
@@ -846,7 +846,7 @@ void Runtime1::generate_unwind_exception(StubAssembler *sasm) {
     __ bind(_after);
     __ pop(rscratch1);
   }
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     __ push(rscratch1);
     Label _after;
     __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));

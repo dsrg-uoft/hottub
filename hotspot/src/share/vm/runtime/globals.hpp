@@ -954,24 +954,14 @@ class CommandLineFlags {
   product(bool, PrintForcedCompileTime, false,                              \
           "-Xcomp flag")                                                    \
                                                                             \
-  product(bool, WildTurtle, false,                                          \
-          "BibleThump")                                                     \
+  product(bool, ProfileIntComp, false,                                      \
+          "Profiling interpreter time")                                     \
                                                                             \
-  product(bool, Dyrus, false,                                               \
-          "Shoutout to David for CSGO - 2015 December 8, R8 Revolver; "     \
-          "Never forget")                                                   \
+  product(bool, ProfileIntCompTrace, false,                                 \
+          "Profiling interpreter time, debug logs")                         \
                                                                             \
-  product(bool, Froggen, false,                                             \
-          "Anivia kid")                                                     \
-                                                                            \
-  product(bool, TheGeneral, false,                                          \
-          "Nagi no asukara")                                                \
-                                                                            \
-  product(bool, Yuuichi, false,                                             \
-          "Shiori's arc")                                                   \
-                                                                            \
-  product(bool, Sachiko, false,                                             \
-          "Okaasan")                                                        \
+  product(bool, ProfileIntCompStrict, false,                                \
+          "Profiling interpreter time, strict sanity checks")               \
                                                                             \
   diagnostic(bool, TraceNMethodInstalls, false,                             \
           "Trace nmethod installation")                                     \

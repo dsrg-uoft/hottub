@@ -5138,7 +5138,7 @@ void execute_internal_vm_tests() {
 
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CallingJavaMain() {
   JavaThread* jt = JavaThread::current();
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     jt->_jvm_state_ready = 1;
     jt->_jvm_state_times[0] = 0;
     jt->_jvm_state_times[1] = 0;

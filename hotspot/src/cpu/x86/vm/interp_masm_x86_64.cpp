@@ -673,7 +673,7 @@ void InterpreterMacroAssembler::remove_activation(
          Address(rbp, frame::interpreter_frame_sender_sp_offset * wordSize));
   leave();                           // remove frame anchor
   pop(ret_addr);                     // get return address
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     if (ret_addr == rax) {
       ShouldNotReachHere();
     }
@@ -711,7 +711,7 @@ void InterpreterMacroAssembler::remove_activation(
     bind(_after);
     pop(rscratch1);
   }
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     push(rscratch1);
     Label _after;
     lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));
@@ -1504,7 +1504,7 @@ void InterpreterMacroAssembler::verify_FPU(int stack_depth, TosState state) {
 
 
 void InterpreterMacroAssembler::_notify_native_entry() {
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     movptr(c_rarg0, r15_thread);
     get_method(c_rarg1);
     xorptr(c_rarg2, c_rarg2);
@@ -1513,7 +1513,7 @@ void InterpreterMacroAssembler::_notify_native_entry() {
 }
 
 void InterpreterMacroAssembler::_notify_native_exit() {
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     push(rax);
     push(c_rarg0);
     push(c_rarg1);
@@ -1562,7 +1562,7 @@ void InterpreterMacroAssembler::notify_method_entry() {
                  r15_thread, c_rarg1);
   }
 
-  if (TheGeneral || Sachiko) {
+  if (ProfileIntComp && ProfileIntCompStrict) {
     get_method(c_rarg1);
     call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::_method_entry), r15_thread, c_rarg1);
   }
@@ -1608,13 +1608,6 @@ void InterpreterMacroAssembler::notify_method_exit(
     call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dtrace_method_exit),
                  r15_thread, c_rarg1);
     NOT_CC_INTERP(pop(state));
-  }
-
-  if (TheGeneral || Sachiko) {
-    push(state);
-    get_method(c_rarg1);
-    call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::_method_exit), r15_thread, c_rarg1);
-    pop(state);
   }
 }
 

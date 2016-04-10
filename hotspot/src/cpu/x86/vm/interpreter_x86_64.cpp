@@ -296,7 +296,7 @@ address InterpreterGenerator::generate_math_entry(AbstractInterpreter::MethodKin
 
 
   __ pop(rax);
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     __ push(rscratch1);
     Label _after;
     __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));

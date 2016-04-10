@@ -3036,7 +3036,7 @@ JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
               "unable to create new native thread");
   }
 
-  if (WildTurtle) {
+  if (ProfileIntComp) {
     native_thread->_jvm_state_ready = 1;
     native_thread->_jvm_state_last_timestamp = _now();
   }

@@ -500,7 +500,7 @@ class StubGenerator: public StubCodeGenerator {
 
     // compute exception handler into rbx
     __ movptr(c_rarg0, Address(rsp, 0));
-    if (WildTurtle) {
+    if (ProfileIntComp) {
       __ push(rscratch1);
       Label _after;
       __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));
@@ -537,7 +537,7 @@ class StubGenerator: public StubCodeGenerator {
       __ bind(_after);
       __ pop(rscratch1);
     }
-    if (WildTurtle) {
+    if (ProfileIntComp) {
       __ push(rscratch1);
       Label _after;
       __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));

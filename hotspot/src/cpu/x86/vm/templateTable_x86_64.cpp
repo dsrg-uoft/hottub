@@ -1785,7 +1785,7 @@ void TemplateTable::branch(bool is_jsr, bool is_wide) {
       // retaddr = j_rarg2 = c_rarg3 = rcx
       // sender_sp = j_rarg1 = c_rarg2 = rdx
       // r13 = nmethod
-      if (WildTurtle) {
+      if (ProfileIntComp) {
         __ push(rax);
         __ push(c_rarg0);
         __ push(c_rarg1);
