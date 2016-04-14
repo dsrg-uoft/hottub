@@ -1,6 +1,6 @@
 
 
-/.hg/
+.hg/
 /build/
 /j2sdk-image.*
 cscope.*
