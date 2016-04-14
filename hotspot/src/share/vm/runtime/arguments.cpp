@@ -1675,9 +1675,8 @@ void Arguments::set_g1_gc_flags() {
   FLAG_SET_DEFAULT(ParallelGCThreads,
                      Abstract_VM_Version::parallel_worker_threads());
   if (ParallelGCThreads == 0) {
-    FLAG_SET_DEFAULT(ParallelGCThreads,
-                     Abstract_VM_Version::parallel_worker_threads());
-  }
+    vm_exit_during_initialization("The flag -XX:+UseG1GC can not be combined with -XX:ParallelGCThreads=0", NULL);
+    }
 
 #if INCLUDE_ALL_GCS
   if (G1ConcRefinementThreads == 0) {
@@ -3414,7 +3413,7 @@ void Arguments::fix_appclasspath() {
   }
 
   if (!PrintSharedArchiveAndExit) {
-    ClassLoader::trace_class_path("[classpath: ", _java_class_path->value());
+    ClassLoader::trace_class_path(tty, "[classpath: ", _java_class_path->value());
   }
 }
 

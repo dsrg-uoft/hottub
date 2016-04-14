@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -17,9 +17,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/*
- * $Id: MultiDOM.java,v 1.5 2005/09/28 13:48:36 pvedula Exp $
- */
 
 package com.sun.org.apache.xalan.internal.xsltc.dom;
 
@@ -32,6 +29,7 @@ import com.sun.org.apache.xml.internal.dtm.DTM;
 import com.sun.org.apache.xml.internal.dtm.DTMAxisIterator;
 import com.sun.org.apache.xml.internal.dtm.DTMManager;
 import com.sun.org.apache.xml.internal.dtm.ref.DTMAxisIteratorBase;
+import com.sun.org.apache.xml.internal.dtm.ref.DTMAxisIterNodeList;
 import com.sun.org.apache.xml.internal.dtm.ref.DTMDefaultBase;
 import com.sun.org.apache.xml.internal.serializer.SerializationHandler;
 import com.sun.org.apache.xml.internal.utils.SuballocatedIntVector;
@@ -569,7 +567,7 @@ public final class MultiDOM implements DOM {
     public NodeList makeNodeList(DTMAxisIterator iter) {
         int index = iter.next();
         if (index == DTM.NULL) {
-            return null;
+            return new DTMAxisIterNodeList(null, null);
         }
         iter.reset();
         return _adapters[getDTMId(index)].makeNodeList(iter);
@@ -671,5 +669,52 @@ public final class MultiDOM implements DOM {
     // %HZ% Does this method make any sense here???
     public Map<String, Integer> getElementsWithIDs() {
         return _main.getElementsWithIDs();
+    }
+
+    public void release() {
+        _main.release();
+    }
+
+    private boolean isMatchingAdapterEntry(DOM entry, DOMAdapter adapter) {
+        DOM dom = adapter.getDOMImpl();
+
+        return (entry == adapter) || (
+            /*
+             * Method addDOMAdapter overwrites for AdaptiveResultTreeImpl
+             * objects the usual entry with an adapter to the nested
+             * DOM, so we must check this here. See last 'if' statement
+             * of addDOMAdapter.
+             */
+            (dom instanceof AdaptiveResultTreeImpl) &&
+            (entry instanceof DOMAdapter) &&
+            (((AdaptiveResultTreeImpl)dom).getNestedDOM() == ((DOMAdapter)entry).getDOMImpl())
+        );
+    }
+
+    public void removeDOMAdapter(DOMAdapter adapter) {
+        _documents.remove(adapter.getDocumentURI(0));
+        DOM dom = adapter.getDOMImpl();
+
+        if (dom instanceof DTMDefaultBase) {
+            SuballocatedIntVector ids = ((DTMDefaultBase) dom).getDTMIDs();
+            int idsSize = ids.size();
+            for (int i = 0; i < idsSize; i++) {
+                _adapters[ids.elementAt(i) >>> DTMManager.IDENT_DTM_NODE_BITS] = null;
+            }
+        } else {
+            int id = dom.getDocument() >>> DTMManager.IDENT_DTM_NODE_BITS;
+            if ((id > 0) && (id < _adapters.length) && isMatchingAdapterEntry(_adapters[id], adapter)) {
+                _adapters[id] = null;
+            } else {
+                boolean found = false;
+                for (int i = 0; i < _adapters.length; i++) {
+                    if (isMatchingAdapterEntry(_adapters[id], adapter)) {
+                        _adapters[i] = null;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+        }
     }
 }
