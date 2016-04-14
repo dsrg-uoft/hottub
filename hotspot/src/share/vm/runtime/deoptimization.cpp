@@ -1050,6 +1050,11 @@ vframeArray* Deoptimization::create_vframeArray(JavaThread* thread, frame fr, Re
   }
 #endif
 
+  if (_unlikely(thread->_bdel_deopt != 0)) {
+    tty->print_cr("_HOTSPOT: in Deoptimization#create_vframeArray, bdel deopt not 0, is %d", thread->_bdel_deopt);
+    ShouldNotReachHere();
+  }
+  thread->_bdel_deopt = 3;
   // Register map for next frame (used for stack crawl).  We capture
   // the state of the deopt'ing frame's caller.  Thus if we need to
   // stuff a C2I adapter we can properly fill in the callee-save
@@ -1058,6 +1063,7 @@ vframeArray* Deoptimization::create_vframeArray(JavaThread* thread, frame fr, Re
   int frame_size = caller.sp() - fr.sp();
 
   frame sender = caller;
+  thread->_bdel_deopt = 0;
 
   // Since the Java thread being deoptimized will eventually adjust it's own stack,
   // the vframeArray containing the unpacking information is allocated in the C heap.

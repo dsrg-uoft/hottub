@@ -1331,11 +1331,6 @@ instanceKlassHandle SystemDictionary::load_instance_class(Symbol* class_name, Ha
     // a customer that counts on this call
     _native_call_begin((JavaThread*) THREAD, NULL, 70);
 
-    /*
-     * # bdel notes
-     * in `exceptions.hpp`
-     * `#define CHECK_(result) THREAD); if (HAS_PENDING_EXCEPTION) return result; (void)(0`
-     */
     if (MustCallLoadClassInternal && has_loadClassInternal()) {
       JavaCalls::call_special(&result,
                               class_loader,
@@ -1345,6 +1340,7 @@ instanceKlassHandle SystemDictionary::load_instance_class(Symbol* class_name, Ha
                               string,
       //                        CHECK_(nh));
                               THREAD);
+     // see `jni_invoke_static` and in `jni.cpp`
      if (HAS_PENDING_EXCEPTION) {
        _native_call_end((JavaThread*) THREAD, NULL, 71);
        return nh;
@@ -1358,6 +1354,7 @@ instanceKlassHandle SystemDictionary::load_instance_class(Symbol* class_name, Ha
                               string,
       //                        CHECK_(nh));
                               THREAD);
+     // see `jni_invoke_static` and in `jni.cpp`
      if (HAS_PENDING_EXCEPTION) {
        _native_call_end((JavaThread*) THREAD, NULL, 71);
        return nh;

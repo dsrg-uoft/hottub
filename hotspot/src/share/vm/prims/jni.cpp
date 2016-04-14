@@ -1306,12 +1306,22 @@ static void jni_invoke_static(JNIEnv *env, JavaValue* result, jobject receiver, 
   // Initialize result type
   result->set_type(args->get_ret_type());
 
+  /*
+   * # bdel notes
+   * in `exceptions.hpp`
+   * `#define CHECK          THREAD); if (HAS_PENDING_EXCEPTION) return       ; (void)(0`
+   * `#define CHECK_(result) THREAD); if (HAS_PENDING_EXCEPTION) return result; (void)(0`
+   *
+   * must handle early return
+   */
   _native_call_begin((JavaThread*) THREAD, method(), 1);
-
   // Invoke the method. Result is returned as oop.
-  JavaCalls::call(result, method, &java_args, CHECK);
-
+  //JavaCalls::call(result, method, &java_args, CHECK);
+  JavaCalls::call(result, method, &java_args, THREAD);
   _native_call_end((JavaThread*) THREAD, method(), 1);
+  if (HAS_PENDING_EXCEPTION) {
+    return;
+  }
 
   // Convert result
   if (result->get_type() == T_OBJECT || result->get_type() == T_ARRAY) {
@@ -1379,10 +1389,15 @@ static void jni_invoke_nonstatic(JNIEnv *env, JavaValue* result, jobject receive
   // Initialize result type
   result->set_type(args->get_ret_type());
 
+  // see `jni_invoke_static`
   _native_call_begin((JavaThread*) THREAD, method(), 1);
   // Invoke the method. Result is returned as oop.
-  JavaCalls::call(result, method, &java_args, CHECK);
+  //JavaCalls::call(result, method, &java_args, CHECK);
+  JavaCalls::call(result, method, &java_args, THREAD);
   _native_call_end((JavaThread*) THREAD, method(), 1);
+  if (HAS_PENDING_EXCEPTION) {
+    return;
+  }
 
   // Convert result
   if (result->get_type() == T_OBJECT || result->get_type() == T_ARRAY) {
