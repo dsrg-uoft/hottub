@@ -860,7 +860,7 @@ public class LambdaToMethod extends TreeTranslator {
         private JCExpression makeReceiver(VarSymbol rcvr) {
             if (rcvr == null) return null;
             JCExpression rcvrExpr = make.Ident(rcvr);
-            Type rcvrType = tree.sym.enclClass().type;
+            Type rcvrType = tree.ownerAccessible ? tree.sym.enclClass().type : tree.expr.type;
             if (rcvrType == syms.arrayClass.type) {
                 // Map the receiver type to the actually type, not just "array"
                 rcvrType = tree.getQualifierExpression().type;
@@ -877,11 +877,9 @@ public class LambdaToMethod extends TreeTranslator {
          */
         private JCExpression expressionInvoke(VarSymbol rcvr) {
             JCExpression qualifier =
-                    tree.sym.isStatic() ?
-                        make.Type(tree.sym.owner.type) :
-                        (rcvr != null) ?
-                            makeReceiver(rcvr) :
-                            tree.getQualifierExpression();
+                    (rcvr != null) ?
+                        makeReceiver(rcvr) :
+                        tree.getQualifierExpression();
 
             //create the qualifier expression
             JCFieldAccess select = make.Select(qualifier, tree.sym.name);

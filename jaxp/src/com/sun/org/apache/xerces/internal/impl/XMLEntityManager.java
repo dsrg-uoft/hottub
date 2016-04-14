@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2016, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -368,7 +368,7 @@ public class XMLEntityManager implements XMLComponent, XMLEntityResolver {
     protected Map<String, Entity> fEntities = new HashMap<>();
 
     /** Entity stack. */
-    protected Stack fEntityStack = new Stack();
+    protected Stack<Entity> fEntityStack = new Stack<>();
 
     /** Current entity. */
     protected Entity.ScannedEntity fCurrentEntity = null;
@@ -631,10 +631,10 @@ public class XMLEntityManager implements XMLComponent, XMLEntityResolver {
                         final HTTPInputSource httpInputSource = (HTTPInputSource) xmlInputSource;
 
                         // set request properties
-                        Iterator propIter = httpInputSource.getHTTPRequestProperties();
+                        Iterator<Map.Entry<String, String>> propIter = httpInputSource.getHTTPRequestProperties();
                         while (propIter.hasNext()) {
-                            Map.Entry entry = (Map.Entry) propIter.next();
-                            urlConnection.setRequestProperty((String) entry.getKey(), (String) entry.getValue());
+                            Map.Entry<String, String> entry = propIter.next();
+                            urlConnection.setRequestProperty(entry.getKey(), entry.getValue());
                         }
 
                         // set preference for redirection
@@ -1053,7 +1053,6 @@ public class XMLEntityManager implements XMLComponent, XMLEntityResolver {
         String literalSystemId = resourceIdentifier.getLiteralSystemId();
         String baseSystemId = resourceIdentifier.getBaseSystemId();
         String expandedSystemId = resourceIdentifier.getExpandedSystemId();
-        String namespace = resourceIdentifier.getNamespace();
 
         // if no base systemId given, assume that it's relative
         // to the systemId of the current scanned entity
@@ -1106,7 +1105,7 @@ public class XMLEntityManager implements XMLComponent, XMLEntityResolver {
     /**
      * Starts a named entity.
      *
-     * @param reference flag to indicate whether the entity is an Entity Reference.
+     * @param isGE flag to indicate whether the entity is a General Entity
      * @param entityName The name of the entity to start.
      * @param literal    True if this entity is started within a literal
      *                   value.
@@ -1114,7 +1113,7 @@ public class XMLEntityManager implements XMLComponent, XMLEntityResolver {
      * @throws IOException  Thrown on i/o error.
      * @throws XNIException Thrown by entity handler to signal an error.
      */
-    public void startEntity(boolean reference, String entityName, boolean literal)
+    public void startEntity(boolean isGE, String entityName, boolean literal)
     throws IOException, XNIException {
 
         // was entity declared?
@@ -1238,7 +1237,7 @@ public class XMLEntityManager implements XMLComponent, XMLEntityResolver {
         }
 
         // start the entity
-        startEntity(reference, entityName, xmlInputSource, literal, external);
+        startEntity(isGE, entityName, xmlInputSource, literal, external);
 
     } // startEntity(String,boolean)
 
@@ -1287,7 +1286,7 @@ public class XMLEntityManager implements XMLComponent, XMLEntityResolver {
      * This method can be used to insert an application defined XML
      * entity stream into the parsing stream.
      *
-     * @param reference flag to indicate whether the entity is an Entity Reference.
+     * @param isGE flag to indicate whether the entity is a General Entity
      * @param name           The name of the entity.
      * @param xmlInputSource The input source of the entity.
      * @param literal        True if this entity is started within a
@@ -1297,12 +1296,12 @@ public class XMLEntityManager implements XMLComponent, XMLEntityResolver {
      * @throws IOException  Thrown on i/o error.
      * @throws XNIException Thrown by entity handler to signal an error.
      */
-    public void startEntity(boolean reference, String name,
+    public void startEntity(boolean isGE, String name,
             XMLInputSource xmlInputSource,
             boolean literal, boolean isExternal)
             throws IOException, XNIException {
 
-        String encoding = setupCurrentEntity(reference, name, xmlInputSource, literal, isExternal);
+        String encoding = setupCurrentEntity(isGE, name, xmlInputSource, literal, isExternal);
 
         //when entity expansion limit is set by the Application, we need to
         //check for the entity expansion limit set by the parser, if number of entity
@@ -2008,14 +2007,6 @@ public class XMLEntityManager implements XMLComponent, XMLEntityResolver {
 
         // system id has to be a valid URI
         if (strict) {
-
-
-            // check if there is a system id before
-            // trying to expand it.
-            if (systemId == null) {
-                return null;
-            }
-
             try {
                 // if it's already an absolute one, return it
                 new URI(systemId);
@@ -2923,7 +2914,7 @@ public class XMLEntityManager implements XMLComponent, XMLEntityResolver {
                     if (!fCurrentEntity.xmlDeclChunkRead)
                     {
                         fCurrentEntity.xmlDeclChunkRead = true;
-                        len = fCurrentEntity.DEFAULT_XMLDECL_BUFFER_SIZE;
+                        len = Entity.ScannedEntity.DEFAULT_XMLDECL_BUFFER_SIZE;
                     }
                     return fInputStream.read(b, off, len);
                 }
