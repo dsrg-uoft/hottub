@@ -1037,6 +1037,11 @@ public:
   }
   bool check_sharing_error_state();
 
+  // forkjvm
+  static fileStream* classlist_file;
+  static void record_class(Klass *k, TRAPS);
+  void re_initialize(bool safe, TRAPS);
+
 private:
   // initialization state
 #ifdef ASSERT

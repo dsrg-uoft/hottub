@@ -916,6 +916,13 @@ LoadJavaVM(const char *jvmpath, InvocationFunctions *ifn)
         return JNI_FALSE;
     }
 
+    ifn->CleanJavaVM = (CleanJavaVM_t)
+        dlsym(libjvm, "JNI_CleanJavaVM");
+    if (ifn->CleanJavaVM == NULL) {
+        JLI_ReportErrorMessage(DLL_ERROR2, jvmpath, dlerror());
+        return JNI_FALSE;
+    }
+
     return JNI_TRUE;
 }
 

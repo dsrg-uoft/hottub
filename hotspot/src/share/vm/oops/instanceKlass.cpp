@@ -171,6 +171,7 @@ HS_DTRACE_PROBE_DECL5(hotspot, class__initialization__end,
 #endif //  ndef DTRACE_ENABLED
 
 volatile int InstanceKlass::_total_instanceKlass_count = 0;
+fileStream* InstanceKlass::classlist_file = NULL;
 
 InstanceKlass* InstanceKlass::allocate_instance_klass(
                                               ClassLoaderData* loader_data,
@@ -1211,7 +1212,8 @@ void InstanceKlass::call_class_initializer_impl(instanceKlassHandle this_oop, TR
   }
 
   methodHandle h_method(THREAD, this_oop->class_initializer());
-  assert(!this_oop->is_initialized(), "we cannot initialize twice");
+  // forkjvm makes this possible
+  //assert(!this_oop->is_initialized(), "we cannot initialize twice");
   if (TraceClassInitialization) {
     tty->print("%d Initializing ", call_class_initializer_impl_counter++);
     this_oop->name()->print_value();
@@ -3845,6 +3847,63 @@ unsigned char * InstanceKlass::get_cached_class_file_bytes() {
   return VM_RedefineClasses::get_cached_class_file_bytes(_cached_class_file);
 }
 
+void InstanceKlass::record_class(Klass *k, TRAPS) {
+  // if the class isn't initialized then no reason to re-initialize it
+  if (cast(k)->is_initialized()) {
+    ResourceMark rm(THREAD);
+    InstanceKlass::classlist_file->print_cr("%s", k->name()->as_C_string());
+  }
+}
+
+/*
+void InstanceKlass::do_magic(Klass *k, TRAPS) {
+  if (!k->class_loader_data()->is_the_null_class_loader_data()) {
+    HandleMark hm(THREAD);
+    Handle nh;
+
+    // initialize will check state and return if not reset
+    InstanceKlass::cast(k)->_init_state = (u1)linked;
+
+    // do java_lang_Class::initialize_mirror_fields
+    // normally called from parseClassFile (although cscope misses this...)
+    instanceKlassHandle ikh_k (THREAD, k);
+    Handle h_jm (k->java_mirror());
+    Handle h_pd (k->protection_domain());
+    java_lang_Class::initialize_mirror_fields(ikh_k, h_jm, h_pd, CHECK);
+
+    // forcefully initialize - take matters into our own hands
+    InstanceKlass::cast(k)->initialize(CHECK);
+  }
+}
+*/
+
+void InstanceKlass::re_initialize(bool full, TRAPS) {
+
+  if (ForkJVMLog) {
+    ResourceMark rm(THREAD);
+    tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] re-initializing (full = %d): %s",
+        full, this->name()->as_C_string());
+  }
+
+  /* perform parse initialization on everything (only should do this if trapping enabled?) */
+  HandleMark hm(THREAD);
+  Handle mirror(java_mirror());
+  do_local_static_fields(&java_lang_Class::initialize_static_field, mirror, CHECK);
+
+  /* run clinit if safe */
+  if (full) {
+    instanceKlassHandle this_oop(THREAD, this);
+    this_oop->call_class_initializer(THREAD);
+
+    /* static analysis should have made any throw calls unsafe */
+    /* if other exceptions are possible our simple safe cases really shouldn't trigger them... */
+    if (HAS_PENDING_EXCEPTION) {
+      ResourceMark rm(THREAD);
+      tty->print_cr("[forkjvm][error][InstanceKlass::re_initialize] clinit exception class = %s",
+          this->name()->as_C_string());
+    }
+  }
+}
 
 // Construct a PreviousVersionNode entry for the array hung off
 // the InstanceKlass.

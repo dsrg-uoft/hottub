@@ -3944,7 +3944,10 @@ class CommandLineFlags {
                                                                             \
   product_pd(bool, PreserveFramePointer,                                    \
              "Use the FP register for holding the frame pointer "           \
-             "and not as a general purpose register.")
+             "and not as a general purpose register.")                      \
+                                                                            \
+  product(bool, ForkJVMLog, false,                                          \
+        "Enable ForkJVM logs and static analysis logs.")
 
 /*
  *  Macros for factoring of globals

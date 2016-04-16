@@ -52,6 +52,9 @@
 
 
 #include "java.h"
+// forkjvm
+#include <sys/un.h>
+#include <sys/socket.h>
 
 /*
  * A NOTE TO DEVELOPERS: For performance reasons it is important that
@@ -168,9 +171,18 @@ static jlong threadStackSize    = 0;  /* stack size of the new thread */
 static jlong maxHeapSize        = 0;  /* max heap size */
 static jlong initialHeapSize    = 0;  /* inital heap size */
 
+// forkjvm
+static jboolean forkjvm = JNI_FALSE;
+// '_' + md5 digest in hex + pool id + null
+//  1  +     16      x 2   +    1    +  1    = 35
+static char forkjvmid[35];
+static int (*clock_gettime_func)(clockid_t, struct timespec*) = NULL;
+static struct timespec start0 = {0};
+
 /*
  * Entry point.
  */
+
 int
 JLI_Launch(int argc, char ** argv,              /* main argc, argc */
         int jargc, const char** jargv,          /* java args */
@@ -185,6 +197,14 @@ JLI_Launch(int argc, char ** argv,              /* main argc, argc */
         jint ergo                               /* ergonomics class policy */
 )
 {
+    /* clock the start of jvm init and save it */
+    void* handle = dlopen("librt.so.1", RTLD_LAZY);
+    if (handle == NULL) {
+        handle = dlopen("librt.so", RTLD_LAZY);
+    }
+    clock_gettime_func = (int(*)(clockid_t, struct timespec*))dlsym(handle, "clock_gettime");
+    clock_gettime_func(CLOCK_MONOTONIC, &start0);
+
     int mode = LM_UNKNOWN;
     char *what = NULL;
     char *cpath = 0;
@@ -350,6 +370,75 @@ JLI_Launch(int argc, char ** argv,              /* main argc, argc */
         } \
     } while (JNI_FALSE)
 
+/* auto converts to abstract socket */
+int listen_sock(const char *path)
+{
+    struct sockaddr_un addr;
+    int fd;
+
+    fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd == -1) {
+        fprintf(stderr, "[forkjvm][error][listen_sock] socket | path = %s | errno = %s\n", path + 1, strerror(errno));
+        return -1;
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+    addr.sun_path[0] = '\0';
+
+    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+        fprintf(stderr, "[forkjvm][error][listen_sock] bind | path = %s | errno = %s\n", path + 1, strerror(errno));
+        return -1;
+    }
+
+    if (listen(fd, 0) == -1) {
+        fprintf(stderr, "[forkjvm][error][listen_sock] listen | path = %s | errno = %s\n", path + 1, strerror(errno));
+        return -1;
+    }
+
+    return fd;
+}
+
+ssize_t read_fd(int fd, void *ptr, size_t nbytes, int *recvfd)
+{
+    struct msghdr   msg;
+    struct iovec    iov[1];
+    ssize_t         n;
+
+    union {
+        struct cmsghdr    cm;
+        char              control[CMSG_SPACE(sizeof(int))];
+    } control_un;
+    struct cmsghdr  *cmptr;
+
+    msg.msg_control = control_un.control;
+    msg.msg_controllen = sizeof(control_un.control);
+
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+
+    iov[0].iov_base = ptr;
+    iov[0].iov_len = nbytes;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+
+    if ((n = recvmsg(fd, &msg, 0)) <= 0)
+        return n;
+
+    if ((cmptr = CMSG_FIRSTHDR(&msg)) != NULL &&
+            cmptr->cmsg_len == CMSG_LEN(sizeof(int))) {
+        if (cmptr->cmsg_level != SOL_SOCKET)
+            fprintf(stderr, "[forkjvm][error][read_fd] control level != SOL_SOCKET");
+        if (cmptr->cmsg_type != SCM_RIGHTS)
+            fprintf(stderr, "[forkjvm][error][read_fd] control type != SCM_RIGHTS");
+        *recvfd = *((int *) CMSG_DATA(cmptr));
+    } else
+        *recvfd = -1;       /* descriptor was not passed */
+
+    return n;
+}
+
 int JNICALL
 JavaMain(void * _args)
 {
@@ -474,14 +563,107 @@ JavaMain(void * _args)
     mainArgs = CreateApplicationArgs(env, argv, argc);
     CHECK_EXCEPTION_NULL_LEAVE(mainArgs);
 
+    struct timespec end0;
+    unsigned long diff0;
+    double ddiff0;
+    int run_num = 0;
+
     /* Invoke main method. */
     (*env)->CallStaticVoidMethod(env, mainClass, mainID, mainArgs);
+    clock_gettime_func(CLOCK_MONOTONIC, &end0);
+    diff0 = 1e9 * (end0.tv_sec - start0.tv_sec) + end0.tv_nsec - start0.tv_nsec;
+    ddiff0 = diff0 / 1e9;
+    fprintf(stderr, "[forkjvm][info][JavaMain] CallStaticVoidMethod | run = %d | identity = %s | diff= %luns (%fs)\n",
+            run_num, forkjvmid, diff0, ddiff0);
 
     /*
      * The launcher's exit code (in the absence of calls to
      * System.exit) will be non-zero if main threw an exception.
      */
     ret = (*env)->ExceptionOccurred(env) == NULL ? 0 : 1;
+
+    if (ret == 0 && forkjvmid[0] != '\0') {
+
+        /* backlog is set to one, so everything after the first client will get
+         * connection refused until we close client
+         */
+        int jvmfd;
+        if ((jvmfd = listen_sock(forkjvmid)) == -1)
+            ret = 1;
+
+        while (ret == 0) {
+
+            /* close server socket when doing a run */
+            int clientfd;
+            char msg[5];
+            int oldfd[3] = { 0 };
+
+            /* 1. clean up everything */
+            if (ifn.CleanJavaVM(forkjvmid)) {
+                fprintf(stderr, "[forkjvm][error][JavaMain] cleanjavavm failed | id = %s\n", forkjvmid);
+                break;
+            }
+
+            /* 2. wait for a request */
+            if ((clientfd = accept(jvmfd, NULL, NULL)) == -1) {
+                fprintf(stderr, "[forkjvm][error][JavaMain] accept | id = %s | errno = %s\n",
+                        forkjvmid, strerror(errno));
+                close(clientfd);
+                continue;
+            }
+
+            /* 3. fixup file descriptors */
+            int error = 0;
+            while(!error) {
+                int read;
+                int recvfd;
+                int fd;
+
+                read = read_fd(clientfd, msg, sizeof(msg), &recvfd);
+                if (read == -1) {
+                    fprintf(stderr, "[forkjvm][error][JavaMain] read_fd | id = %s | errno = %s\n",
+                            forkjvmid, strerror(errno));
+                    close(clientfd);
+                    error = 1;
+                    break;
+                } else if (recvfd == -1) {
+                    /* done */
+                    break;
+                } else {
+                    fd = atoi(msg);
+                    oldfd[fd] = dup(fd);
+                    dup2(recvfd, fd);
+                    close(recvfd);
+                }
+            }
+            if (error)
+                continue;
+
+            /* 4. run main */
+            struct timespec start1, end1;
+            unsigned long diff1;
+            double ddiff1;
+
+            run_num++;
+            clock_gettime_func(CLOCK_MONOTONIC, &start1);
+            (*env)->CallStaticVoidMethod(env, mainClass, mainID, mainArgs);
+            clock_gettime_func(CLOCK_MONOTONIC, &end1);
+            diff1 = 1e9 * (end1.tv_sec - start1.tv_sec) + end1.tv_nsec - start1.tv_nsec;
+            ddiff1 = diff1 / 1e9;
+            fprintf(stderr, "[forkjvm][info][JavaMain] CallStaticVoidMethod | run = %d | identity= %s | diff= %luns (%fs)\n",
+                    run_num, forkjvmid, diff1, ddiff1);
+
+            ret = (*env)->ExceptionOccurred(env) == NULL ? 0 : 1;
+
+            int i;
+            for (i = 0; i < 3; i++) {
+                dup2(oldfd[i], i);
+                close(oldfd[i]);
+            }
+            close(clientfd);
+        }
+        close(jvmfd);
+    }
     LEAVE();
 }
 
@@ -1157,6 +1339,11 @@ ParseArguments(int *pargc, char ***pargv,
             ; /* Processing of platform dependent options */
         } else if (RemovableOption(arg)) {
             ; /* Do not pass option to vm. */
+        } else if (JLI_StrCmp(arg, "-forkjvm") == 0) {
+            forkjvm = JNI_TRUE;
+        } else if (JLI_StrCCmp(arg, "-forkjvmid=") == 0) {
+            char *p = arg + 11;
+            strcpy(forkjvmid, p);
         } else {
             AddOption(arg, NULL);
         }

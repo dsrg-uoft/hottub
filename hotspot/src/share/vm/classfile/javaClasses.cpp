@@ -485,7 +485,7 @@ void java_lang_String::print(oop java_string, outputStream* st) {
 }
 
 
-static void initialize_static_field(fieldDescriptor* fd, Handle mirror, TRAPS) {
+void java_lang_Class::initialize_static_field(fieldDescriptor* fd, Handle mirror, TRAPS) {
   assert(mirror.not_null() && fd->is_static(), "just checking");
   if (fd->has_initial_value()) {
     BasicType t = fd->field_type();

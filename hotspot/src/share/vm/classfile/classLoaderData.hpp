@@ -74,6 +74,7 @@ class ClassLoaderDataGraph : public AllStatic {
   static void post_class_unload_events(void);
   static void clean_metaspaces();
  public:
+  static ClassLoaderData* get_head() { return  _head; }
   static ClassLoaderData* find_or_create(Handle class_loader, TRAPS);
   static void purge();
   static void clear_claimed_marks();
@@ -189,7 +190,6 @@ class ClassLoaderData : public CHeapObj<mtClass> {
   static Metaspace* _rw_metaspace;
 
   void set_next(ClassLoaderData* next) { _next = next; }
-  ClassLoaderData* next() const        { return _next; }
 
   ClassLoaderData(Handle h_class_loader, bool is_anonymous, Dependencies dependencies);
   ~ClassLoaderData();
@@ -219,6 +219,7 @@ class ClassLoaderData : public CHeapObj<mtClass> {
   MetaWord* allocate(size_t size);
 
  public:
+  ClassLoaderData* next() const        { return _next; }
 
   bool is_alive(BoolObjectClosure* is_alive_closure) const;
 
