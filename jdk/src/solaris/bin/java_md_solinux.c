@@ -901,6 +901,18 @@ LoadJavaVM(const char *jvmpath, InvocationFunctions *ifn)
         JLI_ReportErrorMessage(DLL_ERROR2, jvmpath, dlerror());
         return JNI_FALSE;
     }
+    ifn->CallingJavaMain = (CallingJavaMain_t)
+        dlsym(libjvm, "JNI_CallingJavaMain");
+    if (ifn->CallingJavaMain == NULL) {
+        JLI_ReportErrorMessage(DLL_ERROR2, jvmpath, dlerror());
+        return JNI_FALSE;
+    }
+    ifn->FinishedJavaMain = (CallingJavaMain_t)
+        dlsym(libjvm, "JNI_FinishedJavaMain");
+    if (ifn->FinishedJavaMain == NULL) {
+        JLI_ReportErrorMessage(DLL_ERROR2, jvmpath, dlerror());
+        return JNI_FALSE;
+    }
 
     ifn->GetDefaultJavaVMInitArgs = (GetDefaultJavaVMInitArgs_t)
         dlsym(libjvm, "JNI_GetDefaultJavaVMInitArgs");

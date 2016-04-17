@@ -189,7 +189,7 @@ void CodeBlob::flush() {
   _strings.free();
 }
 
-
+#include "runtime/_bdel.hpp"
 OopMap* CodeBlob::oop_map_for_return_address(address return_address) {
   assert(oop_maps() != NULL, "nope");
   return oop_maps()->find_map_at_offset((intptr_t) return_address - (intptr_t) code_begin());

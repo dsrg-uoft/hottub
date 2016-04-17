@@ -614,7 +614,7 @@ class CommandLineFlags {
   develop(bool, TraceItables, false,                                        \
           "Trace initialization and use of itables")                        \
                                                                             \
-  develop(bool, TracePcPatching, false,                                     \
+  product(bool, TracePcPatching, false,                                     \
           "Trace usage of frame::patch_pc")                                 \
                                                                             \
   develop(bool, TraceJumps, false,                                          \
@@ -720,7 +720,7 @@ class CommandLineFlags {
   product(bool, UseCRC32Intrinsics, false,                                  \
           "use intrinsics for java.util.zip.CRC32")                         \
                                                                             \
-  develop(bool, TraceCallFixup, false,                                      \
+  product(bool, TraceCallFixup, false,                                      \
           "Trace all call fixups")                                          \
                                                                             \
   develop(bool, DeoptimizeALot, false,                                      \
@@ -950,6 +950,18 @@ class CommandLineFlags {
                                                                             \
   product(bool, PrintCompilation, false,                                    \
           "Print compilations")                                             \
+                                                                            \
+  product(bool, PrintForcedCompileTime, false,                              \
+          "-Xcomp flag")                                                    \
+                                                                            \
+  product(bool, ProfileIntComp, false,                                      \
+          "Profiling interpreter time")                                     \
+                                                                            \
+  product(bool, ProfileIntCompTrace, false,                                 \
+          "Profiling interpreter time, debug logs")                         \
+                                                                            \
+  product(bool, ProfileIntCompStrict, false,                                \
+          "Profiling interpreter time, strict sanity checks")               \
                                                                             \
   diagnostic(bool, TraceNMethodInstalls, false,                             \
           "Trace nmethod installation")                                     \
@@ -1360,7 +1372,7 @@ class CommandLineFlags {
   develop(bool, TraceOopMapRewrites, false,                                 \
           "Trace rewriting of method oops during oop map generation")       \
                                                                             \
-  develop(bool, TraceSafepoint, false,                                      \
+  product(bool, TraceSafepoint, false,                                      \
           "Trace safepoint operations")                                     \
                                                                             \
   develop(bool, TraceICBuffer, false,                                       \
@@ -2933,10 +2945,10 @@ class CommandLineFlags {
           "Prefetch instruction to prefetch ahead of allocation pointer")   \
                                                                             \
   /* deoptimization */                                                      \
-  develop(bool, TraceDeoptimization, false,                                 \
+  product(bool, TraceDeoptimization, false,                                 \
           "Trace deoptimization")                                           \
                                                                             \
-  develop(bool, DebugDeoptimization, false,                                 \
+  product(bool, DebugDeoptimization, false,                                 \
           "Tracing various information while debugging deoptimization")     \
                                                                             \
   product(intx, SelfDestructTimer, 0,                                       \

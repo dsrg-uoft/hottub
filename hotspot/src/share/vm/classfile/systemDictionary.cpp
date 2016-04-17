@@ -68,6 +68,8 @@
 #include "trace/tracing.hpp"
 #endif
 
+#include "runtime/_bdel.hpp"
+
 Dictionary*            SystemDictionary::_dictionary          = NULL;
 PlaceholderTable*      SystemDictionary::_placeholders        = NULL;
 Dictionary*            SystemDictionary::_shared_dictionary   = NULL;
@@ -416,6 +418,7 @@ void SystemDictionary::validate_protection_domain(instanceKlassHandle klass,
   }
 
   KlassHandle system_loader(THREAD, SystemDictionary::ClassLoader_klass());
+  _native_call_begin((JavaThread*) THREAD, NULL, 6);
   JavaCalls::call_special(&result,
                          class_loader,
                          system_loader,
@@ -424,6 +427,7 @@ void SystemDictionary::validate_protection_domain(instanceKlassHandle klass,
                          Handle(THREAD, klass->java_mirror()),
                          protection_domain,
                          THREAD);
+  _native_call_end((JavaThread*) THREAD, NULL, 6);
 
   if (TraceProtectionDomainVerification) {
     if (HAS_PENDING_EXCEPTION) {
@@ -1325,6 +1329,13 @@ instanceKlassHandle SystemDictionary::load_instance_class(Symbol* class_name, Ha
     //
     // Added MustCallLoadClassInternal in case we discover in the field
     // a customer that counts on this call
+    _native_call_begin((JavaThread*) THREAD, NULL, 70);
+
+    /*
+     * # bdel notes
+     * in `exceptions.hpp`
+     * `#define CHECK_(result) THREAD); if (HAS_PENDING_EXCEPTION) return result; (void)(0`
+     */
     if (MustCallLoadClassInternal && has_loadClassInternal()) {
       JavaCalls::call_special(&result,
                               class_loader,
@@ -1332,7 +1343,12 @@ instanceKlassHandle SystemDictionary::load_instance_class(Symbol* class_name, Ha
                               vmSymbols::loadClassInternal_name(),
                               vmSymbols::string_class_signature(),
                               string,
-                              CHECK_(nh));
+      //                        CHECK_(nh));
+                              THREAD);
+     if (HAS_PENDING_EXCEPTION) {
+       _native_call_end((JavaThread*) THREAD, NULL, 71);
+       return nh;
+     }
     } else {
       JavaCalls::call_virtual(&result,
                               class_loader,
@@ -1340,8 +1356,14 @@ instanceKlassHandle SystemDictionary::load_instance_class(Symbol* class_name, Ha
                               vmSymbols::loadClass_name(),
                               vmSymbols::string_class_signature(),
                               string,
-                              CHECK_(nh));
+      //                        CHECK_(nh));
+                              THREAD);
+     if (HAS_PENDING_EXCEPTION) {
+       _native_call_end((JavaThread*) THREAD, NULL, 71);
+       return nh;
+     }
     }
+    _native_call_end((JavaThread*) THREAD, NULL, 70);
 
     assert(result.get_type() == T_OBJECT, "just checking");
     oop obj = (oop) result.get_jobject();
@@ -1405,7 +1427,9 @@ void SystemDictionary::define_instance_class(instanceKlassHandle k, TRAPS) {
     JavaValue result(T_VOID);
     JavaCallArguments args(class_loader_h);
     args.push_oop(Handle(THREAD, k->java_mirror()));
+    _native_call_begin((JavaThread*) THREAD, NULL, 8);
     JavaCalls::call(&result, m, &args, CHECK);
+    _native_call_end((JavaThread*) THREAD, NULL, 8);
   }
 
   // Add the new class. We need recompile lock during update of CHA.

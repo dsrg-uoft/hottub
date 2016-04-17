@@ -48,6 +48,8 @@ HS_DTRACE_PROBE_DECL3(hotspot, vmops__end, char *, uintptr_t, int);
 
 PRAGMA_FORMAT_MUTE_WARNINGS_FOR_GCC
 
+#include "runtime/_bdel.hpp"
+
 // Dummy VM operation to act as first element in our circular double-linked list
 class VM_Dummy: public VM_Operation {
   VMOp_Type type() const { return VMOp_Dummy; }

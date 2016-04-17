@@ -101,6 +101,622 @@ SafepointBlob*      SharedRuntime::_polling_page_return_handler_blob;
 UncommonTrapBlob*   SharedRuntime::_uncommon_trap_blob;
 #endif // COMPILER2
 
+#include "runtime/_bdel.hpp"
+#include "utilities/defaultStream.hpp"
+
+/*
+ * time in nanoseconds
+ */
+uint64_t _now() {
+  struct timespec ts;
+  int status = clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (uint64_t) ts.tv_sec * (1000 * 1000 * 1000) + (uint64_t) ts.tv_nsec;
+}
+/*
+ * transition to state s2, updating timers
+ */
+void _jvm_transitions_clock(JavaThread* jt, int8_t s2) {
+  uint64_t t = _now();
+  if (_unlikely(t < jt->_jvm_state_last_timestamp)) {
+    tty->print_cr("_HOTSPOT: transitioning %lu, %lu", t, jt->_jvm_state_last_timestamp);
+    ShouldNotReachHere();
+  }
+  jt->_jvm_state_times[jt->_jvm_state & 1] += t - jt->_jvm_state_last_timestamp;
+  jt->_jvm_state_last_timestamp = t;
+  jt->_jvm_state = s2;
+}
+/*
+ * print JVM state stack
+ */
+static void _jvm_transitions_dump(JavaThread* jt) {
+  tty->print_cr("_HOTSPOT: dumping jvm transitions for %p", jt);
+  for (int i = jt->_jvm_transitions_pos - 1; i >= 0; i++) {
+    tty->print_cr("%d: %d", i, jt->_jvm_transitions[i]);
+  }
+  _i2c_dump_stack(jt);
+  _c2i_dump_stack(jt);
+}
+/*
+ * transition to state s2 (may already be in s2)
+ */
+static void _jvm_transitions_push(JavaThread* jt, int8_t to_state) {
+  if (_unlikely(jt->_jvm_transitions_pos >= _JVM_TRANSITIONS_SIZE)) {
+    tty->print_cr("_HOTSPOT: jvm transitions overflowed");
+    _jvm_transitions_dump(jt);
+    ShouldNotReachHere();
+  }
+  jt->_jvm_transitions[jt->_jvm_transitions_pos++] = jt->_jvm_state;
+  if (_unlikely(to_state != jt->_jvm_state)) {
+    _jvm_transitions_clock(jt, to_state);
+  }
+  jt->_jvm_transitions_max = _MAX(jt->_jvm_transitions_max, jt->_jvm_transitions_pos);
+}
+/*
+ * pop off state from stack, and potentially transition to state s2
+ */
+static void _jvm_transitions_pop(JavaThread* jt) {
+  if (_unlikely(jt->_jvm_transitions_pos <= 0)) {
+    tty->print_cr("_HOTSPOT: jvm transitions underflowed");
+    ShouldNotReachHere();
+  }
+  int8_t from_state = jt->_jvm_transitions[--(jt->_jvm_transitions_pos)];
+  if (_unlikely(from_state != jt->_jvm_state)) {
+    _jvm_transitions_clock(jt, from_state);
+  }
+}
+/*
+ * called when thread exits
+ */
+void _bdel_knell(const char* str) {
+  JavaThread* jt = JavaThread::current();
+  if (PrintForcedCompileTime) {
+    tty->print_cr("[thread exit] (%s, %ld): Blocking compilation took %.6fs", str, _bdel_sys_gettid(), jt->_blocking_compile_time * 1.0 / 1e9);
+  }
+  if (ProfileIntComp && ProfileIntCompStrict) {
+    if (jt->_jvm_transitions_pos != 0 || jt->_i2c_stack_pos != 0 || jt->_c2i_stack_pos != 0) {
+      tty->print_cr(
+        "Profiling int/comp time, transitions did not end at 0! transitions %d, i2c %d, c2i %d"
+        , jt->_jvm_transitions_pos
+        , jt->_i2c_stack_pos
+        , jt->_c2i_stack_pos
+      );
+    }
+  }
+}
+
+extern "C" {
+  /*
+   * jt - java thread, need tls
+   * ret - return address
+   * rbp - where return address will be stored on the stack (I know it's not really rbp)
+   * m - method, for debugging purposes
+   *
+   * returns return address to put on stack (usually address of i2c return handler)
+   */
+  void* _i2c_ret_push(JavaThread* jt, void* ret, void* rbp, Method* m) {
+    if (_unlikely(!jt->is_Java_thread())) {
+      tty->print_cr("_HOTSPOT: i2c push not in java thread");
+      ShouldNotReachHere();
+    }
+    if (_unlikely(!jt->_jvm_state_ready)) {
+      // some weird stuff happens while the JVM is starting up
+      // _jvm_state_ready is updated in `JNI_CallingJavaMain` which is called from the JDK side before calling `main`
+      // if JVM is not ready yet, return the original/real address; don't do profiling
+      return ret;
+    }
+    if (_unlikely(jt->_i2c_stack_pos >= _I2C_STACK_SIZE)) {
+      tty->print_cr("_HOTSPOT: i2c stack overflowed");
+      ShouldNotReachHere();
+    }
+    jt->_i2c_rbp_stack[jt->_i2c_stack_pos] = rbp;
+    jt->_i2c_ret_stack[jt->_i2c_stack_pos++] = ret;
+    jt->_i2c_stack_max = _MAX(jt->_i2c_stack_max, jt->_i2c_stack_pos);
+
+    _jvm_transitions_push(jt, 1);
+    return (void*) &_i2c_ret_handler;
+  }
+  _rax_rdx _i2c_ret_pop(JavaThread* jt) {
+    if (_unlikely(jt->_i2c_stack_pos <= 0)) {
+      tty->print_cr("_HOTSPOT: i2c stack underflowed");
+      ShouldNotReachHere();
+    }
+    _rax_rdx ret;
+    ret.rdx = jt->_i2c_rbp_stack[--(jt->_i2c_stack_pos)];
+    ret.rax = jt->_i2c_ret_stack[jt->_i2c_stack_pos];
+
+    _jvm_transitions_pop(jt);
+    return ret;
+  }
+  void* _i2c_ret_verify_location_and_pop(JavaThread* jt, void* rbp) {
+    _rax_rdx ret = _i2c_ret_pop(jt);
+    if (_unlikely(rbp != ret.rdx)) {
+      tty->print_cr("_HOTSPOT: i2c ret verify location and pop check failed; rbp is %p, expected is %p, was %ld bytes deeper", rbp, ret.rdx, (int64_t) rbp - (int64_t) ret.rdx);
+      tty->print_cr("_HOTSPOT: position is %d", jt->_i2c_stack_pos);
+      int found = 0;
+      for (int i = 0; i < 128; i++) {
+        if (jt->_i2c_rbp_stack[i] == rbp) {
+          tty->print_cr("_HOTSPOT: found match at %d", i);
+          found = 1;
+          break;
+        }
+      }
+      if (!found) {
+        tty->print_cr("_HOTSPOT: not found");
+        for (int i = 0; i < 128; i++) {
+          int64_t x = (int64_t) jt->_i2c_rbp_stack[i];
+          int64_t y = (int64_t) rbp;
+          if ((x - y < 40) || (y - x < 40)) {
+            tty->print_cr("_HOTSPOT: found close at %d", i);
+            break;
+          }
+        }
+        tty->print_cr("_HOTSPOT: checked close");
+      }
+      _i2c_dump_stack(jt);
+      ShouldNotReachHere();
+    }
+    return ret.rax;
+  }
+  void _i2c_ret_handler() {
+    // ===============================
+    // | bottom of stack/top address |
+    // | ...                         | _<- rsp entering this, aligned 16 bytes
+    // | rbp pushed by gcc (was callee's return address, this's address) | _<- current rbp
+    // | was callee's rbp, will be rax (saved)
+    // | will be rdx (saved)
+    // | will be garbage, so that _<- will be aligned 16 bytes for call
+    // | ...
+    // | top of stack                |
+    // ===============================
+    // - because we need to save `rax` and `rdx`, we need to push them onto the stack at the start
+    //   because we modify rsp, if we wrote C code with local variables, their offsets would be wrong
+    //   therefore, it's best this function only uses assembly
+    // - calling functions is okay because any caller saved registers could have been mangled
+    //   by the called compiled function we are returning from anyways
+    asm(
+      // save return registers
+      "push %rax\n"
+      "\tpush %rdx\n"
+      // align stack
+      "\tlea -8(%rsp), %rsp\n"
+      // arguments
+      "\tmov %r15, %rdi\n"
+      "\tmov %rbp, %rsi\n"
+      // call
+      "\tcallq _i2c_ret_verify_location_and_pop\n"
+      // save return address
+      "\tmov %rax, %r11\n"
+      // fix stack
+      "\tlea 8(%rsp), %rsp\n"
+      // restore return registers
+      "\tpop %rdx\n"
+      "\tpop %rax\n"
+      // slip return address where expected
+      "\tpop %rbp\n"
+      "\tpush %r11\n"
+      "\tpush %rbp\n"
+    );
+  }
+  /*
+   * called before entering osr
+   *
+   * - OSR is not just a loop compilation; it replaced the loop and the rest of the method
+   * - the interpreted stack frame replaced by compiled frame
+   * - if the interpreted function's caller was compiled (we had c2i), the return is really return c2c
+   */
+  void* _i2c_osr(JavaThread* jt, void* ret, void* rbp, void* sender_sp, nmethod* nm) {
+    if (_unlikely(!jt->_jvm_state_ready)) {
+      return ret;
+    }
+    if (ret == (void*) &_c2i_ret_handler) {
+      // our caller did c2i; we're completely leaving interpreted
+      return _c2i_ret_verify_location_and_pop(jt, rbp, -42);
+    } else {
+      // when this OSR piece returns, it's an i2c return (going back to i)
+      // this expression comes from the osr stuff in `TemplateTable::branch`
+      void** rbp = (void**) ((intptr_t) sender_sp & (intptr_t) -StackAlignmentInBytes) - 1;
+      return _i2c_ret_push(jt, ret, rbp, nm->method());
+    }
+  }
+  /*
+   * going i2n, if `opposite != 0`, actually n2i
+   */
+  void _native_call_begin(JavaThread* jt, Method* m, int opposite) {
+    if (_unlikely(!jt->_jvm_state_ready)) {
+      return;
+    }
+    if (opposite) {
+      // n2i
+      _jvm_transitions_push(jt, 0);
+    } else {
+      // i2n
+      _jvm_transitions_push(jt, 3);
+    }
+  }
+  /*
+   * returning i2n (back to i), if `opposite != 0`, actually n2i
+   */
+  void _native_call_end(JavaThread* jt, Method* m, int opposite) {
+    if (_unlikely(!jt->_jvm_state_ready)) {
+      return;
+    }
+    _jvm_transitions_pop(jt);
+  }
+  /*
+   * undo all our changes to the return addresses so the JVM sees the real call trace
+   */
+  void _i2c_unpatch(JavaThread* jt, const char* where) {
+    if (jt->_bdel_safepoint++) {
+      return;
+    }
+    if (jt->_i2c_stack_pos != 0) {
+      if (ProfileIntCompTrace) {
+        tty->print_cr("_HOTSPOT %ld: beginning i2c unpatch of %d levels (%s)", _bdel_sys_gettid(), jt->_i2c_stack_pos, where);
+      }
+    }
+    int badness = 0;
+    for (int i = 0; i < jt->_i2c_stack_pos; i++) {
+      void** location = (void**) jt->_i2c_rbp_stack[i];
+      if (_likely(*location == (void*) &_i2c_ret_handler)) {
+        // replace with real/original return address
+        *location = jt->_i2c_ret_stack[i];
+      } else {
+        // did not find return address where expected
+        badness = 1;
+        tty->print_cr("_HOTSPOT: i2c unpatch bad at %d", i);
+      }
+    }
+    if (badness) {
+      tty->print_cr("_HOTSPOT %ld: i2c unpatch faulty (%s)", _bdel_sys_gettid(), where);
+      _i2c_dump_stack(jt);
+      ShouldNotReachHere();
+    } else if (jt->_i2c_stack_pos != 0) {
+      if (ProfileIntCompTrace) {
+        tty->print_cr("_HOTSPOT %ld: done i2c unpatch of %d levels (%s)", _bdel_sys_gettid(), jt->_i2c_stack_pos, where);
+      }
+    }
+    if (jt->_c2i_stack_pos != 0) {
+      if (ProfileIntCompTrace) {
+        tty->print_cr("_HOTSPOT %ld: beginning c2i unpatch of %d levels (%s)", _bdel_sys_gettid(), jt->_c2i_stack_pos, where);
+      }
+    }
+    // exact same logic for c2i
+    for (int i = 0; i < jt->_c2i_stack_pos; i++) {
+      void** location = (void**) jt->_c2i_rbp_stack[i];
+      if (_likely(*location == (void*) &_c2i_ret_handler)) {
+        *location = jt->_c2i_ret_stack[i];
+      } else {
+        badness = 1;
+        tty->print_cr("_HOTSPOT: c2i unpatch bad at %d", i);
+      }
+    }
+    if (badness) {
+      tty->print_cr("_HOTSPOT %ld: c2i unpatch faulty (%s)", _bdel_sys_gettid(), where);
+      _c2i_dump_stack(jt);
+      ShouldNotReachHere();
+    } else if (jt->_c2i_stack_pos != 0) {
+      if (ProfileIntCompTrace) {
+        tty->print_cr("_HOTSPOT %ld: done c2i unpatch of %d levels (%s)", _bdel_sys_gettid(), jt->_c2i_stack_pos, where);
+      }
+    }
+  }
+  /*
+   * redo our changes to return addresses after done inspecting stack
+   */
+  void _i2c_repatch(JavaThread* jt, const char* where) {
+    if (--jt->_bdel_safepoint) {
+      return;
+    }
+    if (jt->_i2c_stack_pos != 0) {
+      if (ProfileIntCompTrace) {
+        tty->print_cr("_HOTSPOT %ld: beginning i2c repatch of %d levels (%s)", _bdel_sys_gettid(), jt->_i2c_stack_pos, where);
+      }
+    }
+    int badness = 0;
+    for (int i = 0; i < jt->_i2c_stack_pos; i++) {
+      void** location = (void**) jt->_i2c_rbp_stack[i];
+      if (_likely(*location == (void*) jt->_i2c_ret_stack[i])) {
+        // replace return address with our handler
+        *location = (void*) &_i2c_ret_handler;
+      } else {
+        // did not find what we replaced
+        badness = 1;
+      }
+    }
+    if (badness) {
+      tty->print_cr("_HOTSPOT %ld: i2c unpatch faulty (%s)", _bdel_sys_gettid(), where);
+      _i2c_dump_stack(jt);
+      ShouldNotReachHere();
+    } else {
+      if (ProfileIntCompTrace) {
+        tty->print_cr("_HOTSPOT %ld: done i2c repatch of %d levels (%s)", _bdel_sys_gettid(), jt->_i2c_stack_pos, where);
+      }
+    }
+    // exact same logic for c2i
+    if (jt->_c2i_stack_pos != 0) {
+      if (ProfileIntCompTrace) {
+        tty->print_cr("_HOTSPOT %ld: beginning c2i repatch of %d levels (%s)", _bdel_sys_gettid(), jt->_c2i_stack_pos, where);
+      }
+    }
+    for (int i = 0; i < jt->_c2i_stack_pos; i++) {
+      void** location = (void**) jt->_c2i_rbp_stack[i];
+      if (_likely(*location == (void*) jt->_c2i_ret_stack[i])) {
+        *location = (void*) &_c2i_ret_handler;
+      } else {
+        badness = 1;
+      }
+    }
+    if (badness) {
+      tty->print_cr("_HOTSPOT %ld: c2i repatch faulty (%s)", _bdel_sys_gettid(), where);
+      _c2i_dump_stack(jt);
+      ShouldNotReachHere();
+    } else if (jt->_c2i_stack_pos != 0) {
+      if (ProfileIntCompTrace) {
+        tty->print_cr("_HOTSPOT %ld: done c2i repatch of %d levels (%s)", _bdel_sys_gettid(), jt->_c2i_stack_pos, where);
+      }
+    }
+  }
+  /*
+   * jt - java thread
+   * ret - return address
+   * rbp - where return address will be saved (not actually rbp)
+   * m - for debugging purposes
+   */
+  void* _c2i_ret_push(JavaThread* jt, void* ret, void* rbp, Method* m) {
+    if (_unlikely(!jt->is_Java_thread())) {
+      tty->print_cr("_HOTSPOT: c2i push not in java thread");
+      ShouldNotReachHere();
+    }
+    if (_unlikely(!jt->_jvm_state_ready)) {
+      // see `i2c_ret_push`
+      return ret;
+    }
+    if (_unlikely(jt->_c2i_stack_pos >= _I2C_STACK_SIZE)) {
+      tty->print_cr("_HOTSPOT: c2i stack overflowed");
+      ShouldNotReachHere();
+    }
+    // debugging purposes
+    jt->_c2i_method_stack[jt->_c2i_stack_pos] = m;
+    jt->_c2i_rbp_stack[jt->_c2i_stack_pos] = rbp;
+    jt->_c2i_ret_stack[jt->_c2i_stack_pos++] = ret;
+
+    _jvm_transitions_push(jt, 0);
+    return (void*) &_c2i_ret_handler;
+  }
+  /*
+   * nothing interesting here
+   */
+  _rax_rdx _c2i_ret_pop(JavaThread* jt, int where) {
+    if (_unlikely(jt->_c2i_stack_pos <= 0)) {
+      tty->print_cr("_HOTSPOT %ld: c2i stack underflowed, c2i handler is %p", _bdel_sys_gettid(), (void*) &_c2i_ret_handler);
+      ShouldNotReachHere();
+    }
+    _rax_rdx ret;
+    ret.rdx = jt->_c2i_rbp_stack[--(jt->_c2i_stack_pos)];
+    ret.rax = jt->_c2i_ret_stack[jt->_c2i_stack_pos];
+
+    _jvm_transitions_pop(jt);
+    return ret;
+  }
+  /*
+   * nothing interesting
+   */
+  void* _c2i_ret_verify_location_and_pop(JavaThread* jt, void* rbp, int where) {
+    _rax_rdx ret = _c2i_ret_pop(jt, where);
+    if (_unlikely(rbp != ret.rdx)) {
+      tty->print_cr("_HOTSPOT: c2i ret verify location and pop check failed (%d); rbp is %p, expected is %p, was %ld bytes deeper", where, rbp, ret.rdx, (int64_t) rbp - (int64_t) ret.rdx);
+      jt->_c2i_stack_pos += 1;
+      _c2i_dump_stack(jt);
+      jt->_c2i_stack_pos -= 1;
+      ShouldNotReachHere();
+    }
+    return ret.rax;
+  }
+  /*
+   * for a compiled function, the last thing it does is `ret`, which pops the return address of the stack, and jumps to it
+   * for an interpreted function, it pops the return address, does `rsp <- r13` (sender sp), and then jumps to the return address
+   *
+   * whereas for i2c, `rsp` on entry is one word above where the return address was,
+   * we don't know anything about where the return address was for interpreted calls
+   *
+   * this is because the interpreter calling convention is different and needs both `sender sp` and `rbp`
+   */
+  void _c2i_ret_handler() {
+    tty->print_cr("_HOTSPOT: in c2i ret handler");
+    ShouldNotReachHere();
+  }
+  /*
+   * in `templateInterpreter_x86_64.cpp`, `InterpreterGenerator#generate_normal_entry`, the return address gets moved below locals
+   * so that parameters and locals can be accessed uniformly
+   *
+   * this function is basically a helper for `_c2i_ret_verify_location_and_pop` for this case of "moving" the return address
+   */
+  void* _c2i_ret_verify_and_update_location(JavaThread* jt, void* rbp, int64_t locals, Method* m) {
+    _rax_rdx ret = _c2i_ret_pop(jt, -10);
+    if (_unlikely((int64_t) ret.rdx - (int64_t) rbp != locals * (int64_t) sizeof(void*))) {
+      tty->print_cr(
+        "_HOTSPOT (%ld): c2i ret verify and update location check failed for %s#%s, saved rbp %p, locals %d, current rbp %p"
+        , _bdel_sys_gettid()
+        , m->klass_name()->as_C_string()
+        , m->name()->as_C_string()
+        , ret.rdx
+        , locals
+        , rbp
+      );
+      ShouldNotReachHere();
+    }
+    _c2i_ret_push(jt, ret.rax, rbp, m);
+    return ret.rax;
+  }
+  /*
+   * when a function gets deoptimized, it may resume execution as interpreted
+   * the compiled function may consist of multiple inlined functions
+   * anyways, the JVM "unpacks" the stack frame for that deoptimized function (see `SharedRuntime::generate_deopt_blob`)
+   *
+   * if the caller of the deoptimized function was interpreted,
+   * the frame walking code (`frame::sender_for_compiled_frame`) should find the i2c address and it's effectively a return (to interpreted)
+   * when the now-interpreted function returns, it goes back to interpreted caller, and it's all good
+   *
+   * if the caller of the deoptimized function was compiled, we need to "insert" a c2i,
+   * so when the now-interpreted function returns, it goes back to compiled state
+   * this is done in `Deoptimization::UnrollBlock::fetch_unroll_info_helper`
+   * however, at the time of that code, we don't know where the return address will be placed
+   * `SharedRuntime::generate_deopt_blob` makes a call to `Deoptimization::UnrollBlock::fetch_unroll_info_helper`
+   * it manually writes the skeleton of frames onto the stack (return address + rbp + adjusting rsp accordingly)
+   * in that loop, we call `_c2i_deopt_bless` for each return address, which checks if it was the c2i return handler address
+   * if so, we now can record where it was stored on the stack
+   *
+   * the same stuff also applies to `SharedRuntime::generate_uncommon_trap_blob`
+   */
+  void _c2i_deopt_bless(JavaThread* jt, void* ret, void* rbp, int where, int frame, int total) {
+    if (ret == (void*) &_c2i_ret_handler) {
+      _rax_rdx ret = _c2i_ret_pop(jt, -11);
+      if (_unlikely(ret.rdx != 0)) {
+        tty->print_cr("_HOTSPOT %ld: c2i deopt bless found handler, but popped expected location nonzero %p with return address %p, %d, %d, rbp %p", _bdel_sys_gettid(), ret.rdx, ret.rax, frame, total, rbp);
+        _c2i_dump_stack(jt);
+        ShouldNotReachHere();
+      }
+      _c2i_ret_push(jt, ret.rax, rbp, NULL);
+    }
+  }
+  /*
+   * in a safepoint, we might change the pc of a function for deoptimization
+   * we did unpatching at the start of the safepoint, and at the end we'll repatch, trying to verify the values of return addresses on the stack
+   * if we patched the return address, we need to reflect changes in our "real stack" (also so that repatching doesn't get confused that it found a different value)
+   */
+  void _i2c_patch_pc(JavaThread* jt, void** loc, void* target) {
+    for (int i = 0; i < jt->_i2c_stack_pos; i++) {
+      if (jt->_i2c_rbp_stack[i] == loc) {
+        if (*loc == jt->_i2c_ret_stack[i]) {
+          jt->_i2c_ret_stack[i] = target;
+        } else {
+          tty->print_cr(
+            "_HOTSPOT %ld: i2c patch pc bad at %d, loc %p, target %p, expected %p, found %p"
+            , _bdel_sys_gettid()
+            , i
+            , loc
+            , target
+            , jt->_i2c_ret_stack[i]
+            , *loc
+          );
+          _i2c_dump_stack(jt);
+          ShouldNotReachHere();
+        }
+        return;
+      }
+    }
+    //tty->print_cr("_HOTSPOT %ld: i2c patch pc at %p not found", _bdel_sys_gettid(), loc);
+    //_i2c_dump_stack(jt);
+  }
+  /*
+   * same as `_i2c_patch_pc`
+   */
+  void _c2i_patch_pc(JavaThread* jt, void** loc, void* target) {
+    for (int i = 0; i < jt->_c2i_stack_pos; i++) {
+      if (jt->_c2i_rbp_stack[i] == loc) {
+        if (*loc == jt->_c2i_ret_stack[i]) {
+          jt->_c2i_ret_stack[i] = target;
+        } else {
+          tty->print_cr(
+            "_HOTSPOT %ld: c2i patch pc bad at %d, loc %p, target %p, expected %p, found %p"
+            , _bdel_sys_gettid()
+            , i
+            , loc
+            , target
+            , jt->_c2i_ret_stack[i]
+            , *loc
+          );
+          _c2i_dump_stack(jt);
+          ShouldNotReachHere();
+        }
+        return;
+      }
+    }
+    //tty->print_cr("_HOTSPOT %ld: c2i patch pc at %p not found", _bdel_sys_gettid(), loc);
+    //_c2i_dump_stack(jt);
+  }
+}
+/*
+ * used for sanity checks
+ */
+JRT_LEAF(int, SharedRuntime::_method_entry(JavaThread* thread, Method* method))
+  if (_unlikely(!thread->_jvm_state_ready)) {
+    return 0;
+  }
+  if (method->is_native()) {
+    //_native_call_begin(thread, method, 0);
+    return 0;
+  }
+  if (thread->_jvm_state != 0) {
+    tty->print_cr("Profiling int/comp, method %s#%s has failed this city!", method->klass_name()->as_C_string(), method->name()->as_C_string());
+    ShouldNotReachHere();
+  }
+  return 0;
+JRT_END
+
+/*
+ * not currently used
+ */
+JRT_LEAF(int, SharedRuntime::_method_exit(JavaThread* thread, Method* method))
+  return 0;
+JRT_END
+
+extern "C" {
+  void _i2c_dump_stack(JavaThread* jt) {
+    tty->print_cr("=== i2c ret stack for %ld (handler at %p, c2i at %p) ===", _bdel_sys_gettid(), (void*) &_i2c_ret_handler, (void*) &_c2i_ret_handler);
+    for (int i = jt->_i2c_stack_pos - 1; i >= 0; i--) {
+      tty->print_cr(" %d. %p: %p", i, jt->_i2c_rbp_stack[i], jt->_i2c_ret_stack[i]);
+    }
+    tty->print_cr("=== i2c actual stack for %ld", _bdel_sys_gettid());
+    for (int i = jt->_i2c_stack_pos - 1; i >= 0; i--) {
+      tty->print_cr(" %d. %p: %p", i, jt->_i2c_rbp_stack[i], *((void**) jt->_i2c_rbp_stack[i]));
+    }
+  }
+  void _c2i_dump_stack(JavaThread* jt) {
+    tty->print_cr("=== c2i ret stack for %ld (%p, handler at %p, i2c at %p) ===", _bdel_sys_gettid(), jt, (void*) &_c2i_ret_handler, (void*) &_i2c_ret_handler);
+    for (int i = _MIN(jt->_c2i_stack_pos, 128) - 1; i >= 0; i--) {
+      Method* m = jt->_c2i_method_stack[i];
+      nmethod* nm = CodeCache::find_nmethod(jt->_c2i_ret_stack[i]);
+      tty->print_cr(
+        //" %d. %p: %p (real %p) (%s#%s) (caller %s#%s)"
+        " %d. %p: %p (real %p)"
+        , i
+        , jt->_c2i_rbp_stack[i]
+        , jt->_c2i_ret_stack[i]
+        , *((void**) jt->_c2i_rbp_stack[i])
+        /*
+        , m == NULL ? "<null" : m->klass_name()->as_C_string()
+        , m == NULL ? "null>" : m->name()->as_C_string()
+        , nm == NULL ? "<null" : nm->method()->klass_name()->as_C_string()
+        , nm == NULL ? "null>" : nm->method()->name()->as_C_string()
+        */
+      );
+    }
+  }
+  void _i2c_verify_stack(JavaThread* jt) {
+    for (int i = jt->_i2c_stack_pos - 1; i >= 0; i--) {
+      void* ret_addr = *((void**) jt->_i2c_rbp_stack[i]);
+      if (_unlikely(ret_addr != (void*) &_i2c_ret_handler)) {
+        tty->print_cr("_HOTSPOT %ld: failed i2c stack check at position %d", _bdel_sys_gettid(), i);
+        _i2c_dump_stack(jt);
+        ShouldNotReachHere();
+      }
+    }
+    tty->print_cr("_HOTSPOT: verified i2c stack");
+  }
+  void _c2i_verify_stack(JavaThread* jt) {
+    for (int i = jt->_c2i_stack_pos - 1; i >= 0; i--) {
+      void* ret_addr = *((void**) jt->_c2i_rbp_stack[i]);
+      if (_unlikely(ret_addr != (void*) &_c2i_ret_handler)) {
+        tty->print_cr("_HOTSPOT %ld: failed c2i stack check at position %d", _bdel_sys_gettid(), i);
+        _c2i_dump_stack(jt);
+        ShouldNotReachHere();
+      }
+    }
+    tty->print_cr("_HOTSPOT: c2i good of %d levels", jt->_c2i_stack_pos);
+  }
+}
+
 
 //----------------------------generate_stubs-----------------------------------
 void SharedRuntime::generate_stubs() {
@@ -991,6 +1607,7 @@ JRT_LEAF(int, SharedRuntime::dtrace_method_entry(
   Symbol* kname = method->klass_name();
   Symbol* name = method->name();
   Symbol* sig = method->signature();
+
 #ifndef USDT2
   HS_DTRACE_PROBE7(hotspot, method__entry, get_java_tid(thread),
       kname->bytes(), kname->utf8_length(),
@@ -1012,6 +1629,7 @@ JRT_LEAF(int, SharedRuntime::dtrace_method_exit(
   Symbol* kname = method->klass_name();
   Symbol* name = method->name();
   Symbol* sig = method->signature();
+
 #ifndef USDT2
   HS_DTRACE_PROBE7(hotspot, method__return, get_java_tid(thread),
       kname->bytes(), kname->utf8_length(),
@@ -1026,7 +1644,6 @@ JRT_LEAF(int, SharedRuntime::dtrace_method_exit(
 #endif /* USDT2 */
   return 0;
 JRT_END
-
 
 // Finds receiver, CallInfo (i.e. receiver method), and calling bytecode)
 // for a call current in progress, i.e., arguments has been pushed on stack

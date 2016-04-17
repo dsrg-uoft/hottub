@@ -46,6 +46,8 @@
 #include "utilities/debug.hpp"
 #include "utilities/macros.hpp"
 
+#include "runtime/_bdel.hpp"
+
 #define __ _masm->
 
 #ifndef CC_INTERP
@@ -565,6 +567,40 @@ void InterpreterGenerator::lock_method(void) {
 void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
   // initialize fixed part of activation frame
   __ push(rax);        // save return address
+  if (ProfileIntComp) {
+    __ push(rscratch1);
+    Label _after;
+    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));
+    __ cmpptr(rscratch1, rax);
+    __ jcc(Assembler::notEqual, _after);
+
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    // no rscratch1
+    __ push(rscratch2);
+    __ movptr(c_rarg0, r15_thread);
+    // 8 caller saved registers before rax
+    __ lea(c_rarg1, Address(rsp, 8 * wordSize));
+    // rscratch2 <- rdx is num extra locals (2 for native), see `generate_normal_entry` and `generate_native_entry
+    __ movptr(c_rarg2, rscratch2);
+    __ movptr(c_rarg3, rbx);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_ret_verify_and_update_location));
+    __ pop(rscratch2);
+    // no rscratch1
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+
+    __ bind(_after);
+    __ pop(rscratch1);
+  }
   __ enter();          // save old & set new rbp
   __ push(r13);        // set sender sp
   __ push((int)NULL_WORD); // leave last_sp as null
@@ -993,6 +1029,8 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
   // (static native method holder mirror/jni oop result)
   __ push((int) NULL_WORD);
 
+  __ lea(rscratch2, RuntimeAddress((address) 2));
+
   // initialize fixed part of activation frame
   generate_fixed_frame(true);
 
@@ -1074,6 +1112,7 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
 
   // jvmti support
   __ notify_method_entry();
+  __ _notify_native_entry();
 
   // work registers
   const Register method = rbx;
@@ -1251,6 +1290,7 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
     __ bind(Continue);
   }
 
+  __ _notify_native_exit();
   // change thread state
   __ movl(Address(r15_thread, JavaThread::thread_state_offset()), _thread_in_Java);
 
@@ -1385,6 +1425,42 @@ address InterpreterGenerator::generate_native_entry(bool synchronized) {
                        wordSize)); // get sender sp
   __ leave();                                // remove frame anchor
   __ pop(rdi);                               // get return address
+  if (ProfileIntComp) {
+    __ push(rscratch1);
+    Label _after;
+    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));
+    __ cmpptr(rscratch1, rdi);
+    __ jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    __ push(rax);
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    // no rscratch1
+    __ push(rscratch2);
+
+    // 8 caller saved registers + rax - already popped
+    __ movptr(c_rarg0, r15_thread);
+    __ lea(c_rarg1, Address(rsp, 8 * wordSize));
+    __ lea(c_rarg2, RuntimeAddress((address) -11));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop));
+    __ pop(rscratch2);
+    // no rscratch1
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ movptr(rdi, rax);
+    __ pop(rax);
+    // my isle; chu chu
+    __ bind(_after);
+    __ pop(rscratch1);
+  }
   __ mov(rsp, t);                            // set sp to sender sp
   __ jmp(rdi);
 
@@ -1443,6 +1519,8 @@ address InterpreterGenerator::generate_normal_entry(bool synchronized) {
   // allocate space for locals
   // explicitly initialize locals
   {
+    __ movptr(rscratch2, rdx);
+
     Label exit, loop;
     __ testl(rdx, rdx);
     __ jcc(Assembler::lessEqual, exit); // do nothing if rdx <= 0

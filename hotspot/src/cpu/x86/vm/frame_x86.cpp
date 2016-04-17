@@ -48,6 +48,8 @@ void RegisterMap::check_location_valid() {
 }
 #endif
 
+#include "runtime/_bdel.hpp"
+
 PRAGMA_FORMAT_MUTE_WARNINGS_FOR_GCC
 
 // Profiling/safepoint support
@@ -456,7 +458,26 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
   }
 #endif // COMPILER2
 
-  return frame(sender_sp, unextended_sp, link(), sender_pc());
+  address* location = sender_pc_addr();
+  address ret_addr = *location;
+  if (ProfileIntComp && ((void*) ret_addr == (void*) &_c2i_ret_handler)) {
+    Thread* th = Thread::current();
+    if (_unlikely(!th->is_Java_thread())) {
+      tty->print_cr("_HOTSPOT: sender for interpreter frame from c2i handler, but current thread not java thread");
+      ShouldNotReachHere();
+    }
+    JavaThread* jt = (JavaThread*) th;
+    if (!jt->_bdel_deopt) {
+      tty->print_cr("_HOTSPOT (%ld): bdel deopt is 0, found c2i address %p", _bdel_sys_gettid(), ret_addr);
+      void* ret = _c2i_ret_verify_location_and_pop(jt, (void*) location, -2);
+      ret_addr = (address) ret;
+      ShouldNotReachHere();
+    }
+    *location = ret_addr;
+  }
+
+  return frame(sender_sp, unextended_sp, link(), ret_addr);
+  //return frame(sender_sp, unextended_sp, link(), sender_pc());
 }
 
 
@@ -472,6 +493,18 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
 
   // On Intel the return_address is always the word on the stack
   address sender_pc = (address) *(sender_sp-1);
+
+  if (ProfileIntComp && (void*) sender_pc == (void*) &_i2c_ret_handler) {
+    Thread* th = Thread::current();
+    if (_unlikely(!th->is_Java_thread())) {
+      tty->print_cr("_HOTSPOT: sender for compiled frame found i2c handler, but current thread not java thread");
+      ShouldNotReachHere();
+    }
+    JavaThread* jt = (JavaThread*) th;
+    void* ret = _i2c_ret_verify_location_and_pop(jt, (void*) (sender_sp - 1));
+    sender_pc = (address) ret;
+    *((void**) (sender_sp - 1)) = ret;
+  }
 
   // This is the saved value of EBP which may or may not really be an FP.
   // It is only an FP if the sender is an interpreter frame (or C1?).
@@ -508,9 +541,15 @@ frame frame::sender(RegisterMap* map) const {
   if (is_interpreted_frame()) return sender_for_interpreter_frame(map);
   assert(_cb == CodeCache::find_blob(pc()),"Must be the same");
 
+  if (_cb != CodeCache::find_blob(pc())) {
+    tty->print_cr("_HOTSPOT: assert failed, cb is not find blob pc, pc is %p, i2c %p, c2i %p", pc(), (void*) &_i2c_ret_handler, (void*) &_c2i_ret_handler);
+    ShouldNotReachHere();
+  }
+
   if (_cb != NULL) {
     return sender_for_compiled_frame(map);
   }
+
   // Must be native-compiled frame, i.e. the marshaling code for native
   // methods that exists in the core system.
   return frame(sender_sp(), link(), sender_pc());

@@ -420,6 +420,8 @@ void SafepointSynchronize::end() {
     end_statistics(os::javaTimeNanos());
   }
 
+  Threads::_bdel_safepoint_end((VMThread*) Thread::current());
+
 #ifdef ASSERT
   // A pending_exception cannot be installed during a safepoint.  The threads
   // may install an async exception after they come back from a safepoint into
@@ -519,6 +521,8 @@ void SafepointSynchronize::do_cleanup_tasks() {
     TraceTime t3("compilation policy safepoint handler", TraceSafepointCleanupTime);
     CompilationPolicy::policy()->do_safepoint_work();
   }
+
+  Threads::_bdel_safepoint_begin((VMThread*) Thread::current());
 
   {
     TraceTime t4("mark nmethods", TraceSafepointCleanupTime);

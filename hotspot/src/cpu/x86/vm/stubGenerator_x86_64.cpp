@@ -43,6 +43,8 @@
 #include "opto/runtime.hpp"
 #endif
 
+#include  "runtime/_bdel.hpp"
+
 // Declaration and definition of StubGenerator (no .hpp file).
 // For a more detailed description of the stub routine structure
 // see the comment in stubRoutines.hpp
@@ -498,6 +500,79 @@ class StubGenerator: public StubCodeGenerator {
 
     // compute exception handler into rbx
     __ movptr(c_rarg0, Address(rsp, 0));
+    if (ProfileIntComp) {
+      __ push(rscratch1);
+      Label _after;
+      __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));
+      __ cmpptr(rscratch1, c_rarg0);
+      __ jcc(Assembler::notEqual, _after);
+      // my isle; hajimemashou
+      __ push(rax);
+      // no c_rarg0
+      __ push(c_rarg1);
+      __ push(c_rarg2);
+      __ push(c_rarg3);
+      __ push(c_rarg4);
+      __ push(c_rarg5);
+      // no rscratch1
+      __ push(rscratch2);
+
+      // 8 caller saved registers + rax
+      __ movptr(c_rarg0, r15_thread);
+      __ lea(c_rarg1, Address(rsp, 8 * wordSize));
+      __ lea(c_rarg2, RuntimeAddress((address) -7));
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop));
+      __ pop(rscratch2);
+      // no rscratch1
+      __ pop(c_rarg5);
+      __ pop(c_rarg4);
+      __ pop(c_rarg3);
+      __ pop(c_rarg2);
+      __ pop(c_rarg1);
+      // no c_rarg0
+      __ movptr(c_rarg0, rax);
+      __ pop(rax);
+      __ movptr(Address(rsp, wordSize), c_rarg0);
+      // my isle; chu chu
+      __ bind(_after);
+      __ pop(rscratch1);
+    }
+    if (ProfileIntComp) {
+      __ push(rscratch1);
+      Label _after;
+      __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
+      __ cmpptr(rscratch1, c_rarg0);
+      __ jcc(Assembler::notEqual, _after);
+      // my isle; hajimemashou
+      __ push(rax);
+      // no c_rarg0
+      __ push(c_rarg1);
+      __ push(c_rarg2);
+      __ push(c_rarg3);
+      __ push(c_rarg4);
+      __ push(c_rarg5);
+      // no rscratch1
+      __ push(rscratch2);
+
+      // 8 caller saved registers + rax
+      __ movptr(c_rarg0, r15_thread);
+      __ lea(c_rarg1, Address(rsp, 8 * wordSize));
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop));
+      __ pop(rscratch2);
+      // no rscratch1
+      __ pop(c_rarg5);
+      __ pop(c_rarg4);
+      __ pop(c_rarg3);
+      __ pop(c_rarg2);
+      __ pop(c_rarg1);
+      // no c_rarg0
+      __ movptr(c_rarg0, rax);
+      __ pop(rax);
+      __ movptr(Address(rsp, wordSize), c_rarg0);
+      // my isle; chu chu
+      __ bind(_after);
+      __ pop(rscratch1);
+    }
     BLOCK_COMMENT("call exception_handler_for_return_address");
     __ call_VM_leaf(CAST_FROM_FN_PTR(address,
                          SharedRuntime::exception_handler_for_return_address),
@@ -1527,6 +1602,7 @@ class StubGenerator: public StubCodeGenerator {
     inc_counter_np(SharedRuntime::_jbyte_array_copy_ctr); // Update counter after rscratch1 is free
     __ xorptr(rax, rax); // return 0
     __ leave(); // required for proper stackwalking of RuntimeStub frame
+
     __ ret(0);
 
     // Copy in multi-bytes chunks

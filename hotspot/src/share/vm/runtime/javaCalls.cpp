@@ -41,6 +41,8 @@
 #include "runtime/stubRoutines.hpp"
 #include "runtime/thread.inline.hpp"
 
+#include "runtime/_bdel.hpp"
+
 // -----------------------------------------------------
 // Implementation of JavaCallWrapper
 
@@ -348,9 +350,20 @@ void JavaCalls::call_helper(JavaValue* result, methodHandle* m, JavaCallArgument
 
   assert(!thread->is_Compiler_thread(), "cannot compile from the compiler");
   if (CompilationPolicy::must_be_compiled(method)) {
+    uint64_t t0 = _now();
     CompileBroker::compile_method(method, InvocationEntryBci,
                                   CompilationPolicy::policy()->initial_compile_level(),
                                   methodHandle(), 0, "must_be_compiled", CHECK);
+    uint64_t t1 = _now();
+    if (_unlikely(thread != Thread::current())) {
+      tty->print_cr("_HOTSPOT: who");
+      ShouldNotReachHere();
+    }
+    if (_unlikely(t1 < t0)) {
+      tty->print_cr("_HOTSPOT: clock not monotonic - t0 %lu, t1 %lu", t0, t1);
+      ShouldNotReachHere();
+    }
+    thread->_blocking_compile_time += (t1 - t0);
   }
 
   // Since the call stub sets up like the interpreter we call the from_interpreted_entry

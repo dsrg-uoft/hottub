@@ -38,6 +38,8 @@
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/thread.inline.hpp"
 
+#include "runtime/_bdel.hpp"
+
 
 // Implementation of InterpreterMacroAssembler
 
@@ -671,6 +673,81 @@ void InterpreterMacroAssembler::remove_activation(
          Address(rbp, frame::interpreter_frame_sender_sp_offset * wordSize));
   leave();                           // remove frame anchor
   pop(ret_addr);                     // get return address
+  if (ProfileIntComp) {
+    if (ret_addr == rax) {
+      ShouldNotReachHere();
+    }
+    push(rscratch1);
+    Label _after;
+    lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
+    cmpptr(rscratch1, ret_addr);
+    jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    push(rax);
+    push(c_rarg0);
+    push(c_rarg1);
+    push(c_rarg2);
+    push(c_rarg3);
+    push(c_rarg4);
+    push(c_rarg5);
+    // no rscratch1
+    push(rscratch2);
+
+    // 8 caller saved registers + rax - already popped
+    movptr(c_rarg0, r15_thread);
+    lea(c_rarg1, Address(rsp, 8 * sizeof(void*)));
+    call_VM_leaf(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop));
+    pop(rscratch2);
+    // no rscratch1
+    pop(c_rarg5);
+    pop(c_rarg4);
+    pop(c_rarg3);
+    pop(c_rarg2);
+    pop(c_rarg1);
+    pop(c_rarg0);
+    movptr(ret_addr, rax);
+    pop(rax);
+    // my isle; chu chu
+    bind(_after);
+    pop(rscratch1);
+  }
+  if (ProfileIntComp) {
+    push(rscratch1);
+    Label _after;
+    lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _c2i_ret_handler)));
+    cmpptr(rscratch1, ret_addr);
+    jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    push(rax);
+    push(c_rarg0);
+    push(c_rarg1);
+    push(c_rarg2);
+    push(c_rarg3);
+    push(c_rarg4);
+    push(c_rarg5);
+    // no rscratch1
+    push(rscratch2);
+
+    // 8 caller saved registers + rax - already popped
+    movptr(c_rarg0, r15_thread);
+    lea(c_rarg1, Address(rsp, 8 * wordSize));
+    //movptr(c_rarg1, rbx);
+    lea(c_rarg2, RuntimeAddress((address) -3));
+    call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_ret_verify_location_and_pop));
+    pop(rscratch2);
+    // no rscratch1
+    pop(c_rarg5);
+    pop(c_rarg4);
+    pop(c_rarg3);
+    pop(c_rarg2);
+    pop(c_rarg1);
+    pop(c_rarg0);
+    movptr(ret_addr, rax);
+    pop(rax);
+    // my isle; chu chu
+    bind(_after);
+    pop(rscratch1);
+  }
   mov(rsp, rbx);                     // set sp to sender sp
 }
 
@@ -1426,6 +1503,44 @@ void InterpreterMacroAssembler::verify_FPU(int stack_depth, TosState state) {
 #endif // !CC_INTERP
 
 
+void InterpreterMacroAssembler::_notify_native_entry() {
+  if (ProfileIntComp) {
+    movptr(c_rarg0, r15_thread);
+    get_method(c_rarg1);
+    xorptr(c_rarg2, c_rarg2);
+    call_VM_leaf(CAST_FROM_FN_PTR(address, _native_call_begin));
+  }
+}
+
+void InterpreterMacroAssembler::_notify_native_exit() {
+  if (ProfileIntComp) {
+    push(rax);
+    push(c_rarg0);
+    push(c_rarg1);
+    push(c_rarg2);
+    push(c_rarg3);
+    push(c_rarg4);
+    push(c_rarg5);
+    push(rscratch1);
+    push(rscratch2);
+
+    movptr(c_rarg0, r15_thread);
+    get_method(c_rarg1);
+    xorptr(c_rarg2, c_rarg2);
+    call_VM_leaf(CAST_FROM_FN_PTR(address, _native_call_end));
+
+    pop(rscratch2);
+    pop(rscratch1);
+    pop(c_rarg5);
+    pop(c_rarg4);
+    pop(c_rarg3);
+    pop(c_rarg2);
+    pop(c_rarg1);
+    pop(c_rarg0);
+    pop(rax);
+  }
+}
+
 void InterpreterMacroAssembler::notify_method_entry() {
   // Whenever JVMTI is interp_only_mode, method entry/exit events are sent to
   // track stack depth.  If it is possible to enter interp_only_mode we add
@@ -1445,6 +1560,11 @@ void InterpreterMacroAssembler::notify_method_entry() {
     get_method(c_rarg1);
     call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dtrace_method_entry),
                  r15_thread, c_rarg1);
+  }
+
+  if (ProfileIntComp && ProfileIntCompStrict) {
+    get_method(c_rarg1);
+    call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::_method_entry), r15_thread, c_rarg1);
   }
 
   // RedefineClasses() tracing support for obsolete method entry

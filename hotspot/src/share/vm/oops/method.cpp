@@ -239,7 +239,7 @@ void Method::mask_for(int bci, InterpreterOopMap* mask) {
   return;
 }
 
-
+#include "runtime/_bdel.hpp"
 int Method::bci_from(address bcp) const {
 #ifdef ASSERT
   { ResourceMark rm;

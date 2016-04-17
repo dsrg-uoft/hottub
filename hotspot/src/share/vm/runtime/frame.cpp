@@ -62,6 +62,8 @@
 # include "nativeInst_ppc.hpp"
 #endif
 
+#include "runtime/_bdel.hpp"
+
 PRAGMA_FORMAT_MUTE_WARNINGS_FOR_GCC
 
 RegisterMap::RegisterMap(JavaThread *thread, bool update_map) {
@@ -334,7 +336,13 @@ void frame::deoptimize(JavaThread* thread) {
     nm->deopt_mh_handler_begin() :
     nm->deopt_handler_begin();
 
+  // see x86 frame code for `patch_pc`
+  address* _pc_addr = &(((address*) sp())[-1]);
+  _i2c_patch_pc(thread, (void**) _pc_addr, (void*) deopt);
+  _c2i_patch_pc(thread, (void**) _pc_addr, (void*) deopt);
+
   // Save the original pc before we patch in the new one
+  //tty->print_cr("_HOTSPOT: in frame#deoptimize, original pc is %p for method %s", (void*) pc(), nm->method()->name());
   nm->set_original_pc(this, pc());
   patch_pc(thread, deopt);
 

@@ -238,3 +238,6 @@
   // support for jvmti/dtrace
   void notify_method_entry();
   void notify_method_exit(TosState state, NotifyMethodExitMode mode);
+
+  void _notify_native_entry();
+  void _notify_native_exit();

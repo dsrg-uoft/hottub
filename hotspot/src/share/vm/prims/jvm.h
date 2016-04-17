@@ -257,6 +257,15 @@ JVM_StopThread(JNIEnv *env, jobject thread, jobject exception);
 JNIEXPORT jboolean JNICALL
 JVM_IsThreadAlive(JNIEnv *env, jobject thread);
 
+JNIEXPORT jlong JNICALL
+JVM_BdelGetBlockingCompileTime(JNIEnv *env, jobject thread);
+JNIEXPORT void JNICALL
+JVM_BdelReset(JNIEnv *env, jobject thread);
+JNIEXPORT jlong JNICALL
+JVM_BdelGetInt(JNIEnv *env, jobject thread);
+JNIEXPORT jlong JNICALL
+JVM_BdelGetComp(JNIEnv *env, jobject thread);
+
 JNIEXPORT void JNICALL
 JVM_SuspendThread(JNIEnv *env, jobject thread);
 

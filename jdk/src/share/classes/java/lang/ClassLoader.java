@@ -401,16 +401,24 @@ public abstract class ClassLoader {
     protected Class<?> loadClass(String name, boolean resolve)
         throws ClassNotFoundException
     {
+        long t0 = System.nanoTime();
         synchronized (getClassLoadingLock(name)) {
+            long t1 = System.nanoTime();
             // First, check if the class has already been loaded
             Class<?> c = findLoadedClass(name);
             if (c == null) {
-                long t0 = System.nanoTime();
+                long t2 = System.nanoTime();
                 try {
                     if (parent != null) {
                         c = parent.loadClass(name, false);
                     } else {
+                        long t5 = System.nanoTime();
                         c = findBootstrapClassOrNull(name);
+                        long t6 = System.nanoTime();
+                        if (c != null) {
+                            sun.misc.PerfCounter.getNullFindClassTime().addTime(t6 - t5);
+                            sun.misc.PerfCounter.getNullFindClasses().increment();
+                        }
                     }
                 } catch (ClassNotFoundException e) {
                     // ClassNotFoundException thrown if class not found
@@ -420,15 +428,17 @@ public abstract class ClassLoader {
                 if (c == null) {
                     // If still not found, then invoke findClass in order
                     // to find the class.
-                    long t1 = System.nanoTime();
+                    long t3 = System.nanoTime();
                     c = findClass(name);
+                    long t4 = System.nanoTime();
 
                     // this is the defining class loader; record the stats
-                    sun.misc.PerfCounter.getParentDelegationTime().addTime(t1 - t0);
-                    sun.misc.PerfCounter.getFindClassTime().addElapsedTimeFrom(t1);
+                    sun.misc.PerfCounter.getParentDelegationTime().addTime(t3 - t2);
+                    sun.misc.PerfCounter.getFindClassTime().addTime(t4 - t3);
                     sun.misc.PerfCounter.getFindClasses().increment();
                 }
             }
+            sun.misc.PerfCounter.getClassNameLockSync().addTime(t1 - t0);
             if (resolve) {
                 resolveClass(c);
             }

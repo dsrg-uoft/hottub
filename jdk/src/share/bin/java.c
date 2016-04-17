@@ -52,6 +52,7 @@
 
 
 #include "java.h"
+#include <sys/time.h> // for clocking jvm init time
 // forkjvm
 #include <sys/un.h>
 #include <sys/socket.h>
@@ -177,7 +178,7 @@ static jboolean forkjvm = JNI_FALSE;
 //  1  +     16      x 2   +    1    +  1    = 35
 static char forkjvmid[35];
 static int (*clock_gettime_func)(clockid_t, struct timespec*) = NULL;
-static struct timespec start0 = {0};
+static struct timespec jvm_init_start = {0};
 
 /*
  * Entry point.
@@ -203,7 +204,7 @@ JLI_Launch(int argc, char ** argv,              /* main argc, argc */
         handle = dlopen("librt.so", RTLD_LAZY);
     }
     clock_gettime_func = (int(*)(clockid_t, struct timespec*))dlsym(handle, "clock_gettime");
-    clock_gettime_func(CLOCK_MONOTONIC, &start0);
+    clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_start);
 
     int mode = LM_UNKNOWN;
     char *what = NULL;
@@ -563,16 +564,30 @@ JavaMain(void * _args)
     mainArgs = CreateApplicationArgs(env, argv, argc);
     CHECK_EXCEPTION_NULL_LEAVE(mainArgs);
 
+    struct timespec jvm_init_end;
+    struct timespec start0;
     struct timespec end0;
+    unsigned long init_diff;
     unsigned long diff0;
+    double init_ddiff;
     double ddiff0;
     int run_num = 0;
 
+    clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_end);
+
     /* Invoke main method. */
+    clock_gettime_func(CLOCK_MONOTONIC, &start0);
+    ifn.CallingJavaMain();
     (*env)->CallStaticVoidMethod(env, mainClass, mainID, mainArgs);
+    ifn.FinishedJavaMain();
     clock_gettime_func(CLOCK_MONOTONIC, &end0);
+
+    init_diff = 1e9 * (jvm_init_end.tv_sec - jvm_init_start.tv_sec) + jvm_init_end.tv_nsec - jvm_init_start.tv_nsec;
+    init_ddiff = init_diff / 1e9;
     diff0 = 1e9 * (end0.tv_sec - start0.tv_sec) + end0.tv_nsec - start0.tv_nsec;
     ddiff0 = diff0 / 1e9;
+    fprintf(stderr, "[forkjvm][info][JavaMain] jvm_init_time | identity = %s | diff= %luns (%fs)\n",
+            forkjvmid, init_diff, init_ddiff);
     fprintf(stderr, "[forkjvm][info][JavaMain] CallStaticVoidMethod | run = %d | identity = %s | diff= %luns (%fs)\n",
             run_num, forkjvmid, diff0, ddiff0);
 
@@ -646,7 +661,9 @@ JavaMain(void * _args)
 
             run_num++;
             clock_gettime_func(CLOCK_MONOTONIC, &start1);
+            ifn.CallingJavaMain();
             (*env)->CallStaticVoidMethod(env, mainClass, mainID, mainArgs);
+            ifn.FinishedJavaMain();
             clock_gettime_func(CLOCK_MONOTONIC, &end1);
             diff1 = 1e9 * (end1.tv_sec - start1.tv_sec) + end1.tv_nsec - start1.tv_nsec;
             ddiff1 = diff1 / 1e9;

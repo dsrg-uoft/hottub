@@ -853,9 +853,12 @@ static int prepare_log_file(const char* pattern, const char* default_pattern, ch
   return fd;
 }
 
+//#include "runtime/_bdel.hpp"
 void VMError::report_and_die() {
   // Don't allocate large buffer on stack
   static char buffer[O_BUFLEN];
+
+  //_c2i_dump_stack(JavaThread::active());
 
   // How many errors occurred in error handler when reporting first_error.
   static int recursive_error_count;

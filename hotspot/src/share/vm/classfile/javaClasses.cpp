@@ -1588,6 +1588,7 @@ void java_lang_Throwable::print_stack_trace(oop throwable, outputStream* st) {
   }
 }
 
+#include "runtime/_bdel.hpp"
 void java_lang_Throwable::fill_in_stack_trace(Handle throwable, methodHandle method, TRAPS) {
   if (!StackTraceInThrowable) return;
   ResourceMark rm(THREAD);
@@ -1615,6 +1616,8 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, methodHandle met
     }
     return;
   }
+
+  _i2c_unpatch(thread, "fill in stack trace");
 
   // Instead of using vframe directly, this version of fill_in_stack_trace
   // basically handles everything by hand. This significantly improved the
@@ -1721,6 +1724,8 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, methodHandle met
 
   // Put completed stack trace into throwable object
   set_backtrace(throwable(), bt.backtrace());
+
+  _i2c_repatch(thread, "fill in stack trace");
 }
 
 void java_lang_Throwable::fill_in_stack_trace(Handle throwable, methodHandle method) {

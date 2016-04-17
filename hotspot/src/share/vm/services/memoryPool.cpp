@@ -37,6 +37,8 @@
 #include "utilities/macros.hpp"
 #include "utilities/globalDefinitions.hpp"
 
+#include "runtime/_bdel.hpp"
+
 MemoryPool::MemoryPool(const char* name,
                        PoolType type,
                        size_t init_size,
@@ -99,12 +101,14 @@ instanceOop MemoryPool::get_memory_pool_instance(TRAPS) {
     args.push_long(usage_threshold_value);    // Argument 3
     args.push_long(gc_usage_threshold_value); // Argument 4
 
+    _native_call_begin((JavaThread*) THREAD, NULL, 21);
     JavaCalls::call_static(&result,
                            ik,
                            method_name,
                            signature,
                            &args,
                            CHECK_NULL);
+    _native_call_end((JavaThread*) THREAD, NULL, 21);
 
     instanceOop p = (instanceOop) result.get_jobject();
     instanceHandle pool(THREAD, p);

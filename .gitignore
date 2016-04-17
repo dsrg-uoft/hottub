@@ -4,6 +4,9 @@
 /build/
 /j2sdk-image.*
 cscope.*
+
+/old/
+
 /forkjvm/client/java
 /forkjvm/client/java.o
 /forkjvm/static_analysis/build

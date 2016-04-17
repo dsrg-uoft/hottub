@@ -727,6 +727,11 @@ class Thread implements Runnable {
 
     private native void start0();
 
+    public native long getBlockingCompileTime();
+    public native void resetIntCompTimes();
+    public native long getIntTime();
+    public native long getCompTime();
+
     /**
      * If this thread was constructed using a separate
      * <code>Runnable</code> run object, then that
@@ -751,6 +756,17 @@ class Thread implements Runnable {
      * a chance to clean up before it actually exits.
      */
     private void exit() {
+        String print_class_loading = System.getProperty("PrintClassLoading");
+        if (print_class_loading != null && print_class_loading.equals("true")) {
+            // print out class loading performance counters
+            System.out.println("[thread exit] "+sun.misc.PerfCounter.getClassNameLockSync());
+            System.out.println("[thread exit] "+sun.misc.PerfCounter.getParentDelegationTime());
+            System.out.println("[thread exit] "+sun.misc.PerfCounter.getFindClassTime());
+            System.out.println("[thread exit] "+sun.misc.PerfCounter.getFindClasses());
+            System.out.println("[thread exit] "+sun.misc.PerfCounter.getNullFindClassTime());
+            System.out.println("[thread exit] "+sun.misc.PerfCounter.getNullFindClasses());
+        }
+
         if (group != null) {
             group.threadTerminated(this);
             group = null;

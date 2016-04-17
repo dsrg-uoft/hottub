@@ -165,6 +165,7 @@ HS_DTRACE_PROBE_DECL5(hotspot, thread__stop, char*, intptr_t,
 
 #endif // ndef DTRACE_ENABLED
 
+#include "runtime/_bdel.hpp"
 
 // Class hierarchy
 // - Thread
@@ -1424,6 +1425,21 @@ void WatcherThread::print_on(outputStream* st) const {
 void JavaThread::initialize() {
   // Initialize fields
 
+  _blocking_compile_time = 0;
+  _bdel_safepoint = 0;
+  _bdel_deopt = 0;
+  _jvm_state = 0;
+  _jvm_state_ready = 0;
+  _jvm_state_times[0] = 0;
+  _jvm_state_times[1] = 0;
+  _jvm_state_last_timestamp = _now();
+  _i2c_stack_pos = 0;
+  _c2i_stack_pos = 0;
+  _i2c_stack_max = 0;
+  _native_levels = 0;
+  _jvm_transitions_pos = 0;
+  _jvm_transitions_max = 0;
+
   // Set the claimed par_id to UINT_MAX (ie not claiming any par_ids)
   set_claimed_par_id(UINT_MAX);
 
@@ -1514,6 +1530,8 @@ JavaThread::JavaThread(bool is_attaching_via_jni) :
 #endif // INCLUDE_ALL_GCS
 {
   initialize();
+  // is false for main thread
+  //tty->print_cr("_HOTSPOT %ld: new thread attaching via jni is %d", _bdel_sys_gettid(), is_attaching_via_jni);
   if (is_attaching_via_jni) {
     _jni_attach_state = _attaching_via_jni;
   } else {
@@ -1574,6 +1592,7 @@ JavaThread::JavaThread(ThreadFunction entry_point, size_t stack_sz) :
     tty->print_cr("creating thread %p", this);
   }
   initialize();
+  //tty->print_cr("_HOTSPOT %ld: new java thread with entry point", _bdel_sys_gettid());
   _jni_attach_state = _not_attaching_via_jni;
   set_entry_point(entry_point);
   // Create the native thread itself.
@@ -1696,7 +1715,11 @@ void JavaThread::thread_main_inner() {
       this->set_native_thread_name(this->get_thread_name());
     }
     HandleMark hm(this);
+    if (ProfileIntComp) {
+        //tty->print_cr("_HOTSPOT: java thread live tid %ld", _bdel_sys_gettid());
+    }
     this->entry_point()(this, this);
+    _bdel_knell("JavaThread");
   }
 
   DTRACE_THREAD_PROBE(stop, this);
@@ -2670,6 +2693,7 @@ void JavaThread::make_zombies() {
 
 void JavaThread::deoptimized_wrt_marked_nmethods() {
   if (!has_last_Java_frame()) return;
+  //_i2c_unpatch(this, "deoptimized wrt marked nmethods");
   // BiasedLocking needs an updated RegisterMap for the revoke monitors pass
   StackFrameStream fst(this, UseBiasedLocking);
   for(; !fst.is_done(); fst.next()) {
@@ -2683,6 +2707,7 @@ void JavaThread::deoptimized_wrt_marked_nmethods() {
       Deoptimization::deoptimize(this, *fst.current(), fst.register_map());
     }
   }
+  //_i2c_repatch(this, "deoptimized wrt marked nmethods");
 }
 
 
@@ -3277,6 +3302,27 @@ bool        Threads::_vm_complete = false;
 
 // All JavaThreads
 #define ALL_JAVA_THREADS(X) for (JavaThread* X = _thread_list; X; X = X->next())
+
+void Threads::_bdel_safepoint_begin(VMThread* vm_thread) {
+  if (!Thread::current()->is_VM_thread()) {
+    tty->print_cr("_HOTSPOT: doing safepoint begin not vm thread");
+  }
+  ALL_JAVA_THREADS(p) {
+    if (!p->has_last_Java_frame()) {
+      continue;
+    }
+    _i2c_unpatch(p, "bdel safepoint");
+  }
+}
+
+void Threads::_bdel_safepoint_end(VMThread* vm_thread) {
+  ALL_JAVA_THREADS(p) {
+    if (!p->has_last_Java_frame()) {
+      continue;
+    }
+    _i2c_repatch(p, "bdel safepoint");
+  }
+}
 
 // All JavaThreads + all non-JavaThreads (i.e., every thread in the system)
 void Threads::threads_do(ThreadClosure* tc) {
@@ -4211,6 +4257,11 @@ void Threads::create_thread_roots_marking_tasks(GCTaskQueue* q) {
 #endif // INCLUDE_ALL_GCS
 
 void Threads::nmethods_do(CodeBlobClosure* cf) {
+  JavaThread* _jt = JavaThread::current();
+  if (_unlikely(!_jt->is_VM_thread())) {
+    tty->print_cr("_HOTSPOT (%ld): in Threads::nmethods_do, current thread is not VM thread", _bdel_sys_gettid());
+    ShouldNotReachHere();
+  }
   ALL_JAVA_THREADS(p) {
     p->nmethods_do(cf);
   }
@@ -4236,6 +4287,11 @@ void Threads::gc_prologue() {
 }
 
 void Threads::deoptimized_wrt_marked_nmethods() {
+  Thread* _t = Thread::current();
+  if (_unlikely(!_t->is_VM_thread())) {
+    tty->print_cr("_HOTSPOT (%ld): in Threads::deoptimized_wrt_marked_nmethods, current thread is not VM thread", _bdel_sys_gettid());
+    ShouldNotReachHere();
+  }
   ALL_JAVA_THREADS(p) {
     p->deoptimized_wrt_marked_nmethods();
   }

@@ -97,6 +97,8 @@ HS_DTRACE_PROBE_DECL1(hotspot, thread__sleep__end, int);
 HS_DTRACE_PROBE_DECL0(hotspot, thread__yield);
 #endif /* !USDT2 */
 
+#include "runtime/_bdel.hpp"
+
 /*
   NOTE about use of any ctor or function call that can trigger a safepoint/GC:
   such ctors and calls MUST NOT come between an oop declaration/init and its
@@ -734,6 +736,7 @@ JVM_ENTRY(jclass, JVM_GetCallerClass(JNIEnv* env, int depth))
     return (k == NULL) ? NULL : (jclass) JNIHandles::make_local(env, k->java_mirror());
   }
 
+  _i2c_unpatch(thread, "JVM_GetCallerClass");
   // Getting the class of the caller frame.
   //
   // The call stack at this point looks something like this:
@@ -751,23 +754,27 @@ JVM_ENTRY(jclass, JVM_GetCallerClass(JNIEnv* env, int depth))
     case 0:
       // This must only be called from Reflection.getCallerClass
       if (m->intrinsic_id() != vmIntrinsics::_getCallerClass) {
+        _i2c_repatch(thread, "JVM_GetCallerClass/throw exception 0");
         THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), "JVM_GetCallerClass must only be called from Reflection.getCallerClass");
       }
       // fall-through
     case 1:
       // Frame 0 and 1 must be caller sensitive.
       if (!m->caller_sensitive()) {
+        _i2c_repatch(thread, "JVM_GetCallerClass/throw exception 1");
         THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), err_msg("CallerSensitive annotation expected at frame %d", n));
       }
       break;
     default:
       if (!m->is_ignored_by_security_stack_walk()) {
+        _i2c_repatch(thread, "JVM_GetCallerClass/early return");
         // We have reached the desired frame; return the holder class.
         return (jclass) JNIHandles::make_local(env, m->method_holder()->java_mirror());
       }
       break;
     }
   }
+  _i2c_repatch(thread, "JVM_GetCallerClass/null return");
   return NULL;
 JVM_END
 
@@ -1311,9 +1318,11 @@ JVM_ENTRY(jobject, JVM_DoPrivileged(JNIEnv *env, jclass cls, jobject action, job
     THROW_MSG_0(vmSymbols::java_lang_NullPointerException(), "Null action");
   }
 
+  _i2c_unpatch(thread, "JVM_DoPrivileged");
   // Compute the frame initiating the do privileged operation and setup the privileged stack
   vframeStream vfst(thread);
   vfst.security_get_caller_frame(1);
+  _i2c_repatch(thread, "JVM_DoPrivileged");
 
   if (vfst.at_end()) {
     THROW_MSG_0(vmSymbols::java_lang_InternalError(), "no caller?");
@@ -1355,13 +1364,14 @@ JVM_ENTRY(jobject, JVM_DoPrivileged(JNIEnv *env, jclass cls, jobject action, job
     thread->set_privileged_stack_top(&pi);
   }
 
-
+  _native_call_begin((JavaThread*) THREAD, m(), 1);
   // invoke the Object run() in the action object. We cannot use call_interface here, since the static type
   // is not really known - it is either java.security.PrivilegedAction or java.security.PrivilegedExceptionAction
   Handle pending_exception;
   JavaValue result(T_OBJECT);
   JavaCallArguments args(object);
   JavaCalls::call(&result, m, &args, THREAD);
+  _native_call_end((JavaThread*) THREAD, m(), 1);
 
   // done with action, remove ourselves from the list
   if (!vfst.at_end()) {
@@ -1381,9 +1391,12 @@ JVM_ENTRY(jobject, JVM_DoPrivileged(JNIEnv *env, jclass cls, jobject action, job
         !pending_exception->is_a(SystemDictionary::RuntimeException_klass())) {
       // Throw a java.security.PrivilegedActionException(Exception e) exception
       JavaCallArguments args(pending_exception);
+
+      //_native_call_begin((JavaThread*) THREAD, NULL, 1);
       THROW_ARG_0(vmSymbols::java_security_PrivilegedActionException(),
                   vmSymbols::exception_void_signature(),
                   &args);
+      //_native_call_end((JavaThread*) THREAD, NULL, 1);
     }
   }
 
@@ -1426,6 +1439,8 @@ JVM_ENTRY(jobject, JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls))
   // duplicate consecutive protection domains into a single one, as
   // well as stopping when we hit a privileged frame.
 
+  _i2c_unpatch(thread, "AccessController#getStackAccessControlContext");
+
   // Use vframeStream to iterate through Java frames
   vframeStream vfst(thread);
 
@@ -1456,6 +1471,7 @@ JVM_ENTRY(jobject, JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls))
 
     if (is_privileged) break;
   }
+  _i2c_repatch(thread, "AccessController#getStackAccessControlContext");
 
 
   // either all the domains on the stack were system domains, or
@@ -3020,6 +3036,10 @@ JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
               "unable to create new native thread");
   }
 
+  if (ProfileIntComp) {
+    native_thread->_jvm_state_ready = 1;
+    native_thread->_jvm_state_last_timestamp = _now();
+  }
   Thread::start(native_thread);
 
 JVM_END
@@ -3061,6 +3081,39 @@ JVM_ENTRY(void, JVM_StopThread(JNIEnv* env, jobject jthread, jobject throwable))
     // exited setting this flag has no affect
     java_lang_Thread::set_stillborn(java_thread);
   }
+JVM_END
+
+JVM_ENTRY(jlong, JVM_BdelGetBlockingCompileTime(JNIEnv* env, jobject jthread))
+  JVMWrapper("JVM_BdelGetBlockingCompileTime");
+  oop java_thread = JNIHandles::resolve_non_null(jthread);
+  JavaThread* receiver = java_lang_Thread::thread(java_thread);
+  _jvm_transitions_clock(receiver, receiver->_jvm_state);
+  return (jlong) receiver->_blocking_compile_time;
+JVM_END
+
+JVM_ENTRY(void, JVM_BdelReset(JNIEnv* env, jobject jthread))
+  JVMWrapper("JVM_BdelReset");
+  oop java_thread = JNIHandles::resolve_non_null(jthread);
+  JavaThread* receiver = java_lang_Thread::thread(java_thread);
+  receiver->_jvm_state_times[0] = 0;
+  receiver->_jvm_state_times[1] = 0;
+  receiver->_jvm_state_last_timestamp = _now();
+JVM_END
+
+JVM_ENTRY(jlong, JVM_BdelGetInt(JNIEnv* env, jobject jthread))
+  JVMWrapper("JVM_BdelGetInt");
+  oop java_thread = JNIHandles::resolve_non_null(jthread);
+  JavaThread* receiver = java_lang_Thread::thread(java_thread);
+  _jvm_transitions_clock(receiver, receiver->_jvm_state);
+  return (jlong) receiver->_jvm_state_times[0];
+JVM_END
+
+JVM_ENTRY(jlong, JVM_BdelGetComp(JNIEnv* env, jobject jthread))
+  JVMWrapper("JVM_BdelGetComp");
+  oop java_thread = JNIHandles::resolve_non_null(jthread);
+  JavaThread* receiver = java_lang_Thread::thread(java_thread);
+  _jvm_transitions_clock(receiver, receiver->_jvm_state);
+  return (jlong) receiver->_jvm_state_times[1];
 JVM_END
 
 
@@ -3423,6 +3476,7 @@ JVM_ENTRY(jobjectArray, JVM_GetClassContext(JNIEnv *env))
   JVMWrapper("JVM_GetClassContext");
   ResourceMark rm(THREAD);
   JvmtiVMObjectAllocEventCollector oam;
+  _i2c_unpatch(thread, "JVM_GetClassContext");
   vframeStream vfst(thread);
 
   if (SystemDictionary::reflect_CallerSensitive_klass() != NULL) {
@@ -3431,6 +3485,7 @@ JVM_ENTRY(jobjectArray, JVM_GetClassContext(JNIEnv *env))
     if (!(m->method_holder() == SystemDictionary::SecurityManager_klass() &&
           m->name()          == vmSymbols::getClassContext_name() &&
           m->signature()     == vmSymbols::void_class_array_signature())) {
+      _i2c_repatch(thread, "JVM_GetClassContext/throw exception");
       THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), "JVM_GetClassContext must only be called from SecurityManager.getClassContext");
     }
   }
@@ -3446,6 +3501,7 @@ JVM_ENTRY(jobjectArray, JVM_GetClassContext(JNIEnv *env))
       klass_array->append(holder);
     }
   }
+  _i2c_repatch(thread, "JVM_GetClassContext");
 
   // Create result array of type [Ljava/lang/Class;
   objArrayOop result = oopFactory::new_objArray(SystemDictionary::Class_klass(), klass_array->length(), CHECK_NULL);
@@ -3645,14 +3701,21 @@ JVM_END
 // if only code from the null class loader is on the stack.
 
 JVM_ENTRY(jobject, JVM_LatestUserDefinedLoader(JNIEnv *env))
+  _i2c_unpatch(thread, "JVM_LatestUserDefinedLoader");
+  if (thread != Thread::current()) {
+    tty->print_cr("_HOTSPOT: what");
+    ShouldNotReachHere();
+  }
   for (vframeStream vfst(thread); !vfst.at_end(); vfst.next()) {
     // UseNewReflection
     vfst.skip_reflection_related_frames(); // Only needed for 1.4 reflection
     oop loader = vfst.method()->method_holder()->class_loader();
     if (loader != NULL) {
+      _i2c_repatch(thread, "JVM_LatestUserDefinedLoader/early return");
       return JNIHandles::make_local(env, loader);
     }
   }
+  _i2c_repatch(thread, "JVM_LatestUserDefinedLoader/null return");
   return NULL;
 JVM_END
 
@@ -4158,7 +4221,9 @@ JVM_ENTRY(jobject, JVM_InvokeMethod(JNIEnv *env, jobject method, jobject obj, jo
     method_handle = Handle(THREAD, JNIHandles::resolve(method));
     Handle receiver(THREAD, JNIHandles::resolve(obj));
     objArrayHandle args(THREAD, objArrayOop(JNIHandles::resolve(args0)));
+    //_native_call_begin((JavaThread*) THREAD, NULL, 2);
     oop result = Reflection::invoke_method(method_handle(), receiver, args, CHECK_NULL);
+    //_native_call_end((JavaThread*) THREAD, NULL, 2);
     jobject res = JNIHandles::make_local(env, result);
     if (JvmtiExport::should_post_vm_object_alloc()) {
       oop ret_type = java_lang_reflect_Method::return_type(method_handle());
@@ -4180,7 +4245,9 @@ JVM_ENTRY(jobject, JVM_NewInstanceFromConstructor(JNIEnv *env, jobject c, jobjec
   JVMWrapper("JVM_NewInstanceFromConstructor");
   oop constructor_mirror = JNIHandles::resolve(c);
   objArrayHandle args(THREAD, objArrayOop(JNIHandles::resolve(args0)));
+  //_native_call_begin((JavaThread*) THREAD, NULL, 3);
   oop result = Reflection::invoke_constructor(constructor_mirror, args, CHECK_NULL);
+  //_native_call_end((JavaThread*) THREAD, NULL, 3);
   jobject res = JNIHandles::make_local(env, result);
   if (JvmtiExport::should_post_vm_object_alloc()) {
     JvmtiExport::post_vm_object_alloc(JavaThread::current(), result);

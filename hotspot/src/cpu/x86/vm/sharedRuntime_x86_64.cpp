@@ -41,6 +41,8 @@
 #include "opto/runtime.hpp"
 #endif
 
+#include "runtime/_bdel.hpp"
+
 #define __ masm->
 
 const int StackAlignmentInSlots = StackAlignmentInBytes / VMRegImpl::stack_slot_size;
@@ -460,6 +462,41 @@ static void patch_callers_callsite(MacroAssembler *masm) {
   // Call into the VM to patch the caller, then jump to compiled callee
   // rax isn't live so capture return address while we easily can
   __ movptr(rax, Address(rsp, 0));
+  if (ProfileIntComp) {
+    __ push(rscratch1);
+    Label _after;
+    __ lea(rscratch1, RuntimeAddress(CAST_FROM_FN_PTR(address, _i2c_ret_handler)));
+    __ cmpptr(rscratch1, rax);
+    __ jcc(Assembler::notEqual, _after);
+    // my isle; hajimemashou
+    // no rax
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    // no rscratch1
+    __ push(rscratch2);
+
+    // 8 caller saved registers
+    __ movptr(c_rarg0, r15_thread);
+    __ lea(c_rarg1, Address(rsp, 8 * wordSize));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _i2c_ret_verify_location_and_pop));
+    __ pop(rscratch2);
+    // no rscratch1
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+    __ movptr(Address(rsp, wordSize), rax);
+    // no rax
+    // my isle; chu chu
+    __ bind(_after);
+    __ pop(rscratch1);
+  }
 
   // align stack so push_CPU_state doesn't fault
   __ andptr(rsp, -(StackAlignmentInBytes));
@@ -523,6 +560,32 @@ static void gen_c2i_adapter(MacroAssembler *masm,
 
   __ subptr(rsp, extraspace);
 
+  if (ProfileIntComp) {
+    // see below; as if rax already pushed; // 8
+    __ push(c_rarg0); // 7
+    __ push(c_rarg1); // 6
+    __ push(c_rarg2); // 5
+    __ push(c_rarg3); // 4
+    __ push(c_rarg4); // 3
+    __ push(c_rarg5); // 2
+    __ push(rscratch1); // 1
+    __ push(rscratch2); // 0
+    __ movptr(c_rarg0, r15_thread);
+    __ movptr(c_rarg1, rax);
+    __ lea(c_rarg2, Address(rsp, 8 * wordSize));
+    __ movptr(c_rarg3, rbx);
+    //__ lea(c_rarg4, RuntimeAddress((address) (int64_t) total_args_passed));
+    //__ lea(c_rarg5, RuntimeAddress((address) (int64_t) comp_args_on_stack));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_ret_push));
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+  }
   // Store the return address in the expected location
   __ movptr(Address(rsp, 0), rax);
 
@@ -719,12 +782,36 @@ static void gen_i2c_adapter(MacroAssembler *masm,
     __ subptr(rsp, comp_words_on_stack * wordSize);
   }
 
-
   // Ensure compiled code always sees stack at proper alignment
   __ andptr(rsp, -16);
 
   // push the return address and misalign the stack that youngest frame always sees
   // as far as the placement of the call instruction
+  if (ProfileIntComp) {
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+
+    __ movptr(c_rarg0, r15_thread);
+    __ movptr(c_rarg1, rax);
+    __ lea(c_rarg2, Address(rsp, 7 * wordSize));
+    __ movptr(c_rarg3, rbx);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _i2c_ret_push));
+
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+  }
   __ push(rax);
 
   // Put saved SP in another register
@@ -2249,6 +2336,17 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     restore_args(masm, total_c_args, c_arg, out_regs);
   }
 
+  if (ProfileIntComp) {
+    save_args(masm, total_c_args, c_arg, out_regs);
+
+    __ movptr(c_rarg0, r15_thread);
+    __ mov_metadata(c_rarg1, method());
+    __ xorptr(c_rarg2, c_rarg2);
+
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _native_call_begin));
+
+    restore_args(masm, total_c_args, c_arg, out_regs);
+  }
   // Lock a synchronized method
 
   // Register definitions used by locking and unlocking
@@ -2483,6 +2581,16 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
     __ bind(done);
 
+  }
+  if (ProfileIntComp) {
+    save_native_result(masm, ret_type, stack_slots);
+
+    __ movptr(c_rarg0, r15_thread);
+    __ mov_metadata(c_rarg1, method());
+    __ xorptr(c_rarg2, c_rarg2);
+
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _native_call_end));
+    restore_native_result(masm, ret_type, stack_slots);
   }
   {
     SkipIfEqual skip(masm, &DTraceMethodProbes, false);
@@ -3535,6 +3643,43 @@ void SharedRuntime::generate_deopt_blob() {
   __ subptr(rbx, 2*wordSize);           // We'll push pc and ebp by hand
 #endif // CC_INTERP
   __ pushptr(Address(rcx, 0));          // Save return address
+  if (ProfileIntComp) {
+    // see `_c2i_deopt_bless`, more explanation there
+    __ push(rax);
+
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+
+    // rdi is 1st argument register, c_rarg5 holds total number of frames
+    __ movl(c_rarg5, Address(rdi, Deoptimization::UnrollBlock:: caller_adjustment_offset_in_bytes())); // (int)
+    // rdx is 3rd argument register, c_rarg4 holds the current frame index
+    __ movptr(c_rarg4, rdx);
+    __ movptr(c_rarg0, r15_thread);
+    // return address
+    __ movptr(c_rarg1, Address(rcx, 0));
+    // where return address was stored
+    __ lea(c_rarg2, Address(rsp, 9 * wordSize));
+    // where `_c2i_deopt_bless` called from (1 for uncommon trap blob)
+    __ lea(c_rarg3, RuntimeAddress((address) 1));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_deopt_bless));
+
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+
+    __ pop(rax);
+  }
   __ enter();                           // Save old & set new ebp
   __ subptr(rsp, rbx);                  // Prolog
 #ifdef CC_INTERP
@@ -3725,6 +3870,41 @@ void SharedRuntime::generate_uncommon_trap_blob() {
   __ movptr(rbx, Address(rsi, 0)); // Load frame size
   __ subptr(rbx, 2 * wordSize);    // We'll push pc and rbp by hand
   __ pushptr(Address(rcx, 0));     // Save return address
+  if (ProfileIntComp) {
+    // see same thing for `generate_deop_blob` - more comments there
+    __ push(rax);
+
+    __ push(c_rarg0);
+    __ push(c_rarg1);
+    __ push(c_rarg2);
+    __ push(c_rarg3);
+    __ push(c_rarg4);
+    __ push(c_rarg5);
+    __ push(rscratch1);
+    __ push(rscratch2);
+
+    // rdi is 1st argument register
+    __ movl(c_rarg5, Address(rdi, Deoptimization::UnrollBlock:: caller_adjustment_offset_in_bytes())); // (int)
+    // rdx is 3rd argument register
+    __ movptr(c_rarg4, rdx);
+    __ movptr(c_rarg0, r15_thread);
+    __ movptr(c_rarg1, Address(rcx, 0));
+    __ lea(c_rarg2, Address(rsp, 9 * wordSize));
+    // where `_c2i_deopt_bless` called from, 1 for deopt blob
+    __ lea(c_rarg3, RuntimeAddress((address) 2));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, _c2i_deopt_bless));
+
+    __ pop(rscratch2);
+    __ pop(rscratch1);
+    __ pop(c_rarg5);
+    __ pop(c_rarg4);
+    __ pop(c_rarg3);
+    __ pop(c_rarg2);
+    __ pop(c_rarg1);
+    __ pop(c_rarg0);
+
+    __ pop(rax);
+  }
   __ enter();                      // Save old & set new rbp
   __ subptr(rsp, rbx);             // Prolog
 #ifdef CC_INTERP
@@ -3811,6 +3991,10 @@ SafepointBlob* SharedRuntime::generate_handler_blob(address call_ptr, int poll_t
   int frame_size_in_words;
   bool cause_return = (poll_type == POLL_AT_RETURN);
   bool save_vectors = (poll_type == POLL_AT_VECTOR_LOOP);
+
+  if (cause_return) {
+    //_gen_call(masm, (void*) &_saw_safepoint_return_handler);
+  }
 
   if (UseRTMLocking) {
     // Abort RTM transaction before calling runtime

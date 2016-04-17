@@ -57,6 +57,8 @@
 # include "os_bsd.inline.hpp"
 #endif
 
+#include "runtime/_bdel.hpp"
+
 
 static void mangle_name_on(outputStream* st, Symbol* name, int begin, int end) {
   char* bytes = (char*)name->bytes() + begin;
@@ -181,6 +183,7 @@ address NativeLookup::lookup_style(methodHandle method, char* pure_name, const c
   Handle name_arg = java_lang_String::create_from_str(jni_name, CHECK_NULL);
 
   JavaValue result(T_LONG);
+  _native_call_begin((JavaThread*) THREAD, NULL, 11);
   JavaCalls::call_static(&result,
                          klass,
                          vmSymbols::findNative_name(),
@@ -189,6 +192,7 @@ address NativeLookup::lookup_style(methodHandle method, char* pure_name, const c
                          loader,
                          name_arg,
                          CHECK_NULL);
+  _native_call_end((JavaThread*) THREAD, NULL, 11);
   entry = (address) (intptr_t) result.get_jlong();
 
   if (entry == NULL) {

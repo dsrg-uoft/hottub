@@ -567,6 +567,7 @@ Parse::Parse(JVMState* caller, ciMethod* parse_method, float expected_uses)
   } else {
     set_map(entry_map);
     do_method_entry();
+    //hail_purple();
   }
 
   if (depth() == 1 && !failing()) {

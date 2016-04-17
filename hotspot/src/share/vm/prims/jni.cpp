@@ -93,6 +93,8 @@
 # include "os_bsd.inline.hpp"
 #endif
 
+#include "runtime/_bdel.hpp"
+
 static jint CurrentVersion = JNI_VERSION_1_8;
 
 
@@ -455,10 +457,12 @@ JNI_ENTRY(jclass, jni_FindClass(JNIEnv *env, const char *name))
     if (loader.is_null() &&
         k->name() == vmSymbols::java_lang_ClassLoader_NativeLibrary()) {
       JavaValue result(T_OBJECT);
+      _native_call_begin((JavaThread*) thread, NULL, 12);
       JavaCalls::call_static(&result, k,
                                       vmSymbols::getFromClass_name(),
                                       vmSymbols::void_class_signature(),
                                       thread);
+      _native_call_end((JavaThread*) thread, NULL, 12);
       if (HAS_PENDING_EXCEPTION) {
         Handle ex(thread, thread->pending_exception());
         CLEAR_PENDING_EXCEPTION;
@@ -1302,8 +1306,12 @@ static void jni_invoke_static(JNIEnv *env, JavaValue* result, jobject receiver, 
   // Initialize result type
   result->set_type(args->get_ret_type());
 
+  _native_call_begin((JavaThread*) THREAD, method(), 1);
+
   // Invoke the method. Result is returned as oop.
   JavaCalls::call(result, method, &java_args, CHECK);
+
+  _native_call_end((JavaThread*) THREAD, method(), 1);
 
   // Convert result
   if (result->get_type() == T_OBJECT || result->get_type() == T_ARRAY) {
@@ -1371,8 +1379,10 @@ static void jni_invoke_nonstatic(JNIEnv *env, JavaValue* result, jobject receive
   // Initialize result type
   result->set_type(args->get_ret_type());
 
+  _native_call_begin((JavaThread*) THREAD, method(), 1);
   // Invoke the method. Result is returned as oop.
   JavaCalls::call(result, method, &java_args, CHECK);
+  _native_call_end((JavaThread*) THREAD, method(), 1);
 
   // Convert result
   if (result->get_type() == T_OBJECT || result->get_type() == T_ARRAY) {
@@ -5126,6 +5136,22 @@ void execute_internal_vm_tests() {
 
 #endif
 
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CallingJavaMain() {
+  JavaThread* jt = JavaThread::current();
+  if (ProfileIntComp) {
+    jt->_jvm_state_ready = 1;
+    jt->_jvm_state_times[0] = 0;
+    jt->_jvm_state_times[1] = 0;
+    jt->_jvm_state_last_timestamp = _now();
+  }
+  return 0;
+}
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_FinishedJavaMain() {
+  JavaThread* jt = JavaThread::current();
+  jt->_jvm_state_ready = 0;
+  return 0;
+}
+
 #ifndef USDT2
 HS_DTRACE_PROBE_DECL3(hotspot_jni, CreateJavaVM__entry, vm, penv, args);
 DT_RETURN_MARK_DECL(CreateJavaVM, jint);
@@ -5605,6 +5631,8 @@ jint JNICALL jni_AttachCurrentThread(JavaVM *vm, void **penv, void *_args) {
 
 
 jint JNICALL jni_DetachCurrentThread(JavaVM *vm)  {
+  _bdel_knell("DetachCurrentThread");
+
 #ifndef USDT2
   DTRACE_PROBE1(hotspot_jni, DetachCurrentThread__entry, vm);
 #else /* USDT2 */

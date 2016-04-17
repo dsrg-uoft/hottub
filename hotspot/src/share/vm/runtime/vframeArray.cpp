@@ -45,6 +45,8 @@
 
 PRAGMA_FORMAT_MUTE_WARNINGS_FOR_GCC
 
+#include "runtime/_bdel.hpp"
+
 int vframeArrayElement:: bci(void) const { return (_bci == SynchronizationEntryBCI ? 0 : _bci); }
 
 void vframeArrayElement::free_monitors(JavaThread* jt) {
@@ -291,6 +293,11 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
   // we placed in the skeletal frame now that we finally know the
   // exact interpreter address we should use.
 
+  /*
+  if (is_bottom_frame) {
+    tty->print_cr("_HOTSPOT: sender pc is %p, i2c is %p, c2i is %p, caller is compiled %d", (void*) pc, (void*) &_i2c_ret_handler, (void*) &_c2i_ret_handler, caller->is_compiled_frame());
+  }
+  */
   _frame.patch_pc(thread, pc);
 
   assert (!method()->is_synchronized() || locks > 0 || _removed_monitors, "synchronized methods must have monitors");
@@ -340,6 +347,7 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
         ShouldNotReachHere();
     }
   }
+  //_i2c_verify_stack();
 
 
   // Unpack the locals
@@ -526,9 +534,13 @@ void vframeArray::unpack_to_stack(frame &unpack_frame, int exec_mode, int caller
   int index;
   for (index = 0; index < frames(); index++ ) {
     *element(index)->iframe() = me;
+    if (index + 1 == frames()) {
+      THREAD->_bdel_deopt = 1;
+    }
     // Get the caller frame (possibly skeletal)
     me = me.sender(&map);
   }
+  THREAD->_bdel_deopt = 0;
 
   // Do the unpacking of interpreter frames; the frame at index 0 represents the top activation, so it has no callee
   // Unpack the frames from the oldest (frames() -1) to the youngest (0)
