@@ -32,4 +32,4 @@ rm build/linux-x86_64-normal-server-$build_type/images/j2sdk-image/bin/java
 
 echo "building jvm"
 
-make images CONF=linux-x86_64-normal-server-$build_type && ./ty_dfg image_name $build_type debuginfo forkjvm
+make images CONF=linux-x86_64-normal-server-$build_type && ./ty_dfg $image_name $build_type debuginfo forkjvm
