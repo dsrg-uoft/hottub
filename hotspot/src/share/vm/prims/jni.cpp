@@ -5287,9 +5287,9 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
   // not sure how legal this transition is... (although seems to cause no asserts)
   ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
 
-  Universe::heap()->print();
+  //Universe::heap()->print();
   ((ParallelScavengeHeap *)Universe::heap())->collect(GCCause::_jvmti_force_gc);
-  Universe::heap()->print();
+  //Universe::heap()->print();
 
   /*
    * maybe try testing with this between runs?
