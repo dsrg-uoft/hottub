@@ -584,19 +584,7 @@ JavaMain(void * _args)
 
     if (ret == 0 && forkjvmid[0] != '\0') {
 
-        /* backlog is set to one, so everything after the first client will get
-         * connection refused until we close client
-         */
-        int jvmfd;
-        if ((jvmfd = listen_sock(forkjvmid)) == -1)
-            ret = 1;
-
         while (ret == 0) {
-
-            /* close server socket when doing a run */
-            int clientfd;
-            char msg[5];
-            int oldfd[3] = { 0 };
 
             /* 1. clean up everything */
             if (ifn.CleanJavaVM(forkjvmid)) {
@@ -605,12 +593,24 @@ JavaMain(void * _args)
             }
 
             /* 2. wait for a request */
+            /* close listening socket when doing a run so new clients go to next jvm */
+            int jvmfd;
+            int clientfd;
+            char msg[5];
+            int oldfd[3] = { 0 };
+
+            if ((jvmfd = listen_sock(forkjvmid)) == -1) {
+                ret = 1;
+                break;
+            }
             if ((clientfd = accept(jvmfd, NULL, NULL)) == -1) {
                 fprintf(stderr, "[forkjvm][error][JavaMain] accept | id = %s | errno = %s\n",
                         forkjvmid, strerror(errno));
                 close(clientfd);
+                close(jvmfd);
                 continue;
             }
+            close(jvmfd);
 
             /* 3. fixup file descriptors */
             int error = 0;
@@ -623,8 +623,8 @@ JavaMain(void * _args)
                 if (read == -1) {
                     fprintf(stderr, "[forkjvm][error][JavaMain] read_fd | id = %s | errno = %s\n",
                             forkjvmid, strerror(errno));
-                    close(clientfd);
                     error = 1;
+                    close(clientfd);
                     break;
                 } else if (recvfd == -1) {
                     /* done */
@@ -662,7 +662,6 @@ JavaMain(void * _args)
             }
             close(clientfd);
         }
-        close(jvmfd);
     }
     LEAVE();
 }
