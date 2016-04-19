@@ -395,82 +395,90 @@ public class StaticAnalysis implements Opcodes {
         boolean safe = false;
 
         switch (fin.getOpcode()) {
-            case GETFIELD:
-            case PUTFIELD:
-                bad_ref_field++; // stats
-                LOGLN("[unsafe] class: " + clinit_cn.name
-                        + " [cause:field] putfield/getfield (non-static reference)");
-                break;
+        case GETFIELD:
+        case PUTFIELD:
+            bad_ref_field++; // stats
+            LOGLN("[unsafe] class: " + clinit_cn.name
+                    + " [cause:field] putfield/getfield (non-static reference)");
+            break;
 
-            case GETSTATIC:
-                // we have a reference, but if it is owned by clinit's class it is ok
-                // this is very rare (makes sense, why would you read from something you will initialize)
-                // this is not a class dependence (as it would depend on itself)
-                if (clinit_cn.name.equals(fin.owner)) {
-                    safe = true;
-                } else {
-                    // check if reference
-                    if (!fin.desc.startsWith("L") && !fin.desc.startsWith("[")) {
-                        // if not reference check if final
-                        ClassNode field_cn = class_map.get(fin.owner);
-                        if (field_cn == null) {
-                            error_unsafe++; // stats
-                            System.out.println("[error][unsafe] class: " + clinit_cn.name 
-                                    + " [cause:field] !class_map.get(field): " + fin.owner);
+        case GETSTATIC:
+            // we have a reference, but if it is owned by clinit's class it is ok
+            // this is very rare (makes sense, why would you read from something you will initialize)
+            // this is not a class dependence (as it would depend on itself)
+            if (clinit_cn.name.equals(fin.owner)) {
+                safe = true;
+            } else {
+                // even final is bad! :(
+                bad_ref_getstatic++; // stats
+                LOGLN("[unsafe] class: " + clinit_cn.name + " [cause:field] getstatic");
+
+                /*
+
+                // check if reference
+                if (!fin.desc.startsWith("L") && !fin.desc.startsWith("[")) {
+                    // if not reference check if final
+                    ClassNode field_cn = class_map.get(fin.owner);
+                    if (field_cn == null) {
+                        error_unsafe++; // stats
+                        System.out.println("[error][unsafe] class: " + clinit_cn.name
+                                + " [cause:field] !class_map.get(field): " + fin.owner);
+                        break;
+                    }
+                    // get field node from class (could make map at start, but not used enough to bother)
+                    FieldNode ffn = null;
+                    // don't ask me why classnode.fields is an object...
+                    for (FieldNode fn : (List<FieldNode>)field_cn.fields) {
+                        if (fn.name.equals(fin.name)) {
+                            ffn = fn;
                             break;
                         }
-                        // get field node from class (could make map at start, but not used enough to bother)
-                        FieldNode ffn = null;
-                        // don't ask me why classnode.fields is an object...
-                        for (FieldNode fn : (List<FieldNode>)field_cn.fields) {
-                            if (fn.name.equals(fin.name)) {
-                                ffn = fn;
-                                break;
-                            }
-                        }
-                        if (ffn != null) {
-                            // not a reference and also final
-                            // this is very rare
-                            if ((ffn.access & ACC_FINAL) == 1) {
-                                safe = true; // not reference and final
-                                addClassDependence(clinit_cn, field_cn);
-                            } else {
-                                bad_ref_getstatic++; // stats
-                            }
+                    }
+                    if (ffn != null) {
+                        // not a reference and also final
+                        // this is very rare
+                        if ((ffn.access & ACC_FINAL) == 1) {
+                            safe = true; // not reference and final
+                            addClassDependence(clinit_cn, field_cn);
                         } else {
-                            error_unsafe++; // stats
-                            System.out.println("[error][unsafe] class: " + clinit_cn.name
-                                    + " [cause:field] !fieldnode for: " + fin.owner);
+                            bad_ref_getstatic++; // stats
                         }
                     } else {
-                        bad_ref_getstatic++; // stats
-                        LOGLN("[unsafe] class: " + clinit_cn.name
-                                + " [cause:field] static field reference outside of class");
+                        error_unsafe++; // stats
+                        System.out.println("[error][unsafe] class: " + clinit_cn.name
+                                + " [cause:field] !fieldnode for: " + fin.owner);
                     }
+                } else {
+                    bad_ref_getstatic++; // stats
+                    LOGLN("[unsafe] class: " + clinit_cn.name
+                            + " [cause:field] static field reference outside of class");
                 }
-                break;
 
-            // only touch static fields from clinit class
-            // causes crashes when running clinit
-            case PUTSTATIC:
-                //TODO: this causes null ptr exception on 2nd run of hdfs
+                */
+            }
+            break;
+
+        // only touch static fields from clinit class
+        // causes crashes when running clinit
+        case PUTSTATIC:
+            //TODO: this causes null ptr exception on 2nd run of hdfs
+            //bad_ref_putstatic++; // stats
+            LOGF("[info][putstatic] clinit.name: %s fin.owner: %s fin.name: %s\n",
+                    clinit_cn.name, fin.owner, fin.name);
+            if (clinit_cn.name.equals(fin.owner)) {
+                safe = true;
+                addClassDependence(clinit_cn, fin.owner);
+            } else {
                 bad_ref_putstatic++; // stats
                 LOGLN("[unsafe] class: " + clinit_cn.name + " [cause:field] putstatic");
-                //LOGF("[info][putstatic] clinit.name: %s fin.owner: %s fin.name: %s\n", clinit_cn.name,fin.owner,fin.name);
-                //if (clinit_cn.name.equals(fin.owner)) {
-                //    //safe = true;
-                //    //addClassDependence(clinit_cn, fin.owner);
-                //    bad_ref_putstatic++; // stats
-                //} else {
-                //    bad_ref_putstatic++; // stats
-                //}
-                break;
+            }
+            break;
 
-            default:
-                error_unsafe++; // stats
-                System.out.println("[error][unsafe] class: " + clinit_cn.name 
-                        + " [cause:field] unknown opcode: " + fin.getOpcode());
-                break;
+        default:
+            error_unsafe++; // stats
+            System.out.println("[error][unsafe] class: " + clinit_cn.name
+                    + " [cause:field] unknown opcode: " + fin.getOpcode());
+            break;
         }
         return safe;
     }
@@ -488,7 +496,6 @@ public class StaticAnalysis implements Opcodes {
         HashSet<MethodNode> result = new HashSet<MethodNode>();
 
         switch (min.getOpcode()) {
-
         case INVOKEVIRTUAL: // invoke virtual
             /* -- can't handle invoke virtual --
              * - the object used to invoke the message is determined at
