@@ -121,7 +121,7 @@ int run_forkjvm(char *id)
         id[0] = '/';
         id[ID_LEN - 1] = '0' + poolno;
         jvmpath[datapath_len + ID_LEN - 1] = '0' + poolno;
-        printf("[info][forkjvm] (run_forkjvm) trying id %s\n", id);
+        printf("[forkjvm][info] (run_forkjvm) trying id %s\n", id);
 
         /* check if a directory exists make it if it doesn't
          * if success then we need to start a new jvm
@@ -132,9 +132,14 @@ int run_forkjvm(char *id)
 
         } else if (errno == EEXIST) {
             int jvmfd;
-
-            if ((jvmfd = connect_sock(id)) == -1)
+            jvmfd = connect_sock(id);
+            if (jvmfd <= 0) {
+                if (jvmfd == -2)
+                    fprintf(stderr, "[forkjvm][error] socket | id = %s | errno = %s\n", id, strerror(errno));
+                else if (jvmfd == -1)
+                    printf("[forkjvm][info] connect | id = %s | errno = %s\n", id, strerror(errno));
                 continue;
+            }
 
             error = send_fds(jvmfd);
             if (error == -2) {
@@ -145,14 +150,14 @@ int run_forkjvm(char *id)
                 continue;
             }
 
-            printf("[info][forkjvm] (run_forkjvm) running server with id %s\n", id);
+            printf("[forkjvm][info] (run_forkjvm) running server with id %s\n", id);
             memset(msg, 0, MSG_LEN);
             if (read_sock(jvmfd, msg, MSG_LEN) == -1)
-                perror("[error][forkjvm] read_sock");
+                perror("[forkjvm][error] read_sock");
             close(jvmfd);
             done = 1;
         } else {
-            fprintf(stderr, "[error][forkjvm] (run_forkjvm) mkdir | jvmpath = %s | errno = %s\n",
+            fprintf(stderr, "[forkjvm][error] (run_forkjvm) mkdir | jvmpath = %s | errno = %s\n",
                     jvmpath, strerror(errno));
             return -1;
         }
@@ -170,13 +175,13 @@ int compute_id(char *id, int argc, char **argv)
     MD5_CTX md5ctx;
 
     if (!MD5_Init(&md5ctx)) {
-        fprintf(stderr, "[error][forkjvm] MD5_Init\n");
+        fprintf(stderr, "[forkjvm][error] MD5_Init\n");
         return -1;
     }
     /* add in all the args */
     for (i = 0; i < argc; i++) {
         if (!MD5_Update(&md5ctx, argv[i], strlen(argv[i]))) {
-            fprintf(stderr, "[error][forkjvm] MD5_Update\n");
+            fprintf(stderr, "[forkjvm][error] MD5_Update\n");
             return -1;
         }
         /* locate classpath while adding args */
@@ -196,7 +201,7 @@ int compute_id(char *id, int argc, char **argv)
     }
 
     if (!MD5_Final(digest, &md5ctx)) {
-      fprintf(stderr, "[error][forkjvm] MD5_Final\n");
+      fprintf(stderr, "[forkjvm][error] MD5_Final\n");
       return -1;
     }
 
@@ -309,7 +314,7 @@ int md5add_file(MD5_CTX *md5ctx, const char *filename)
     unsigned char data[1024];
     while ((bytes = fread(data, 1, 1024, inFile)) != 0) {
         if (!MD5_Update(md5ctx, data, 1024)) {
-            fprintf(stderr, "[error][forkjvm] MD5_Update\n");
+            fprintf(stderr, "[forkjvm][error] MD5_Update\n");
             return -1;
         }
     }
@@ -319,10 +324,10 @@ int md5add_file(MD5_CTX *md5ctx, const char *filename)
 int create_datapath(char *datapath) {
     int datapath_len = readlink("/proc/self/exe", datapath, MAX_PATH_SIZE);
     if (datapath_len == -1) {
-        perror("[error][forkjvm] readlink");
+        perror("[forkjvm][error] readlink");
         return -1;;
     } else if (datapath_len > MAX_PATH_SIZE) {
-        fprintf(stderr, "[error][forkjvm] readlink MAX_PATH_SIZE too small\n");
+        fprintf(stderr, "[forkjvm][error] readlink MAX_PATH_SIZE too small\n");
         return -1;
     }
     // -11 removes "bin/java"
@@ -337,7 +342,7 @@ int create_execpath(char *execpath)
 {
     int exec_path_len = readlink("/proc/self/exe", execpath, MAX_PATH_SIZE);
     if (exec_path_len == -1) {
-        perror("[error][forkjvm] readlink");
+        perror("[forkjvm][error] readlink");
         return exec_path_len;
     }
     execpath[exec_path_len] = '\0';
@@ -364,10 +369,10 @@ int exec_jvm(const char *id, int main_argc, char **main_argv)
         argv[1] = forkjvm_arg;
         memcpy(argv + 2, main_argv + 1, sizeof(argv));
         argv[main_argc + 1] = NULL;
-        printf("[info][forkjvm] (exec_jvm) exec with id %s\n", id + 1);
+        printf("[forkjvm][info] (exec_jvm) exec with id %s\n", id + 1);
     }
     execv(execpath, argv);
-    perror("[error][forkjvm] exec");
+    perror("[forkjvm][error] exec");
     return -1;
 }
 
@@ -380,7 +385,7 @@ int send_fds(int jvmfd)
 
     /* send fds to forkjvm */
     if (getrlimit(RLIMIT_NOFILE, &fd_lim) == -1) {
-        perror("[error][forkjvm] (send_fds) getrlimit");
+        perror("[forkjvm][error] (send_fds) getrlimit");
         return -2;
     }
 
@@ -389,14 +394,14 @@ int send_fds(int jvmfd)
         if (fcntl(fd, F_GETFD) != -1) {
             sprintf(msg, "%d", fd);
             if (write_fd(jvmfd, msg, MSG_LEN, fd) != MSG_LEN) {
-                perror("[error][forkjvm] (send_fds) write_fd");
+                perror("[forkjvm][error] (send_fds) write_fd");
                 return -1;
             }
         }
     }
     /* send go msg aka no fd */
     if (write_sock(jvmfd, msg, MSG_LEN) != MSG_LEN) {
-        perror("[error][forkjvm] (send_fds) write_sock");
+        perror("[forkjvm][error] (send_fds) write_sock");
         return -1;
     }
     return 0;
@@ -409,20 +414,17 @@ int connect_sock(const char *path)
     int fd;
 
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (fd == -1) {
-        fprintf(stderr, "[error][forkjvm] socket | path = %s | errno = %s\n", path + 1, strerror(errno));
-        return -1;
-    }
+    if (fd == -1)
+        return -2;
 
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
     addr.sun_path[0] = '\0';
 
-    if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        fprintf(stderr, "[error][forkjvm] connect | path = %s | errno = %s\n", path + 1, strerror(errno));
+    if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1)
         return -1;
-    }
+
     return fd;
 }
 
