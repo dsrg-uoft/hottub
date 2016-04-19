@@ -5279,6 +5279,25 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_GetCreatedJavaVMs(JavaVM **vm_buf, jsize
   return JNI_OK;
 }
 
+/*
+class VM_DeoptimizeTheWorld : public VM_Operation {
+ public:
+  VMOp_Type type() const {
+    return VMOp_DeoptimizeTheWorld;
+  }
+  void doit() {
+    CodeCache::mark_all_nmethods_for_deoptimization();
+    ResourceMark rm;
+    DeoptimizationMarker dm;
+    // Deoptimize all activations depending on marked methods
+    Deoptimization::deoptimize_dependents();
+
+    // Mark the dependent methods non entrant
+    CodeCache::make_marked_nmethods_not_entrant();
+  }
+};
+*/
+
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
   JavaThread* thread = JavaThread::current();
 
@@ -5286,6 +5305,11 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
 
   // not sure how legal this transition is... (although seems to cause no asserts)
   ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
+
+  /*
+  VM_DeoptimizeTheWorld op;
+  VMThread::execute(&op);
+  */
 
   //Universe::heap()->print();
   ((ParallelScavengeHeap *)Universe::heap())->collect(GCCause::_jvmti_force_gc);
