@@ -3861,28 +3861,6 @@ void InstanceKlass::record_class(Klass *k, TRAPS) {
   }
 }
 
-/*
-void InstanceKlass::do_magic(Klass *k, TRAPS) {
-  if (!k->class_loader_data()->is_the_null_class_loader_data()) {
-    HandleMark hm(THREAD);
-    Handle nh;
-
-    // initialize will check state and return if not reset
-    InstanceKlass::cast(k)->_init_state = (u1)linked;
-
-    // do java_lang_Class::initialize_mirror_fields
-    // normally called from parseClassFile (although cscope misses this...)
-    instanceKlassHandle ikh_k (THREAD, k);
-    Handle h_jm (k->java_mirror());
-    Handle h_pd (k->protection_domain());
-    java_lang_Class::initialize_mirror_fields(ikh_k, h_jm, h_pd, CHECK);
-
-    // forcefully initialize - take matters into our own hands
-    InstanceKlass::cast(k)->initialize(CHECK);
-  }
-}
-*/
-
 void InstanceKlass::re_initialize(bool full, TRAPS) {
 
   if (ForkJVMLog) {
