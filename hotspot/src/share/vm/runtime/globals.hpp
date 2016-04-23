@@ -963,6 +963,9 @@ class CommandLineFlags {
   product(bool, ProfileIntCompStrict, false,                                \
           "Profiling interpreter time, strict sanity checks")               \
                                                                             \
+  product(bool, ProfileIntCompJitOnly, false,                               \
+          "Profiling jitted code time (native part of \"interpreted\"")     \
+                                                                            \
   diagnostic(bool, TraceNMethodInstalls, false,                             \
           "Trace nmethod installation")                                     \
                                                                             \

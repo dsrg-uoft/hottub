@@ -83,6 +83,8 @@
 
 PRAGMA_FORMAT_MUTE_WARNINGS_FOR_GCC
 
+#include "runtime/_bdel.hpp"
+
 // --------------------------------------------------------------------------------------------------
 // Implementation of Safepoint begin/end
 
@@ -958,6 +960,8 @@ void ThreadSafepointState::handle_polling_page_exception() {
   assert(type() == ThreadSafepointState::_running,
          "polling page exception on thread not running state");
 
+  _i2c_unpatch(thread(), "ThreadSafepointState#handle_polling_page_exception");
+
   // Step 1: Find the nmethod from the return address
   if (ShowSafepointMsgs && Verbose) {
     tty->print_cr("Polling page exception at " INTPTR_FORMAT, thread()->saved_exception_pc());
@@ -1042,6 +1046,7 @@ void ThreadSafepointState::handle_polling_page_exception() {
       }
     }
   }
+  _i2c_repatch(thread(), "ThreadSafepointState#handle_polling_page_exception");
 }
 
 

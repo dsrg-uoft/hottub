@@ -330,7 +330,7 @@ extern "C" {
       _jvm_transitions_push(jt, 0);
     } else {
       // i2n
-      _jvm_transitions_push(jt, 3);
+      _jvm_transitions_push(jt, ProfileIntCompJitOnly ? 2 : 3);
     }
   }
   /*

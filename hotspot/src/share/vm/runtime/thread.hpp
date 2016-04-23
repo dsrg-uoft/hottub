@@ -832,7 +832,9 @@ class JavaThread: public Thread {
   uint64_t _blocking_compile_time;
   int8_t _bdel_deopt;
   int8_t _bdel_safepoint;
-  // 0 for interpreted, 1 for compiled, 3 for native
+  // 0 for interpreted, 1 for compiled
+  // when ProfileIntCompJitOnly is true, 2 for native, otherwise 3
+  // when adding the time at a transition, it takes state & 1 so native gets attributed to either int or comp
   int8_t _jvm_state;
   int8_t _jvm_state_ready;
   uint64_t _jvm_state_times[2];

@@ -456,15 +456,43 @@ public class URLClassLoader extends SecureClassLoader implements Closeable {
             // Use (direct) ByteBuffer:
             CodeSigner[] signers = res.getCodeSigners();
             CodeSource cs = new CodeSource(url, signers);
-            sun.misc.PerfCounter.getReadClassBytesTime().addElapsedTimeFrom(t0);
-            return defineClass(name, bb, cs);
+            long t1 = System.nanoTime();
+            sun.misc.PerfCounter.getReadClassBytesTime().addTime(t1 - t0);
+            long _size = bb.remaining();
+            sun.misc.PerfCounter.getReadClassBytes().add(_size);
+            if (_size < 1024) {
+                sun.misc.PerfCounter.getReadClassBytes_u1kb().increment();
+                sun.misc.PerfCounter.getReadClassBytesTime_u1kb().addTime(t1 - t0);
+            } else if (_size < 5 * 1024) {
+                sun.misc.PerfCounter.getReadClassBytes_u5kb().increment();
+                sun.misc.PerfCounter.getReadClassBytesTime_u5kb().addTime(t1 - t0);
+            }
+            //return defineClass(name, bb, cs);
+            Class<?> _ret = defineClass(name, bb, cs);
+            long t2 = System.nanoTime();
+            sun.misc.PerfCounter.getDefineClassTime().add(t2 - t1);
+            return _ret;
         } else {
             byte[] b = res.getBytes();
             // must read certificates AFTER reading bytes.
             CodeSigner[] signers = res.getCodeSigners();
             CodeSource cs = new CodeSource(url, signers);
-            sun.misc.PerfCounter.getReadClassBytesTime().addElapsedTimeFrom(t0);
-            return defineClass(name, b, 0, b.length, cs);
+            long t1 = System.nanoTime();
+            sun.misc.PerfCounter.getReadClassBytesTime().addTime(t1 - t0);
+            long _size = b.length;
+            sun.misc.PerfCounter.getReadClassBytes().add(_size);
+            if (_size < 1024) {
+                sun.misc.PerfCounter.getReadClassBytes_u1kb().increment();
+                sun.misc.PerfCounter.getReadClassBytesTime_u1kb().addTime(t1 - t0);
+            } else if (_size < 5 * 1024) {
+                sun.misc.PerfCounter.getReadClassBytes_u5kb().increment();
+                sun.misc.PerfCounter.getReadClassBytesTime_u5kb().addTime(t1 - t0);
+            }
+            //return defineClass(name, b, 0, b.length, cs);
+            Class<?> _ret = defineClass(name, b, 0, b.length, cs);
+            long t2 = System.nanoTime();
+            sun.misc.PerfCounter.getDefineClassTime().add(t2 - t1);
+            return _ret;
         }
     }
 

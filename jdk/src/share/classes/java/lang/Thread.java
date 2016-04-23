@@ -758,13 +758,23 @@ class Thread implements Runnable {
     private void exit() {
         String print_class_loading = System.getProperty("PrintClassLoading");
         if (print_class_loading != null && print_class_loading.equals("true")) {
-            // print out class loading performance counters
-            System.out.println("[thread exit] "+sun.misc.PerfCounter.getClassNameLockSync());
-            System.out.println("[thread exit] "+sun.misc.PerfCounter.getParentDelegationTime());
-            System.out.println("[thread exit] "+sun.misc.PerfCounter.getFindClassTime());
-            System.out.println("[thread exit] "+sun.misc.PerfCounter.getFindClasses());
-            System.out.println("[thread exit] "+sun.misc.PerfCounter.getNullFindClassTime());
-            System.out.println("[thread exit] "+sun.misc.PerfCounter.getNullFindClasses());
+            long a = sun.misc.PerfCounter.tl_ClassNameLockSyncTime().get();
+            long b = sun.misc.PerfCounter.tl_FindLoadedClassTime().get();
+            long c = sun.misc.PerfCounter.tl_NullFindClassTime().get();
+            long d = sun.misc.PerfCounter.tl_ParentDelegationTime().get();
+            long e = sun.misc.PerfCounter.tl_FindClassTime().get();
+            long f = sun.misc.PerfCounter.tl_ResolveClassTime().get();
+            System.out.print(String.format(
+                "[thread exit %d]: cnls %.6f, flct %.6f, nfct %.6f, pdt %.6f fct %.6f, rct %.6f, total %.6f\n"
+                , this.getId()
+                , a / 1e9
+                , b / 1e9
+                , c / 1e9
+                , d / 1e9
+                , e / 1e9
+                , f / 1e9
+                , (a + b + c + d + e + f) / 1e9
+            ));
         }
 
         if (group != null) {

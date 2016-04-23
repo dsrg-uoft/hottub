@@ -3242,11 +3242,14 @@ javaVFrame* JavaThread::last_java_vframe(RegisterMap *reg_map) {
 
 
 Klass* JavaThread::security_get_caller_class(int depth) {
+  _i2c_unpatch(this, "JavaThread#security_get_caller_class");
   vframeStream vfst(this);
   vfst.security_get_caller_frame(depth);
   if (!vfst.at_end()) {
+    _i2c_repatch(this, "JavaThread#security_get_caller_class");
     return vfst.method()->method_holder();
   }
+  _i2c_repatch(this, "JavaThread#security_get_caller_class");
   return NULL;
 }
 

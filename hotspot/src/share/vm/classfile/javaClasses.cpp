@@ -1767,6 +1767,8 @@ void java_lang_Throwable::fill_in_stack_trace_of_preallocated_backtrace(Handle t
   objArrayHandle backtrace (THREAD, (objArrayOop)java_lang_Throwable::backtrace(throwable()));
   assert(backtrace.not_null(), "backtrace should have been preallocated");
 
+  _i2c_unpatch(THREAD, "fill in stack trace of preallocated backtrace");
+
   ResourceMark rm(THREAD);
   vframeStream st(THREAD);
 
@@ -1787,6 +1789,7 @@ void java_lang_Throwable::fill_in_stack_trace_of_preallocated_backtrace(Handle t
     // Bail-out for deep stacks
     if (chunk_count >= max_chunks) break;
   }
+  _i2c_repatch(THREAD, "fill in stack trace of preallocated backtrace");
 
   // For Java 7+ we support the Throwable immutability protocol defined for Java 7. This support
   // was missing in 7u0 so in 7u0 there is a workaround in the Throwable class. That workaround

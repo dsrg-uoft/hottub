@@ -125,43 +125,62 @@ public class PerfCounter {
     }
 
     static class CoreCounters {
+        static final PerfCounter pdt   = newPerfCounter("sun.classloader.parentDelegationTime");
+        static final PerfCounter lc    = newPerfCounter("sun.classloader.findClasses");
+        static final PerfCounter lct   = newPerfCounter("sun.classloader.findClassTime");
+        static final PerfCounter rcbt  = newPerfCounter("sun.urlClassLoader.readClassBytesTime");
         static final PerfCounter zfc   = newPerfCounter("sun.zip.zipFiles");
         static final PerfCounter zfot  = newPerfCounter("sun.zip.zipFile.openTime");
 
+        static final PerfCounter flct = newPerfCounter("sun.classloader.findLoadedClassTime");
+        static final PerfCounter cnlst = newPerfCounter("sun.classloader.classNameLockSyncTime");
+        static final PerfCounter null_lc = newPerfCounter("sun.classloader.nullFindClasses");
+        static final PerfCounter null_lct = newPerfCounter("sun.classloader.nullFindClassTime");
+        static final PerfCounter ojt  = newPerfCounter("sun.urlClassLoader.openJarTime");
+        static final PerfCounter oj  = newPerfCounter("sun.urlClassLoader.openJars");
+        static final PerfCounter dct  = newPerfCounter("sun.urlClassLoader.defineClassTime");
+        static final PerfCounter clct = newPerfCounter("sun.classloader.classLoadingCompTime");
+        static final PerfCounter rct = newPerfCounter("sun.classloader.resolveClassTime");
 
-        static final ThreadLocal<PerfCounter> pdt = new ThreadLocal<PerfCounter>() {
-            @Override protected PerfCounter initialValue() {
-                return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_parentDelegationTime");
-            }
-        };
-        static final ThreadLocal<PerfCounter> lc = new ThreadLocal<PerfCounter>() {
-            @Override protected PerfCounter initialValue() {
-                return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_findClasses");
-            }
-        };
-        static final ThreadLocal<PerfCounter> lct = new ThreadLocal<PerfCounter>() {
+        static final PerfCounter rcb = newPerfCounter("sun.urlClassLoader.readClassBytes");
+        static final PerfCounter rcb_u1kb = newPerfCounter("sun.urlClassLoader.readClassBytes_u1kb");
+        static final PerfCounter rcb_u5kb = newPerfCounter("sun.urlClassLoader.readClassBytes_u4kb");
+        static final PerfCounter rcbt_u1kb = newPerfCounter("sun.urlClassLoader.readClassBytesTime_u1kb");
+        static final PerfCounter rcbt_u5kb = newPerfCounter("sun.urlClassLoader.readClassBytesTime_u4kb");
+
+        static final ThreadLocal<PerfCounter> tl_lct = new ThreadLocal<PerfCounter>() {
             @Override protected PerfCounter initialValue() {
                 return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_findClassTime");
             }
         };
-        static final ThreadLocal<PerfCounter> cnls = new ThreadLocal<PerfCounter>() {
-            @Override protected PerfCounter initialValue() {
-                return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_classNameLockSync");
-            }
-        };
-        static final ThreadLocal<PerfCounter> rcbt = new ThreadLocal<PerfCounter>() {
-            @Override protected PerfCounter initialValue() {
-                return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_readClassBytesTime");
-            }
-        };
-        static final ThreadLocal<PerfCounter> null_lc = new ThreadLocal<PerfCounter>() {
+        static final ThreadLocal<PerfCounter> tl_null_lc = new ThreadLocal<PerfCounter>() {
             @Override protected PerfCounter initialValue() {
                 return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_null_findClasses");
             }
         };
-        static final ThreadLocal<PerfCounter> null_lct = new ThreadLocal<PerfCounter>() {
+        static final ThreadLocal<PerfCounter> tl_null_lct = new ThreadLocal<PerfCounter>() {
             @Override protected PerfCounter initialValue() {
                 return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_null_findClassTime");
+            }
+        };
+        static final ThreadLocal<PerfCounter> tl_flct = new ThreadLocal<PerfCounter>() {
+            @Override protected PerfCounter initialValue() {
+                return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_findLoadedCLassTime");
+            }
+        };
+        static final ThreadLocal<PerfCounter> tl_pdt = new ThreadLocal<PerfCounter>() {
+            @Override protected PerfCounter initialValue() {
+                return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_parentDelegationTime");
+            }
+        };
+        static final ThreadLocal<PerfCounter> tl_rct = new ThreadLocal<PerfCounter>() {
+            @Override protected PerfCounter initialValue() {
+                return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_resolveClassTime");
+            }
+        };
+        static final ThreadLocal<PerfCounter> tl_cnlst = new ThreadLocal<PerfCounter>() {
+            @Override protected PerfCounter initialValue() {
+                return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_classNameLockSyncTime");
             }
         };
     }
@@ -174,7 +193,7 @@ public class PerfCounter {
      * Number of findClass calls
      */
     public static PerfCounter getFindClasses() {
-        return CoreCounters.lc.get();
+        return CoreCounters.lc;
     }
 
     /**
@@ -182,14 +201,14 @@ public class PerfCounter {
      * lookup and read class bytes and defineClass
      */
     public static PerfCounter getFindClassTime() {
-        return CoreCounters.lct.get();
+        return CoreCounters.lct;
     }
 
     /**
      * Time (ns) spent in finding classes
      */
     public static PerfCounter getReadClassBytesTime() {
-        return CoreCounters.rcbt.get();
+        return CoreCounters.rcbt;
     }
 
     /**
@@ -197,7 +216,7 @@ public class PerfCounter {
      * the parent of the defining class loader
      */
     public static PerfCounter getParentDelegationTime() {
-        return CoreCounters.pdt.get();
+        return CoreCounters.pdt;
     }
 
     /**
@@ -222,25 +241,79 @@ public class PerfCounter {
         return WindowsClientCounters.d3dAvailable;
     }
 
+    // JVMPERF
     /**
      * Time (ns) spend trying to synchronize on class name lock
      */
-    public static PerfCounter getClassNameLockSync() {
-        return CoreCounters.cnls.get();
+    public static PerfCounter getClassNameLockSyncTime() {
+        return CoreCounters.cnlst;
     }
-
     /**
      * Number of null class loader findClass calls
      */
     public static PerfCounter getNullFindClasses() {
-        return CoreCounters.null_lc.get();
+        return CoreCounters.null_lc;
     }
-
     /**
      * Time (ns) spent in null finding classes that includes
      * lookup and read class bytes and defineClass
      */
     public static PerfCounter getNullFindClassTime() {
-        return CoreCounters.null_lct.get();
+        return CoreCounters.null_lct;
+    }
+    public static PerfCounter getOpenJars() {
+        return CoreCounters.oj;
+    }
+    public static PerfCounter getOpenJarTime() {
+        return CoreCounters.ojt;
+    }
+    public static PerfCounter getDefineClassTime() {
+        return CoreCounters.dct;
+    }
+    public static PerfCounter getClassLoadingCompTime() {
+        return CoreCounters.clct;
+    }
+    public static PerfCounter getFindLoadedClassTime() {
+        return CoreCounters.flct;
+    }
+    public static PerfCounter getResolveClassTime() {
+        return CoreCounters.rct;
+    }
+    public static PerfCounter getReadClassBytes() {
+        return CoreCounters.rcb;
+    }
+    public static PerfCounter getReadClassBytes_u1kb() {
+        return CoreCounters.rcb_u1kb;
+    }
+    public static PerfCounter getReadClassBytes_u5kb() {
+        return CoreCounters.rcb_u5kb;
+    }
+    public static PerfCounter getReadClassBytesTime_u1kb() {
+        return CoreCounters.rcbt_u1kb;
+    }
+    public static PerfCounter getReadClassBytesTime_u5kb() {
+        return CoreCounters.rcbt_u5kb;
+    }
+    // JVMPERF thread local
+    public static PerfCounter tl_FindClassTime() {
+        return CoreCounters.tl_lct.get();
+    }
+    public static PerfCounter tl_ClassNameLockSyncTime() {
+        return CoreCounters.tl_cnlst.get();
+    }
+    public static PerfCounter tl_FindLoadedClassTime() {
+        return CoreCounters.tl_flct.get();
+    }
+    public static PerfCounter tl_ParentDelegationTime() {
+        return CoreCounters.tl_pdt.get();
+    }
+    public static PerfCounter tl_ResolveClassTime() {
+        return CoreCounters.tl_rct.get();
+    }
+    public static PerfCounter tl_NullFindClasses() {
+        return CoreCounters.tl_null_lc.get();
+    }
+    public static PerfCounter tl_NullFindClassTime() {
+        return CoreCounters.tl_null_lct.get();
     }
 }

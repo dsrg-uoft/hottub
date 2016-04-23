@@ -401,23 +401,34 @@ public abstract class ClassLoader {
     protected Class<?> loadClass(String name, boolean resolve)
         throws ClassNotFoundException
     {
+        final Thread th = Thread.currentThread();
         long t0 = System.nanoTime();
+        long t0_c = th.getCompTime();
         synchronized (getClassLoadingLock(name)) {
             long t1 = System.nanoTime();
             // First, check if the class has already been loaded
             Class<?> c = findLoadedClass(name);
+            long t2 = System.nanoTime();
+            sun.misc.PerfCounter.getClassNameLockSyncTime().addTime(t1 - t0);
+            sun.misc.PerfCounter.getFindLoadedClassTime().addTime(t2 - t1);
+            sun.misc.PerfCounter.tl_ClassNameLockSyncTime().addTime(t1 - t0);
+            sun.misc.PerfCounter.tl_FindLoadedClassTime().addTime(t2 - t1);
+            final sun.misc.PerfCounter clct = sun.misc.PerfCounter.getClassLoadingCompTime();
             if (c == null) {
-                long t2 = System.nanoTime();
                 try {
                     if (parent != null) {
                         c = parent.loadClass(name, false);
                     } else {
-                        long t5 = System.nanoTime();
                         c = findBootstrapClassOrNull(name);
-                        long t6 = System.nanoTime();
+                        //long t3_c = th.getCompTime();
+                        //clct.addTime(t3_c - t0_c);
+                        // bootstrap class loader doesn't record stats
                         if (c != null) {
-                            sun.misc.PerfCounter.getNullFindClassTime().addTime(t6 - t5);
+                            long t3 = System.nanoTime();
+                            sun.misc.PerfCounter.getNullFindClassTime().addTime(t3 - t2);
                             sun.misc.PerfCounter.getNullFindClasses().increment();
+                            sun.misc.PerfCounter.tl_NullFindClassTime().addTime(t3 - t2);
+                            sun.misc.PerfCounter.tl_NullFindClasses().increment();
                         }
                     }
                 } catch (ClassNotFoundException e) {
@@ -428,19 +439,31 @@ public abstract class ClassLoader {
                 if (c == null) {
                     // If still not found, then invoke findClass in order
                     // to find the class.
-                    long t3 = System.nanoTime();
-                    c = findClass(name);
                     long t4 = System.nanoTime();
+                    //long t4_c = th.getCompTime();
+                    c = findClass(name);
+                    long t5 = System.nanoTime();
+                    long t5_c = th.getCompTime();
+
+                    clct.addTime(t5_c - t0_c);
 
                     // this is the defining class loader; record the stats
-                    sun.misc.PerfCounter.getParentDelegationTime().addTime(t3 - t2);
-                    sun.misc.PerfCounter.getFindClassTime().addTime(t4 - t3);
+                    sun.misc.PerfCounter.getParentDelegationTime().addTime(t4 - t2);
+                    sun.misc.PerfCounter.tl_ParentDelegationTime().addTime(t4 - t2);
+                    sun.misc.PerfCounter.getFindClassTime().addTime(t5 - t4);
+                    sun.misc.PerfCounter.tl_FindClassTime().addTime(t5 - t4);
                     sun.misc.PerfCounter.getFindClasses().increment();
                 }
             }
-            sun.misc.PerfCounter.getClassNameLockSync().addTime(t1 - t0);
             if (resolve) {
+                long t10 = System.nanoTime();
+                long t10_c = th.getCompTime();
                 resolveClass(c);
+                long t11 = System.nanoTime();
+                long t11_c = th.getCompTime();
+                sun.misc.PerfCounter.getResolveClassTime().addTime(t11 - t10);
+                sun.misc.PerfCounter.tl_ResolveClassTime().addTime(t11 - t10);
+                clct.addTime(t11_c - t10_c);
             }
             return c;
         }
