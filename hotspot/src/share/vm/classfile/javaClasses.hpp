@@ -252,6 +252,7 @@ class java_lang_Class : AllStatic {
   static void initialize_mirror_fields(KlassHandle k, Handle mirror, Handle protection_domain, TRAPS);
  public:
   // forkjvm re-initialization
+  static void zero_initialize_static_field(fieldDescriptor* fd, Handle mirror, TRAPS);
   static void initialize_static_field(fieldDescriptor* fd, Handle mirror, TRAPS);
 
   static void compute_offsets();
