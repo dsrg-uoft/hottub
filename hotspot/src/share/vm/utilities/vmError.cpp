@@ -229,7 +229,7 @@ char* VMError::error_string(char* buf, int buflen) {
 
   if (signame) {
     jio_snprintf(buf, buflen,
-                 "%s (0x%x) at pc=" PTR_FORMAT ", pid=%d, tid=" UINTX_FORMAT,
+                 "%s (0x%x) at pc=" PTR_FORMAT ", pid=%d, tid=" INTPTR_FORMAT,
                  signame, _id, _pc,
                  os::current_process_id(), os::current_thread_id());
   } else if (_filename != NULL && _lineno > 0) {
@@ -237,7 +237,7 @@ char* VMError::error_string(char* buf, int buflen) {
     char separator = os::file_separator()[0];
     const char *p = strrchr(_filename, separator);
     int n = jio_snprintf(buf, buflen,
-                         "Internal Error at %s:%d, pid=%d, tid=" UINTX_FORMAT,
+                         "Internal Error at %s:%d, pid=%d, tid=" INTPTR_FORMAT,
                          p ? p + 1 : _filename, _lineno,
                          os::current_process_id(), os::current_thread_id());
     if (n >= 0 && n < buflen && _message) {
@@ -251,7 +251,7 @@ char* VMError::error_string(char* buf, int buflen) {
     }
   } else {
     jio_snprintf(buf, buflen,
-                 "Internal Error (0x%x), pid=%d, tid=" UINTX_FORMAT,
+                 "Internal Error (0x%x), pid=%d, tid=" INTPTR_FORMAT,
                  _id, os::current_process_id(), os::current_thread_id());
   }
 
@@ -438,7 +438,7 @@ void VMError::report(outputStream* st) {
 
      // process id, thread id
      st->print(", pid=%d", os::current_process_id());
-     st->print(", tid=" UINTX_FORMAT, os::current_thread_id());
+     st->print(", tid=" INTPTR_FORMAT, os::current_thread_id());
      st->cr();
 
   STEP(40, "(printing error message)")
@@ -853,12 +853,9 @@ static int prepare_log_file(const char* pattern, const char* default_pattern, ch
   return fd;
 }
 
-//#include "runtime/_bdel.hpp"
 void VMError::report_and_die() {
   // Don't allocate large buffer on stack
   static char buffer[O_BUFLEN];
-
-  //_c2i_dump_stack(JavaThread::active());
 
   // How many errors occurred in error handler when reporting first_error.
   static int recursive_error_count;

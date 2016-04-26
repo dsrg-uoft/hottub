@@ -330,7 +330,7 @@ extern "C" {
       _jvm_transitions_push(jt, 0);
     } else {
       // i2n
-      _jvm_transitions_push(jt, 3);
+      _jvm_transitions_push(jt, ProfileIntCompJitOnly ? 2 : 3);
     }
   }
   /*
@@ -1966,7 +1966,13 @@ JRT_BLOCK_ENTRY(address, SharedRuntime::handle_wrong_method(JavaThread* thread))
   RegisterMap reg_map(thread, false);
   frame stub_frame = thread->last_frame();
   assert(stub_frame.is_runtime_frame(), "sanity check");
+  if (_unlikely(thread->_bdel_deopt != 0)) {
+    tty->print_cr("_HOTSPOT: in SharedRuntime#handle_wrong_method, bdel deopt not 0, is %d", thread->_bdel_deopt);
+    ShouldNotReachHere();
+  }
+  thread->_bdel_deopt = 2;
   frame caller_frame = stub_frame.sender(&reg_map);
+  thread->_bdel_deopt = 0;
 
   if (caller_frame.is_interpreted_frame() ||
       caller_frame.is_entry_frame()) {

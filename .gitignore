@@ -1,6 +1,7 @@
 
 
-/.hg/
+.hg/
+.hgtags
 /build/
 /j2sdk-image.*
 cscope.*

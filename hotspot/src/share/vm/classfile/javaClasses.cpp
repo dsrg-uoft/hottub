@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -984,7 +984,7 @@ void java_lang_Thread::compute_offsets() {
   assert(_group_offset == 0, "offsets should be initialized only once");
 
   Klass* k = SystemDictionary::Thread_klass();
-  compute_offset(_name_offset,      k, vmSymbols::name_name(),      vmSymbols::char_array_signature());
+  compute_offset(_name_offset,      k, vmSymbols::name_name(),      vmSymbols::string_signature());
   compute_offset(_group_offset,     k, vmSymbols::group_name(),     vmSymbols::threadgroup_signature());
   compute_offset(_contextClassLoader_offset, k, vmSymbols::contextClassLoader_name(), vmSymbols::classloader_signature());
   compute_offset(_inheritedAccessControlContext_offset, k, vmSymbols::inheritedAccessControlContext_name(), vmSymbols::accesscontrolcontext_signature());
@@ -1014,15 +1014,12 @@ void java_lang_Thread::set_thread(oop java_thread, JavaThread* thread) {
 }
 
 
-typeArrayOop java_lang_Thread::name(oop java_thread) {
-  oop name = java_thread->obj_field(_name_offset);
-  assert(name == NULL || (name->is_typeArray() && TypeArrayKlass::cast(name->klass())->element_type() == T_CHAR), "just checking");
-  return typeArrayOop(name);
+oop java_lang_Thread::name(oop java_thread) {
+  return java_thread->obj_field(_name_offset);
 }
 
 
-void java_lang_Thread::set_name(oop java_thread, typeArrayOop name) {
-  assert(java_thread->obj_field(_name_offset) == NULL, "name should be NULL");
+void java_lang_Thread::set_name(oop java_thread, oop name) {
   java_thread->obj_field_put(_name_offset, name);
 }
 
@@ -1818,6 +1815,8 @@ void java_lang_Throwable::fill_in_stack_trace_of_preallocated_backtrace(Handle t
   objArrayHandle backtrace (THREAD, (objArrayOop)java_lang_Throwable::backtrace(throwable()));
   assert(backtrace.not_null(), "backtrace should have been preallocated");
 
+  _i2c_unpatch(THREAD, "fill in stack trace of preallocated backtrace");
+
   ResourceMark rm(THREAD);
   vframeStream st(THREAD);
 
@@ -1838,6 +1837,7 @@ void java_lang_Throwable::fill_in_stack_trace_of_preallocated_backtrace(Handle t
     // Bail-out for deep stacks
     if (chunk_count >= max_chunks) break;
   }
+  _i2c_repatch(THREAD, "fill in stack trace of preallocated backtrace");
 
   // For Java 7+ we support the Throwable immutability protocol defined for Java 7. This support
   // was missing in 7u0 so in 7u0 there is a workaround in the Throwable class. That workaround

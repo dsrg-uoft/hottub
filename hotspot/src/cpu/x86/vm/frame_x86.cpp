@@ -467,13 +467,13 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
       ShouldNotReachHere();
     }
     JavaThread* jt = (JavaThread*) th;
-    if (!jt->_bdel_deopt) {
-      tty->print_cr("_HOTSPOT (%ld): bdel deopt is 0, found c2i address %p", _bdel_sys_gettid(), ret_addr);
-      void* ret = _c2i_ret_verify_location_and_pop(jt, (void*) location, -2);
-      ret_addr = (address) ret;
+    if (jt->_bdel_deopt != 1) {
+      tty->print_cr("_HOTSPOT: in frame#sender_for_interpreter_frame, bdel deopt is %d", jt->_bdel_deopt);
+      //void* ret = _c2i_ret_verify_location_and_pop(jt, (void*) location, -2);
+      //ret_addr = (address) ret;
       ShouldNotReachHere();
     }
-    *location = ret_addr;
+    //*location = ret_addr;
   }
 
   return frame(sender_sp, unextended_sp, link(), ret_addr);
@@ -501,6 +501,10 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
       ShouldNotReachHere();
     }
     JavaThread* jt = (JavaThread*) th;
+    if (jt->_bdel_deopt != 2 && jt->_bdel_deopt != 3) {
+      tty->print_cr("_HOTSPOT: in frame#sender_for_compiled_frame, bdel deopt is %d", jt->_bdel_deopt);
+      ShouldNotReachHere();
+    }
     void* ret = _i2c_ret_verify_location_and_pop(jt, (void*) (sender_sp - 1));
     sender_pc = (address) ret;
     *((void**) (sender_sp - 1)) = ret;
@@ -549,7 +553,6 @@ frame frame::sender(RegisterMap* map) const {
   if (_cb != NULL) {
     return sender_for_compiled_frame(map);
   }
-
   // Must be native-compiled frame, i.e. the marshaling code for native
   // methods that exists in the core system.
   return frame(sender_sp(), link(), sender_pc());

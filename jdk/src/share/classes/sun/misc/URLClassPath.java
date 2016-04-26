@@ -515,6 +515,7 @@ public class URLClassPath {
      * Returns the Loader for the specified base URL.
      */
     private Loader getLoader(final URL url) throws IOException {
+        long t0 = System.nanoTime();
         try {
             return java.security.AccessController.doPrivileged(
                 new java.security.PrivilegedExceptionAction<Loader>() {
@@ -527,12 +528,16 @@ public class URLClassPath {
                             return new Loader(url);
                         }
                     } else {
+                        sun.misc.PerfCounter.getOpenJars().add(1);
                         return new JarLoader(url, jarHandler, lmap);
                     }
                 }
             });
         } catch (java.security.PrivilegedActionException pae) {
             throw (IOException)pae.getException();
+        } finally {
+            long t1 = System.nanoTime();
+            sun.misc.PerfCounter.getOpenJarTime().add(t1 - t0);
         }
     }
 
@@ -1003,6 +1008,7 @@ public class URLClassPath {
                 throw new InternalError(e);
             }
             final JarEntry entry = jar.getJarEntry(name);
+            //System.out.print("_JDK: " + (entry == null ? "not " : "") + "found " + name + " in " + jar.getName() + "\n");
             if (entry != null)
                 return checkResource(name, check, entry);
 

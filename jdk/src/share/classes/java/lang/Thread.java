@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2013, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2016, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -145,7 +145,7 @@ class Thread implements Runnable {
         registerNatives();
     }
 
-    private volatile char  name[];
+    private volatile String name;
     private int            priority;
     private Thread         threadQ;
     private long           eetop;
@@ -366,7 +366,7 @@ class Thread implements Runnable {
             throw new NullPointerException("name cannot be null");
         }
 
-        this.name = name.toCharArray();
+        this.name = name;
 
         Thread parent = currentThread();
         SecurityManager security = System.getSecurityManager();
@@ -758,13 +758,23 @@ class Thread implements Runnable {
     private void exit() {
         String print_class_loading = System.getProperty("PrintClassLoading");
         if (print_class_loading != null && print_class_loading.equals("true")) {
-            // print out class loading performance counters
-            System.out.println("[thread exit] "+sun.misc.PerfCounter.getClassNameLockSync());
-            System.out.println("[thread exit] "+sun.misc.PerfCounter.getParentDelegationTime());
-            System.out.println("[thread exit] "+sun.misc.PerfCounter.getFindClassTime());
-            System.out.println("[thread exit] "+sun.misc.PerfCounter.getFindClasses());
-            System.out.println("[thread exit] "+sun.misc.PerfCounter.getNullFindClassTime());
-            System.out.println("[thread exit] "+sun.misc.PerfCounter.getNullFindClasses());
+            long a = sun.misc.PerfCounter.tl_ClassNameLockSyncTime().get();
+            long b = sun.misc.PerfCounter.tl_FindLoadedClassTime().get();
+            long c = sun.misc.PerfCounter.tl_NullFindClassTime().get();
+            long d = sun.misc.PerfCounter.tl_ParentDelegationTime().get();
+            long e = sun.misc.PerfCounter.tl_FindClassTime().get();
+            long f = sun.misc.PerfCounter.tl_ResolveClassTime().get();
+            System.out.print(String.format(
+                "[thread exit %d]: cnls %.6f, flct %.6f, nfct %.6f, pdt %.6f fct %.6f, rct %.6f, total %.6f\n"
+                , this.getId()
+                , a / 1e9
+                , b / 1e9
+                , c / 1e9
+                , d / 1e9
+                , e / 1e9
+                , f / 1e9
+                , (a + b + c + d + e + f) / 1e9
+            ));
         }
 
         if (group != null) {
@@ -1135,7 +1145,11 @@ class Thread implements Runnable {
      */
     public final synchronized void setName(String name) {
         checkAccess();
-        this.name = name.toCharArray();
+        if (name == null) {
+            throw new NullPointerException("name cannot be null");
+        }
+
+        this.name = name;
         if (threadStatus != 0) {
             setNativeName(name);
         }
@@ -1148,7 +1162,7 @@ class Thread implements Runnable {
      * @see     #setName(String)
      */
     public final String getName() {
-        return new String(name, true);
+        return name;
     }
 
     /**

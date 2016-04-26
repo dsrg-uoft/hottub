@@ -135,9 +135,8 @@ public class CodeSource implements java.io.Serializable {
      */
     @Override
     public boolean equals(Object obj) {
-        if (obj == this) {
+        if (obj == this)
             return true;
-        }
 
         // objects types must be equal
         if (!(obj instanceof CodeSource))

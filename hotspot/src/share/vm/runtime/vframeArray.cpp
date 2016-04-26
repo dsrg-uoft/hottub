@@ -293,11 +293,6 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
   // we placed in the skeletal frame now that we finally know the
   // exact interpreter address we should use.
 
-  /*
-  if (is_bottom_frame) {
-    tty->print_cr("_HOTSPOT: sender pc is %p, i2c is %p, c2i is %p, caller is compiled %d", (void*) pc, (void*) &_i2c_ret_handler, (void*) &_c2i_ret_handler, caller->is_compiled_frame());
-  }
-  */
   _frame.patch_pc(thread, pc);
 
   assert (!method()->is_synchronized() || locks > 0 || _removed_monitors, "synchronized methods must have monitors");
@@ -528,6 +523,10 @@ void vframeArray::unpack_to_stack(frame &unpack_frame, int exec_mode, int caller
 
   // Find the skeletal interpreter frames to unpack into
   JavaThread* THREAD = JavaThread::current();
+  if (_unlikely(THREAD->_bdel_deopt != 0)) {
+    tty->print_cr("_HOTSPOT: in vframeArray#unpack_to_stack, bdel deopt not 0, is %d", THREAD->_bdel_deopt);
+    ShouldNotReachHere();
+  }
   RegisterMap map(THREAD, false);
   // Get the youngest frame we will unpack (last to be unpacked)
   frame me = unpack_frame.sender(&map);
