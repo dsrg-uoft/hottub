@@ -153,6 +153,11 @@ public class PerfCounter {
                 return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_findClassTime");
             }
         };
+        static final ThreadLocal<PerfCounter> tl_lc = new ThreadLocal<PerfCounter>() {
+            @Override protected PerfCounter initialValue() {
+                return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_findClasses");
+            }
+        };
         static final ThreadLocal<PerfCounter> tl_null_lc = new ThreadLocal<PerfCounter>() {
             @Override protected PerfCounter initialValue() {
                 return PerfCounter.newPerfCounter("t"+Thread.currentThread().getId()+"_null_findClasses");
@@ -297,6 +302,9 @@ public class PerfCounter {
     // JVMPERF thread local
     public static PerfCounter tl_FindClassTime() {
         return CoreCounters.tl_lct.get();
+    }
+    public static PerfCounter tl_FindClasses() {
+        return CoreCounters.tl_lc.get();
     }
     public static PerfCounter tl_ClassNameLockSyncTime() {
         return CoreCounters.tl_cnlst.get();

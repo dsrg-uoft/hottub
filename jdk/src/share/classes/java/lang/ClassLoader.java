@@ -453,6 +453,7 @@ public abstract class ClassLoader {
                     sun.misc.PerfCounter.getFindClassTime().addTime(t5 - t4);
                     sun.misc.PerfCounter.tl_FindClassTime().addTime(t5 - t4);
                     sun.misc.PerfCounter.getFindClasses().increment();
+                    sun.misc.PerfCounter.tl_FindClasses().increment();
                 }
             }
             if (resolve) {
