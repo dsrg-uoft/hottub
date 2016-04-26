@@ -5279,7 +5279,6 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_GetCreatedJavaVMs(JavaVM **vm_buf, jsize
   return JNI_OK;
 }
 
-/*
 class VM_DeoptimizeTheWorld : public VM_Operation {
  public:
   VMOp_Type type() const {
@@ -5296,137 +5295,142 @@ class VM_DeoptimizeTheWorld : public VM_Operation {
     CodeCache::make_marked_nmethods_not_entrant();
   }
 };
-*/
 
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
+
   JavaThread* thread = JavaThread::current();
-
-  /* phase1: run gc */
-
+  // transition to vm so that class initialization and gc call works
   // not sure how legal this transition is... (although seems to cause no asserts)
   ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
 
-  /*
-  VM_DeoptimizeTheWorld op;
-  VMThread::execute(&op);
-  */
+  if (ForkJVMReinit) {
 
-  //Universe::heap()->print();
-  ((ParallelScavengeHeap *)Universe::heap())->collect(GCCause::_jvmti_force_gc);
-  //Universe::heap()->print();
+    /* phase1: write classpath + classlist file */
+    const char* java_home = Arguments::get_java_home();
+    int java_home_len     = strlen(java_home) - 3; /* -3 for jre */
+    int forkjvm_home_len  = java_home_len + 7;     /* +7 for "forkjvm" */
+    char forkjvm_home[forkjvm_home_len + 1];
+    strncpy(forkjvm_home, java_home, java_home_len);
+    forkjvm_home[java_home_len] = '\0';
+    strcat(forkjvm_home, "forkjvm");
 
-  /*
-   * maybe try testing with this between runs?
-   * possibly see effects of interp vs jit?
-   * template(DeoptimizeTheWorld)                    \
-   * template(EnterInterpOnlyMode)                   \
-  */
+    /* forkjvm_home               + forkjvmid                                   + /classpath.txt
+     * forkjvm_home_len + "/data" + '/' + /<32 char md5 hex> + <1 char pool id> + 14
+     * forkjvm_home_len + 5       +  1  + 32                 + 1                + 14
+     * forkjvm_home_len + 53 (note forkjvm_home_len includes null)
+     */
+    int sa_file_len = forkjvm_home_len + 53;
+    char classpath_path[sa_file_len + 1];
+    char classlist_path[sa_file_len + 1];
 
-  /* phase2: write classlist file */
+    sprintf(classpath_path, "%s/data%s/classpath.txt", forkjvm_home, forkjvmid);
+    sprintf(classlist_path, "%s/data%s/classlist.txt", forkjvm_home, forkjvmid);
 
-  const char* java_home = Arguments::get_java_home();
-  int java_home_len     = strlen(java_home) - 3; /* -3 for jre */
-  int forkjvm_home_len  = java_home_len + 7;     /* +7 for "forkjvm" */
-  char forkjvm_home[forkjvm_home_len + 1];
-  strncpy(forkjvm_home, java_home, java_home_len);
-  forkjvm_home[java_home_len] = '\0';
-  strcat(forkjvm_home, "forkjvm");
+    /* forkjvm_home     + "/static_analysis/run.sh" (23) + " " + classpath_path + " " + casslist_path + " log 2>&1" (9) */
+    /* forkjvm_home_len + 23                             + 1   + sa_file_len    + 1   + sa_file_len   + 9               */
+    int sa_cmd_len = forkjvm_home_len + 23 + 2 + sa_file_len * 2 + 9;
+    char sa_cmd[sa_cmd_len + 1];
+    if (ForkJVMLog) {
+      sprintf(sa_cmd, "%s/static_analysis/run.sh %s %s log 2>&1",
+          forkjvm_home, classpath_path, classlist_path);
+    } else {
+      sprintf(sa_cmd, "%s/static_analysis/run.sh %s %s 2>&1",
+          forkjvm_home, classpath_path, classlist_path);
+    }
 
-  /* forkjvm_home               + forkjvmid                                   + /classpath.txt
-   * forkjvm_home_len + "/data" + '/' + /<32 char md5 hex> + <1 char pool id> + 14
-   * forkjvm_home_len + 5       +  1  + 32                 + 1                + 14
-   * forkjvm_home_len + 53 (note forkjvm_home_len includes null)
-   */
-  int sa_file_len = forkjvm_home_len + 53;
-  char classpath_path[sa_file_len + 1];
-  char classlist_path[sa_file_len + 1];
+    InstanceKlass::classlist_file = new(ResourceObj::C_HEAP, mtInternal) fileStream(classlist_path, "w");
+    SystemDictionary::classes_do(InstanceKlass::record_class, thread);
+    delete InstanceKlass::classlist_file;
 
-  sprintf(classpath_path, "%s/data%s/classpath.txt", forkjvm_home, forkjvmid);
-  sprintf(classlist_path, "%s/data%s/classlist.txt", forkjvm_home, forkjvmid);
+    fileStream* classpath_file = new(ResourceObj::C_HEAP, mtInternal) fileStream(classpath_path, "w");
+    char* c = Arguments::get_appclasspath();
+    while (c[0] != '\0') {
+      classpath_file->print("%c", c[0]);
+      c++;
+    }
+    delete classpath_file;
 
-  /* forkjvm_home     + "/static_analysis/run.sh" (23) + " " + classpath_path + " " + casslist_path + " log 2>&1" (9) */
-  /* forkjvm_home_len + 23                             + 1   + sa_file_len    + 1   + sa_file_len   + 9               */
-  int sa_cmd_len = forkjvm_home_len + 23 + 2 + sa_file_len * 2 + 9;
-  char sa_cmd[sa_cmd_len + 1];
-  if (ForkJVMLog) {
-    sprintf(sa_cmd, "%s/static_analysis/run.sh %s %s log 2>&1",
-        forkjvm_home, classpath_path, classlist_path);
-  } else {
-    sprintf(sa_cmd, "%s/static_analysis/run.sh %s %s 2>&1",
-        forkjvm_home, classpath_path, classlist_path);
-  }
+    /* phase2: perform static analysis */
 
-  InstanceKlass::classlist_file = new(ResourceObj::C_HEAP, mtInternal) fileStream(classlist_path, "w");
-  SystemDictionary::classes_do(InstanceKlass::record_class, thread);
-  delete InstanceKlass::classlist_file;
-  fileStream* classpath_file = new(ResourceObj::C_HEAP, mtInternal) fileStream(classpath_path, "w");
-  char* c = Arguments::get_appclasspath();
-  while (c[0] != '\0') {
-    classpath_file->print("%c", c[0]);
-    c++;
-  }
-  delete classpath_file;
+    char line[1024]; /* make this big to handle any log added to static analysis */
+    FILE* output = popen(sa_cmd, "r");
 
-  /* phase3: perform static analysis */
+    while (fgets(line, 1023, output)) {
+      if (ForkJVMLog)
+        tty->print("[forkjvm]%s", line);
 
-  char line[1024]; /* make this big to handle any log added to static analysis */
-  FILE* output = popen(sa_cmd, "r");
+      /* lines starting with [<category>] are a log and not a result */
+      if (line[0] != '[') {
+        /* phase3: static re-initialization */
+        /* 1. get symbol */
+        unsigned int hash;
+        int len = strlen(line);
 
-  while (fgets(line, 1023, output)) {
-    if (ForkJVMLog)
-      tty->print("[forkjvm]%s", line);
+        /* line = "<class name>" + ' ' + '0/1' + '\n'
+         * len - 3 to remove trailing characters after class name
+         */
+        Symbol* class_name = SymbolTable::lookup_only(line, len - 3, hash);
+        if (class_name != NULL) {
 
-    /* lines starting with [<category>] are a log and not a result */
-    if (line[0] != '[') {
-      /* phase4: static re-initialization */
-      /* 1. get symbol */
-      unsigned int hash;
-      int len = strlen(line);
+          /* 2. get klass (try null first then app) */
+          Klass* klass = NULL;
+          {
+            HandleMark hm(thread);
+            Handle nh; // null handle
+            ClassLoaderData* cld = ClassLoaderDataGraph::get_head();
+            // even though they say it isn't this loop has the null class loader in it so we gud
+            while (cld != NULL && klass == NULL) {
+              /* tty->print_cr("[CleanJavaVM] isnull: %d",cld->is_the_null_class_loader_data());
+               * tty->print_cr("[CleanJavaVM] metaspace: %p",cld->metaspace_or_null());
+               * tty->print_cr("[CleanJavaVM] isanon: %d",cld->is_anonymous());
+               * tty->print_cr("[CleanJavaVM] class_loader oop: %p",cld->class_loader());
+               */
 
-      /* line = "<class name>" + ' ' + '0/1' + '\n'
-       * len - 3 to remove trailing characters after class name
-       */
-      Symbol* class_name = SymbolTable::lookup_only(line, len - 3, hash);
-      if (class_name != NULL) {
+              /* - anon classloaders have null class_loader oop just like null
+               *   loader, so they'll find system classes
+               * - the refelction loader * will automatically delegate the search
+               *   to its parent, finding application classes
+               */
 
-        /* 2. get klass (try null first then app) */
-        Klass* klass = NULL;
-        {
-          HandleMark hm(thread);
-          Handle nh; // null handle
-          ClassLoaderData* cld = ClassLoaderDataGraph::get_head();
-          // even though they say it isn't this loop has the null class loader in it so we gud
-          while (cld != NULL && klass == NULL) {
-            /* tty->print_cr("[CleanJavaVM] isnull: %d",cld->is_the_null_class_loader_data());
-             * tty->print_cr("[CleanJavaVM] metaspace: %p",cld->metaspace_or_null());
-             * tty->print_cr("[CleanJavaVM] isanon: %d",cld->is_anonymous());
-             * tty->print_cr("[CleanJavaVM] class_loader oop: %p",cld->class_loader());
-             */
-
-            /* - anon classloaders have null class_loader oop just like null
-             *   loader, so they'll find system classes
-             * - the refelction loader * will automatically delegate the search
-             *   to its parent, finding application classes
-             */
-
-            klass = SystemDictionary::find(class_name, Handle(cld->class_loader()), nh, thread);
-            cld = cld->next();
+              klass = SystemDictionary::find(class_name, Handle(cld->class_loader()), nh, thread);
+              cld = cld->next();
+            }
           }
-        }
-        if (!klass)
-          tty->print_cr("[forkjvm][error][JNI_CleanJavaVM] never found klass = %s", line);
+          if (!klass)
+            tty->print_cr("[forkjvm][error][JNI_CleanJavaVM] never found klass = %s", line);
 
-        /* 3. re-initialize klass */
-        /* len - 2: \n + \0 */
-        int safe = line[len - 2] - '0';
-        InstanceKlass::cast(klass)->re_initialize(safe, thread);
-      } else {
-        tty->print_cr("[forkjvm][error][JNI_CleanJavaVM] never found symbol = %s", line);
+          /* 3. re-initialize klass */
+          /* len - 2: \n + \0 */
+          int safe = line[len - 2] - '0';
+          InstanceKlass::cast(klass)->re_initialize(safe, thread);
+        } else {
+          tty->print_cr("[forkjvm][error][JNI_CleanJavaVM] never found symbol = %s", line);
+        }
       }
     }
+    pclose(output);
   }
-  pclose(output);
 
+  /* phase4: run gc */
+
+  if (ForkJVMDeopt) {
+    tty->print_cr("[forkjvm][info][JNI_CleanJavaVM] VMThread::execute VM_DeoptimizeTheWorld");
+    VM_DeoptimizeTheWorld op;
+    VMThread::execute(&op);
+  }
+
+  {
+    HandleMark hm(thread);
+    if (ForkJVMLog)
+      Universe::heap()->print();
+
+    ((ParallelScavengeHeap *)Universe::heap())->collect(GCCause::_jvmti_force_gc);
+
+    if (ForkJVMLog)
+      Universe::heap()->print();
+  }
+
+  // transition back to native to not confuse anything else
   ThreadStateTransition::transition(thread, _thread_in_vm, _thread_in_native);
 
   tty->print_cr("[forkjvm][info][JNI_CleanJavaVM] so fresh and so clean");

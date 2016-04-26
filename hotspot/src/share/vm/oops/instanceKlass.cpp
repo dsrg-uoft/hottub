@@ -3847,60 +3847,76 @@ unsigned char * InstanceKlass::get_cached_class_file_bytes() {
   return VM_RedefineClasses::get_cached_class_file_bytes(_cached_class_file);
 }
 
+bool InstanceKlass::is_createvm_initialized() {
+  if (name() == vmSymbols::java_lang_String()
+      || name() == vmSymbols::java_lang_System()
+      || name() == vmSymbols::java_lang_ThreadGroup()
+      || name() == vmSymbols::java_lang_Thread()
+      || name() == vmSymbols::java_lang_Class()
+      || name() == vmSymbols::java_lang_reflect_Method()
+      || name() == vmSymbols::java_lang_ref_Finalizer()
+      || name() == vmSymbols::java_lang_OutOfMemoryError()
+      || name() == vmSymbols::java_lang_NullPointerException()
+      || name() == vmSymbols::java_lang_ClassCastException()
+      || name() == vmSymbols::java_lang_ArrayStoreException()
+      || name() == vmSymbols::java_lang_ArithmeticException()
+      || name() == vmSymbols::java_lang_StackOverflowError()
+      || name() == vmSymbols::java_lang_IllegalMonitorStateException()
+      || name() == vmSymbols::java_lang_IllegalArgumentException()
+      || name() == vmSymbols::java_lang_Compiler()
+      || name() == vmSymbols::java_lang_invoke_MethodHandle()
+      || name() == vmSymbols::java_lang_invoke_MemberName()
+      || name() == vmSymbols::java_lang_invoke_MethodHandleNatives())
+    return true;
+  else
+    return false;
+}
+
 void InstanceKlass::record_class(Klass *k, TRAPS) {
   // if the class isn't initialized then no reason to re-initialize it
-  if (cast(k)->is_initialized()) {
+  if (cast(k)->is_initialized() && !cast(k)->is_createvm_initialized()) {
     ResourceMark rm(THREAD);
     InstanceKlass::classlist_file->print_cr("%s", k->name()->as_C_string());
   }
 }
 
-/*
-void InstanceKlass::do_magic(Klass *k, TRAPS) {
-  if (!k->class_loader_data()->is_the_null_class_loader_data()) {
-    HandleMark hm(THREAD);
-    Handle nh;
-
-    // initialize will check state and return if not reset
-    InstanceKlass::cast(k)->_init_state = (u1)linked;
-
-    // do java_lang_Class::initialize_mirror_fields
-    // normally called from parseClassFile (although cscope misses this...)
-    instanceKlassHandle ikh_k (THREAD, k);
-    Handle h_jm (k->java_mirror());
-    Handle h_pd (k->protection_domain());
-    java_lang_Class::initialize_mirror_fields(ikh_k, h_jm, h_pd, CHECK);
-
-    // forcefully initialize - take matters into our own hands
-    InstanceKlass::cast(k)->initialize(CHECK);
-  }
-}
-*/
-
 void InstanceKlass::re_initialize(bool full, TRAPS) {
+
+  //{
+  //  ResourceMark rm(THREAD);
+  //  if (strncmp(name()->as_C_string(), "hi_world", 8) != 0)
+  //    return;
+  //}
 
   if (ForkJVMLog) {
     ResourceMark rm(THREAD);
     tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] re-initializing (full = %d): %s",
-        full, this->name()->as_C_string());
+        full, name()->as_C_string());
   }
 
-  /* perform parse initialization on everything (only should do this if trapping enabled?) */
-  HandleMark hm(THREAD);
-  Handle mirror(java_mirror());
-  do_local_static_fields(&java_lang_Class::initialize_static_field, mirror, CHECK);
+  /* perform parse initialization on everything*/
+  if (full) { //TODO: to parse init for everything once trapping is enabled
+    HandleMark hm(THREAD);
+    Handle mirror(java_mirror());
+    do_local_static_fields(&java_lang_Class::zero_initialize_static_field, mirror, CHECK);
+    do_local_static_fields(&java_lang_Class::initialize_static_field, mirror, CHECK);
 
   /* run clinit if safe */
-  if (full) {
-    instanceKlassHandle this_oop(THREAD, this);
-    this_oop->call_class_initializer(THREAD);
+  //if (full) {
+    call_class_initializer(THREAD);
 
     /* static analysis should have made any throw calls unsafe */
     /* if other exceptions are possible our simple safe cases really shouldn't trigger them... */
     if (HAS_PENDING_EXCEPTION) {
       ResourceMark rm(THREAD);
       tty->print_cr("[forkjvm][error][InstanceKlass::re_initialize] clinit exception class = %s",
-          this->name()->as_C_string());
+          name()->as_C_string());
+    }
+  } else {
+    /* TODO trap */
+    if (ForkJVMLog) {
+      ResourceMark rm;
+      tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] name = %s | ik = %p | size = %d | sizeof(InstanceKlass) = %d", name()->as_C_string(), this, size(), sizeof(InstanceKlass));
     }
   }
 }

@@ -531,6 +531,54 @@ void java_lang_Class::initialize_static_field(fieldDescriptor* fd, Handle mirror
   }
 }
 
+void java_lang_Class::zero_initialize_static_field(fieldDescriptor* fd, Handle mirror, TRAPS) {
+  assert(mirror.not_null() && fd->is_static(), "just checking");
+  BasicType t = fd->field_type();
+  switch (t) {
+    case T_BYTE:
+      mirror()->byte_field_put(fd->offset(), 0);
+      break;
+    case T_BOOLEAN:
+      mirror()->bool_field_put(fd->offset(), 0);
+      break;
+    case T_CHAR:
+      mirror()->char_field_put(fd->offset(), 0);
+      break;
+    case T_SHORT:
+      mirror()->short_field_put(fd->offset(), 0);
+      break;
+    case T_INT:
+      mirror()->int_field_put(fd->offset(), 0);
+      break;
+    case T_FLOAT:
+      mirror()->float_field_put(fd->offset(), 0.0);
+      break;
+    case T_DOUBLE:
+      mirror()->double_field_put(fd->offset(), 0.0);
+      break;
+    case T_LONG:
+      mirror()->long_field_put(fd->offset(), 0);
+      break;
+    case T_ARRAY:
+    case T_OBJECT:
+      // TODO fix this stuff obj seems to work, but not array
+      // oop always seem to be int sized (4 bytes)
+
+      //mirror()->int_field_put(fd->offset(), 0);
+
+      // this doesn't work
+      //InstanceKlass::cast(k())->static_field_size();
+      //memset(mirror() + InstanceMirrorKlass::offset_of_static_fields(), 0, InstanceKlass::cast(mirror->klass())->static_field_size());
+      break;
+    default:
+      // look in hotspot/src/share/vm/utilities/globalDefinitions.hpp to see type
+      tty->print_cr("[forkjvm][error][java_lang_Class::zero_initialize_static_field] type = %d", t);
+      THROW_MSG(vmSymbols::java_lang_ClassFormatError(),
+          "zero_initialize_static_field found Illegal ConstantValue attribute in class file");
+      break;
+  }
+}
+
 
 void java_lang_Class::fixup_mirror(KlassHandle k, TRAPS) {
   assert(InstanceMirrorKlass::offset_of_static_fields() != 0, "must have been computed already");

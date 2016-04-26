@@ -3947,7 +3947,13 @@ class CommandLineFlags {
              "and not as a general purpose register.")                      \
                                                                             \
   product(bool, ForkJVMLog, false,                                          \
-        "Enable ForkJVM logs and static analysis logs.")
+        "Enable ForkJVM logs and static analysis logs.")                    \
+                                                                            \
+  product(bool, ForkJVMReinit, false,                                       \
+        "Enable ForkJVM to reinitialize classes.")                          \
+                                                                            \
+  product(bool, ForkJVMDeopt, false,                                        \
+        "Enable ForkJVM to deoptimize all methods.")
 
 /*
  *  Macros for factoring of globals
