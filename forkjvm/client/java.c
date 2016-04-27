@@ -128,7 +128,19 @@ int run_forkjvm(char *id)
          * if fail try to contact jvm
          */
         if (mkdir(jvmpath, 0775) == 0) {
-            return 1;
+            /* cool hack so server also returns:
+             * fork and make the child exec to become the jvm server
+             * parent retires the poolno again after sleeping to give the serve a chance to start
+             */
+
+            int pid = fork();
+            if (pid == 0) {
+                return 1;
+            } else {
+                poolno--;
+                sleep(3);
+                continue;
+            }
 
         } else if (errno == EEXIST) {
             int jvmfd;

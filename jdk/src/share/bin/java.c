@@ -563,36 +563,11 @@ JavaMain(void * _args)
     mainArgs = CreateApplicationArgs(env, argv, argc);
     CHECK_EXCEPTION_NULL_LEAVE(mainArgs);
 
-    struct timespec end0;
-    unsigned long diff0;
-    double ddiff0;
-    int run_num = 0;
+    if (forkjvmid[0] != '\0') {
+        int run_num = 0;
 
-    /* Invoke main method. */
-    (*env)->CallStaticVoidMethod(env, mainClass, mainID, mainArgs);
-    clock_gettime_func(CLOCK_MONOTONIC, &end0);
-    diff0 = 1e9 * (end0.tv_sec - start0.tv_sec) + end0.tv_nsec - start0.tv_nsec;
-    ddiff0 = diff0 / 1e9;
-    fprintf(stderr, "[forkjvm][info][JavaMain] CallStaticVoidMethod | run = %d | identity = %s | diff= %luns (%fs)\n",
-            run_num, forkjvmid, diff0, ddiff0);
-
-    /*
-     * The launcher's exit code (in the absence of calls to
-     * System.exit) will be non-zero if main threw an exception.
-     */
-    ret = (*env)->ExceptionOccurred(env) == NULL ? 0 : 1;
-
-    if (ret == 0 && forkjvmid[0] != '\0') {
-
-        while (ret == 0) {
-
-            /* 1. clean up everything */
-            if (ifn.CleanJavaVM(forkjvmid)) {
-                fprintf(stderr, "[forkjvm][error][JavaMain] cleanjavavm failed | id = %s\n", forkjvmid);
-                break;
-            }
-
-            /* 2. wait for a request */
+        do {
+            /* 1. wait for a request */
             /* close listening socket when doing a run so new clients go to next jvm */
             int jvmfd;
             int clientfd;
@@ -612,7 +587,7 @@ JavaMain(void * _args)
             }
             close(jvmfd);
 
-            /* 3. fixup file descriptors */
+            /* 2. fixup file descriptors */
             int error = 0;
             while(!error) {
                 int read;
@@ -639,19 +614,19 @@ JavaMain(void * _args)
             if (error)
                 continue;
 
-            /* 4. run main */
-            struct timespec start1, end1;
-            unsigned long diff1;
-            double ddiff1;
+            /* 3. run main */
+            struct timespec start, end;
+            unsigned long diff;
+            double ddiff;
 
-            run_num++;
-            clock_gettime_func(CLOCK_MONOTONIC, &start1);
+            clock_gettime_func(CLOCK_MONOTONIC, &start);
             (*env)->CallStaticVoidMethod(env, mainClass, mainID, mainArgs);
-            clock_gettime_func(CLOCK_MONOTONIC, &end1);
-            diff1 = 1e9 * (end1.tv_sec - start1.tv_sec) + end1.tv_nsec - start1.tv_nsec;
-            ddiff1 = diff1 / 1e9;
+            clock_gettime_func(CLOCK_MONOTONIC, &end);
+            diff = 1e9 * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
+            ddiff = diff / 1e9;
             fprintf(stderr, "[forkjvm][info][JavaMain] CallStaticVoidMethod | run = %d | identity= %s | diff= %luns (%fs)\n",
-                    run_num, forkjvmid, diff1, ddiff1);
+                    run_num, forkjvmid, diff, ddiff);
+            run_num++;
 
             ret = (*env)->ExceptionOccurred(env) == NULL ? 0 : 1;
 
@@ -661,7 +636,23 @@ JavaMain(void * _args)
                 close(oldfd[i]);
             }
             close(clientfd);
-        }
+
+            /* 4. clean up everything */
+            if (ifn.CleanJavaVM(forkjvmid)) {
+                fprintf(stderr, "[forkjvm][error][JavaMain] cleanjavavm failed | id = %s\n", forkjvmid);
+                break;
+            }
+
+        } while (ret == 0);
+    } else {
+        /* Invoke main method. */
+        (*env)->CallStaticVoidMethod(env, mainClass, mainID, mainArgs);
+
+        /*
+         * The launcher's exit code (in the absence of calls to
+         * System.exit) will be non-zero if main threw an exception.
+         */
+        ret = (*env)->ExceptionOccurred(env) == NULL ? 0 : 1;
     }
     LEAVE();
 }
