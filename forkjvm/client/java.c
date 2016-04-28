@@ -121,7 +121,7 @@ int run_forkjvm(char *id)
         id[0] = '/';
         id[ID_LEN - 1] = '0' + poolno;
         jvmpath[datapath_len + ID_LEN - 1] = '0' + poolno;
-        printf("[forkjvm][info] (run_forkjvm) trying id %s\n", id);
+        fprintf(stderr, "[forkjvm][info] (run_forkjvm) trying id %s\n", id);
 
         /* check if a directory exists make it if it doesn't
          * if success then we need to start a new jvm
@@ -149,7 +149,7 @@ int run_forkjvm(char *id)
                 if (jvmfd == -2)
                     fprintf(stderr, "[forkjvm][error] socket | id = %s | errno = %s\n", id, strerror(errno));
                 else if (jvmfd == -1)
-                    printf("[forkjvm][info] connect | id = %s | errno = %s\n", id, strerror(errno));
+                    fprintf(stderr, "[forkjvm][info] connect | id = %s | errno = %s\n", id, strerror(errno));
                 continue;
             }
 
@@ -162,7 +162,7 @@ int run_forkjvm(char *id)
                 continue;
             }
 
-            printf("[forkjvm][info] (run_forkjvm) running server with id %s\n", id);
+            fprintf(stderr, "[forkjvm][info] (run_forkjvm) running server with id %s\n", id);
             memset(msg, 0, MSG_LEN);
             if (read_sock(jvmfd, msg, MSG_LEN) == -1)
                 perror("[forkjvm][error] read_sock");
@@ -342,7 +342,7 @@ int create_datapath(char *datapath) {
         fprintf(stderr, "[forkjvm][error] readlink MAX_PATH_SIZE too small\n");
         return -1;
     }
-    // -11 removes "bin/java"
+    // -8 removes "bin/java"
     datapath_len -= 8;
     datapath[datapath_len] = '\0';
     strcat(datapath,"forkjvm/data");
@@ -381,7 +381,7 @@ int exec_jvm(const char *id, int main_argc, char **main_argv)
         argv[1] = forkjvm_arg;
         memcpy(argv + 2, main_argv + 1, sizeof(argv));
         argv[main_argc + 1] = NULL;
-        printf("[forkjvm][info] (exec_jvm) exec with id %s\n", id + 1);
+        fprintf(stderr, "[forkjvm][info] (exec_jvm) exec with id %s\n", id + 1);
     }
     execv(execpath, argv);
     perror("[forkjvm][error] exec");
