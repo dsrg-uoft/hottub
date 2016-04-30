@@ -58,6 +58,9 @@ int exec_jvm(const char *jvmid, int main_argc, char **main_argv);
 /* try to use a jvm from pool or add new jvm to pool */
 int run_forkjvm(char *id);
 
+/* server pidfile */
+int write_server_pid(char* jvmpath, int pid);
+
 /* fork/re-run jvm */
 
 /* ---------- ENTRY ---------- */
@@ -121,7 +124,7 @@ int run_forkjvm(char *id)
         id[0] = '/';
         id[ID_LEN - 1] = '0' + poolno;
         jvmpath[datapath_len + ID_LEN - 1] = '0' + poolno;
-        printf("[forkjvm][info] (run_forkjvm) trying id %s\n", id);
+        fprintf(stderr, "[forkjvm][info] (run_forkjvm) trying id %s\n", id);
 
         /* check if a directory exists make it if it doesn't
          * if success then we need to start a new jvm
@@ -137,6 +140,8 @@ int run_forkjvm(char *id)
             if (pid == 0) {
                 return 1;
             } else {
+                write_server_pid(jvmpath, pid);
+                // TODO: handle error?
                 poolno--;
                 sleep(3);
                 continue;
@@ -149,7 +154,7 @@ int run_forkjvm(char *id)
                 if (jvmfd == -2)
                     fprintf(stderr, "[forkjvm][error] socket | id = %s | errno = %s\n", id, strerror(errno));
                 else if (jvmfd == -1)
-                    printf("[forkjvm][info] connect | id = %s | errno = %s\n", id, strerror(errno));
+                    fprintf(stderr, "[forkjvm][info] connect | id = %s | errno = %s\n", id, strerror(errno));
                 continue;
             }
 
@@ -162,7 +167,7 @@ int run_forkjvm(char *id)
                 continue;
             }
 
-            printf("[forkjvm][info] (run_forkjvm) running server with id %s\n", id);
+            fprintf(stderr, "[forkjvm][info] (run_forkjvm) running server with id %s\n", id);
             memset(msg, 0, MSG_LEN);
             if (read_sock(jvmfd, msg, MSG_LEN) == -1)
                 perror("[forkjvm][error] read_sock");
@@ -342,7 +347,7 @@ int create_datapath(char *datapath) {
         fprintf(stderr, "[forkjvm][error] readlink MAX_PATH_SIZE too small\n");
         return -1;
     }
-    // -11 removes "bin/java"
+    // -8 removes "bin/java"
     datapath_len -= 8;
     datapath[datapath_len] = '\0';
     strcat(datapath,"forkjvm/data");
@@ -381,7 +386,7 @@ int exec_jvm(const char *id, int main_argc, char **main_argv)
         argv[1] = forkjvm_arg;
         memcpy(argv + 2, main_argv + 1, sizeof(argv));
         argv[main_argc + 1] = NULL;
-        printf("[forkjvm][info] (exec_jvm) exec with id %s\n", id + 1);
+        fprintf(stderr, "[forkjvm][info] (exec_jvm) exec with id %s\n", id + 1);
     }
     execv(execpath, argv);
     perror("[forkjvm][error] exec");
@@ -493,4 +498,30 @@ ssize_t write_sock(int fd, void *ptr, size_t nbytes)
     msg.msg_iov = iov;
     msg.msg_iovlen = 1;
     return sendmsg(fd, &msg, 0);
+}
+
+int write_server_pid(char* jvmpath, int pid) {
+    // build path <jvmpath>/pid.txt
+    int jvmpath_len = strlen(jvmpath);
+    int pidfile_len = strlen("pid.txt");
+    char path[jvmpath_len + 1 + pidfile_len + 1];
+    strcpy(path, jvmpath);
+    path[jvmpath_len] = '/';
+    strcpy(path + jvmpath_len + 1, "pid.txt");
+    path[jvmpath_len + 1 + pidfile_len] = '\0';
+
+    FILE* f = fopen(path, "w");
+    if (f == NULL) {
+        perror("[forkjvm][error] (write_server_pid) fopen");
+        return errno;
+    }
+    int ret = fprintf(f, "%d\n", pid);
+    if (ret < 0) {
+        fprintf(stderr, "[forkjvm][error] (write_server_pid) fprintf returned %d, ferror %d\n", ret, ferror(f));
+    }
+    ret = fclose(f);
+    if (ret) {
+        fprintf(stderr, "[forkjvm][error] (write_server_pid) fclose returned %d\n", ret);
+    }
+    return ret;
 }
