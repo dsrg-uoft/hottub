@@ -13,8 +13,9 @@ for d in "$FORKJVM_DATA"/*; do
         if [ -f "$PIDFILE" ]; then
             PID="$(< "$PIDFILE")"
             echo "ForkJVM: sending sigterm to $PID"
-            kill "$PID"
-            sleep 3
+            if kill "$PID"; then
+                sleep 3
+            fi
             if kill -s 0 "$PID" 2> /dev/null; then
                 echo "ForkJVM: killing $PID"
                 kill -9 "$PID"

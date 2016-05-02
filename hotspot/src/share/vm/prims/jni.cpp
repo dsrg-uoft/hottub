@@ -5402,12 +5402,14 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
           /* 3. re-initialize klass */
           /* len - 2: \n + \0 */
           int safe = line[len - 2] - '0';
+          //tty->print_cr("[forkjvm][hmm][JNI_CleanJavaVM] class %s is safe %d", class_name->as_C_string(), safe);
           InstanceKlass::cast(klass)->re_initialize(safe, thread);
         } else {
           tty->print_cr("[forkjvm][error][JNI_CleanJavaVM] never found symbol = %s", line);
         }
       }
     }
+    tty->print_cr("[forkjvm][info][JNI_CleanJavaVM] so fresh and so clean");
     pclose(output);
   }
 
@@ -5433,7 +5435,6 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
   // transition back to native to not confuse anything else
   ThreadStateTransition::transition(thread, _thread_in_vm, _thread_in_native);
 
-  tty->print_cr("[forkjvm][info][JNI_CleanJavaVM] so fresh and so clean");
   return JNI_OK;
 }
 
