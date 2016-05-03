@@ -623,6 +623,7 @@ JavaMain(void * _args)
             clock_gettime_func(CLOCK_MONOTONIC, &start);
             ifn.CallingJavaMain();
             (*env)->CallStaticVoidMethod(env, mainClass, mainID, mainArgs);
+            ifn.WaitTillLastThread();
             ifn.FinishedJavaMain();
             clock_gettime_func(CLOCK_MONOTONIC, &end);
             diff = 1e9 * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;

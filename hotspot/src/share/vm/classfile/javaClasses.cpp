@@ -565,6 +565,7 @@ void java_lang_Class::zero_initialize_static_field(fieldDescriptor* fd, Handle m
       // oop always seem to be int sized (4 bytes)
 
       //mirror()->int_field_put(fd->offset(), 0);
+      mirror()->obj_field_put_raw(fd->offset(), 0);
 
       // this doesn't work
       //InstanceKlass::cast(k())->static_field_size();
