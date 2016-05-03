@@ -68,6 +68,7 @@ fi
 # client
 mv $JAVA_HOME/bin/java $JAVA_HOME/bin/java_real
 cp ./forkjvm/client/java $JAVA_HOME/bin
+cp ./forkjvm/client/spoonjvm $JAVA_HOME/bin
 
 # sa
 cp ./forkjvm/static_analysis/build/* $JAVA_HOME/forkjvm/static_analysis

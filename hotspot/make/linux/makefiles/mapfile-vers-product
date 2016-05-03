@@ -33,6 +33,7 @@ SUNWprivate_1.1 {
                 JNI_CallingJavaMain;
                 JNI_FinishedJavaMain;
                 JNI_CleanJavaVM;
+                JNI_WaitTillLastThread;
 
                 # JVM
                 JVM_Accept;
