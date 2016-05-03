@@ -31,6 +31,7 @@ SUNWprivate_1.1 {
                 JNI_GetCreatedJavaVMs;
                 JNI_GetDefaultJavaVMInitArgs;
                 JNI_CleanJavaVM;
+                JNI_WaitTillLastThread;
 
                 # JVM
                 JVM_Accept;

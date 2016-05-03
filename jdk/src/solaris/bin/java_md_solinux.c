@@ -923,6 +923,13 @@ LoadJavaVM(const char *jvmpath, InvocationFunctions *ifn)
         return JNI_FALSE;
     }
 
+    ifn->WaitTillLastThread = (WaitTillLastThread_t)
+        dlsym(libjvm, "JNI_WaitTillLastThread");
+    if (ifn->WaitTillLastThread == NULL) {
+        JLI_ReportErrorMessage(DLL_ERROR2, jvmpath, dlerror());
+        return JNI_FALSE;
+    }
+
     return JNI_TRUE;
 }
 

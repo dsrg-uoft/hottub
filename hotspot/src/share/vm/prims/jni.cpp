@@ -5384,8 +5384,8 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
                * tty->print_cr("[CleanJavaVM] metaspace: %p",cld->metaspace_or_null());
                * tty->print_cr("[CleanJavaVM] isanon: %d",cld->is_anonymous());
                * tty->print_cr("[CleanJavaVM] class_loader oop: %p",cld->class_loader());
+               * tty->print_cr("[CleanJavaVM] loader_name: %s",cld->loader_name());
                */
-
               /* - anon classloaders have null class_loader oop just like null
                *   loader, so they'll find system classes
                * - the refelction loader * will automatically delegate the search
@@ -5690,6 +5690,29 @@ jint JNICALL jni_DetachCurrentThread(JavaVM *vm)  {
                                          JNI_OK);
 #endif /* USDT2 */
   return JNI_OK;
+}
+
+jint JNICALL JNI_WaitTillLastThread() {
+  JavaThread* thread = JavaThread::current();
+  ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
+  // Wait until we are the last non-daemon thread to execute
+  { MutexLocker nu(Threads_lock);
+    while (Threads::number_of_non_daemon_threads() > 1 )
+      // This wait should make safepoint checks, wait without a timeout,
+      // and wait as a suspend-equivalent condition.
+      //
+      // Note: If the FlatProfiler is running and this thread is waiting
+      // for another non-daemon thread to finish, then the FlatProfiler
+      // is waiting for the external suspend request on this thread to
+      // complete. wait_for_ext_suspend_completion() will eventually
+      // timeout, but that takes time. Making this wait a suspend-
+      // equivalent condition solves that timeout problem.
+      //
+      Threads_lock->wait(!Mutex::_no_safepoint_check_flag, 0,
+          Mutex::_as_suspend_equivalent_flag);
+  }
+  ThreadStateTransition::transition_and_fence(thread, _thread_in_vm, _thread_in_native);
+  return 0;
 }
 
 #ifndef USDT2

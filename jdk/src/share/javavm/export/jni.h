@@ -1943,6 +1943,9 @@ JNI_GetCreatedJavaVMs(JavaVM **, jsize, jsize *);
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL
 JNI_CleanJavaVM(char *forkjvmid);
 
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL
+JNI_WaitTillLastThread();
+
 /* Defined by native libraries. */
 JNIEXPORT jint JNICALL
 JNI_OnLoad(JavaVM *vm, void *reserved);
