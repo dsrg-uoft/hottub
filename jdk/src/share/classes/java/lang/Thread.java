@@ -764,7 +764,7 @@ class Thread implements Runnable {
             long d = sun.misc.PerfCounter.tl_ParentDelegationTime().get();
             long e = sun.misc.PerfCounter.tl_FindClassTime().get();
             long f = sun.misc.PerfCounter.tl_ResolveClassTime().get();
-            System.out.print(String.format(
+            System.err.print(String.format(
                 "[thread exit %d]: cnls %.6f, flct %.6f, nfct %.6f, pdt %.6f fct %.6f, rct %.6f, total %.6f\n"
                 , this.getId()
                 , a / 1e9

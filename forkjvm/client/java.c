@@ -138,6 +138,7 @@ int run_forkjvm(char *id)
 
             int pid = fork();
             if (pid == 0) {
+                setsid();
                 return 1;
             } else {
                 write_server_pid(jvmpath, pid);
