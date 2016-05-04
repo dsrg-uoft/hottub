@@ -139,6 +139,7 @@ int run_forkjvm(char *id)
 
             int pid = fork();
             if (pid == 0) {
+                setsid();
                 setup_server_logs(jvmpath);
                 // TODO: we can continue with error here, but parent and child have same std* fds
                 return 1;

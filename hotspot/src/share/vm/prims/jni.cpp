@@ -5450,7 +5450,7 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
         }
       }
     }
-    tty->print_cr("[forkjvm][info][JNI_CleanJavaVM] so fresh and so clean");
+    fprintf(stderr, "[forkjvm][info][JNI_CleanJavaVM] so fresh and so clean");
     pclose(output);
   }
 
