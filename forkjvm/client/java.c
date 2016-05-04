@@ -58,8 +58,9 @@ int exec_jvm(const char *jvmid, int main_argc, char **main_argv);
 /* try to use a jvm from pool or add new jvm to pool */
 int run_forkjvm(char *id);
 
-/* server pidfile */
-int write_server_pid(char* jvmpath, int pid);
+/* server initialization utilities */
+int write_server_pid(const char* jvmpath, int pid);
+int setup_server_logs(const char* jvmpath);
 
 /* fork/re-run jvm */
 
@@ -138,6 +139,8 @@ int run_forkjvm(char *id)
 
             int pid = fork();
             if (pid == 0) {
+                setup_server_logs(jvmpath);
+                // TODO: we can continue with error here, but parent and child have same std* fds
                 return 1;
             } else {
                 write_server_pid(jvmpath, pid);
@@ -500,7 +503,7 @@ ssize_t write_sock(int fd, void *ptr, size_t nbytes)
     return sendmsg(fd, &msg, 0);
 }
 
-int write_server_pid(char* jvmpath, int pid) {
+int write_server_pid(const char* jvmpath, int pid) {
     // build path <jvmpath>/pid.txt
     int jvmpath_len = strlen(jvmpath);
     int pidfile_len = strlen("pid.txt");
@@ -522,6 +525,40 @@ int write_server_pid(char* jvmpath, int pid) {
     ret = fclose(f);
     if (ret) {
         fprintf(stderr, "[forkjvm][error] (write_server_pid) fclose returned %d\n", ret);
+    }
+    return ret;
+}
+
+int setup_server_logs(const char *jvmpath) {
+    int path_len = strlen(jvmpath) + strlen("/stdout") + 1;
+    char stdout_path[path_len];
+    char stderr_path[path_len];
+    int ret = 0;
+
+    strcpy(stdout_path, jvmpath);
+    strcat(stdout_path, "/stdout");
+    strcpy(stderr_path, jvmpath);
+    strcat(stderr_path, "/stderr");
+
+    /* server should have no stdin on its own (no client connected)
+     * just closing stdin could lead to its fd used by something else and later overwritten by client stdin
+     * so we set to /dev/null
+     */
+    if (freopen("/dev/null", "r", stdin) == NULL) {
+        fprintf(stderr, "[forkjvm][error] (setup_server_logs) freopen stdin_path = %s errno = %s\n",
+                "/dev/null", strerror(errno));
+        ret = -1;
+    }
+
+    if (freopen(stdout_path, "w", stdout) == NULL) {
+        fprintf(stderr, "[forkjvm][error] (setup_server_logs) freopen stdout_path = %s errno = %s\n",
+                stdout_path, strerror(errno));
+        ret = -2;
+    }
+    if (freopen(stderr_path, "w", stderr) == NULL) {
+        fprintf(stderr, "[forkjvm][error] (setup_server_logs) open stderr_path = %s errno = %s\n",
+                stderr_path, strerror(errno));
+        ret = -3;
     }
     return ret;
 }
