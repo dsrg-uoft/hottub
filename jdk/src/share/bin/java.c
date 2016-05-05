@@ -578,10 +578,20 @@ JavaMain(void * _args)
     jmethodID setPropertyID = (*env)->GetStaticMethodID(env, systemClass, "setProperty",
                                        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
     CHECK_EXCEPTION_NULL_LEAVE(setPropertyID);
+    struct timespec jvm_init_end = {0};
+    clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_end);
 
     if (forkjvmid[0] != '\0') {
-        int run_num = 0;
 
+        unsigned long init_diff;
+        double init_ddiff;
+        init_diff = 1e9 * (jvm_init_end.tv_sec - jvm_init_start.tv_sec)
+            + jvm_init_end.tv_nsec - jvm_init_start.tv_nsec;
+        init_ddiff = init_diff / 1e9;
+        fprintf(stderr, "[forkjvm][info][JavaMain] jvm_init | diff= %luns (%fs)\n",
+                init_diff, init_ddiff);
+
+        int run_num = 0;
         do {
             /* 1. wait for a request */
             /* close listening socket when doing a run so new clients go to next jvm */
@@ -736,7 +746,7 @@ JavaMain(void * _args)
                 break;
             }
 
-        } while (ret == 0);
+        } while (JNI_TRUE /*ret == 0*/);
     } else {
         /* Build platform specific argument array */
         mainArgs = CreateApplicationArgs(env, argv, argc);
