@@ -209,7 +209,6 @@ int compute_id(char *id, int argc, char **argv, int* java_argc, char*** java_arg
         fprintf(stderr, "[forkjvm][error] MD5_Init\n");
         return -1;
     }
-    int last_is_classpath = 0;
     /* add in all the args */
     for (i = 1; i < argc; i++) {
         if (strlen(argv[i]) > 2 && argv[i][0] == '-' && argv[i][1] == 'D') {
@@ -222,18 +221,23 @@ int compute_id(char *id, int argc, char **argv, int* java_argc, char*** java_arg
         }
         /* locate classpath while adding args */
         if (strcmp(argv[i], "-classpath") == 0 ||
-            strcmp(argv[i], "-cp") == 0) {
-          classpath = argv[i + 1];
-          last_is_classpath = 1;
+                strcmp(argv[i], "-cp") == 0) {
+            classpath = argv[i + 1];
+            i++;
+            if (!MD5_Update(&md5ctx, argv[i], strlen(argv[i]))) {
+                fprintf(stderr, "[forkjvm][error] MD5_Update\n");
+                return -1;
+            }
+            continue;
         }
-        if (argv[i][0] != '-' && !last_is_classpath) {
+        if (argv[i][0] != '-') {
             break;
         }
-        last_is_classpath = 0;
     }
     // c args: (0) java.exe, (1) -foo, (2) bar, (3) baz; i == 2, java_argc = 4 - 2 - 1
     *java_argc = argc - i - 1;
     *java_argv = argv + i + 1;
+    fprintf(stderr, "i is %d, argc is %d, java_argc is %d\n", i, argc, *java_argc);
 
     if (classpath == NULL)
         classpath = getenv("CLASSPATH");
