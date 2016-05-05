@@ -33,7 +33,7 @@
  */
 
 /* id building */
-int compute_id(char *id, int argc, char **argv);
+int compute_id(char *id, int argc, char **argv, int* java_argc, char*** java_argv);
 int md5add_classpath(MD5_CTX *md5ctx, const char *classpath);
 int is_wildcard(const char *filename);
 int strsuffix(const char *str, const char *suffix);
@@ -51,12 +51,13 @@ ssize_t write_fd(int fd, void *ptr, size_t nbytes, int sendfd);
 ssize_t read_sock(int fd, void *ptr, size_t nbytes);
 ssize_t write_sock(int fd, void *ptr, size_t nbytes);
 int send_fds(int jvmfd);
+int send_args(int jvmfd, int argc, char** argv);
 
 /* set up args and call exec */
 int exec_jvm(const char *jvmid, int main_argc, char **main_argv);
 
 /* try to use a jvm from pool or add new jvm to pool */
-int run_forkjvm(char *id);
+int run_forkjvm(char *id, int argc, char** argv);
 
 /* server initialization utilities */
 int write_server_pid(const char* jvmpath, int pid);
@@ -83,11 +84,13 @@ int main(int argc, char **argv)
         return exec_jvm(NULL, argc, argv);
 
     /* compute identity */
-    if (compute_id(id, argc, argv) == -1)
+    int java_argc;
+    char **java_argv;
+    if (compute_id(id, argc, argv, &java_argc, &java_argv) == -1)
         return exec_jvm(NULL, argc, argv);
 
     /* try to contact a forkjvm and send fds */
-    status = run_forkjvm(id);
+    status = run_forkjvm(id, java_argc, java_argv);
     if (status == 1)
         return exec_jvm(id, argc, argv);
     else if (status == -1)
@@ -104,7 +107,7 @@ int main(int argc, char **argv)
  * if there is ever a fatal error return -1 (default to normal exec)
  * if you ever can't connect or lose connection to a jvm just go next
  */
-int run_forkjvm(char *id)
+int run_forkjvm(char *id, int java_argc, char** java_argv)
 {
     /* check for existing forkjvm in id's pool */
     int done = 0;
@@ -169,6 +172,8 @@ int run_forkjvm(char *id)
                 close(jvmfd);
                 continue;
             }
+            // global data for argc and argv :D
+            error = send_args(jvmfd, java_argc, java_argv);
 
             fprintf(stderr, "[forkjvm][info] (run_forkjvm) running server with id %s\n", id);
             memset(msg, 0, MSG_LEN);
@@ -186,7 +191,7 @@ int run_forkjvm(char *id)
     return done ? 0 : -1;
 }
 
-int compute_id(char *id, int argc, char **argv)
+int compute_id(char *id, int argc, char **argv, int* java_argc, char*** java_argv)
 {
     /* openssl is 1 success, 0 error */
     unsigned char digest[MD5_DIGEST_LENGTH];
@@ -198,8 +203,9 @@ int compute_id(char *id, int argc, char **argv)
         fprintf(stderr, "[forkjvm][error] MD5_Init\n");
         return -1;
     }
+    int last_is_classpath = 0;
     /* add in all the args */
-    for (i = 0; i < argc; i++) {
+    for (i = 1; i < argc; i++) {
         if (!MD5_Update(&md5ctx, argv[i], strlen(argv[i]))) {
             fprintf(stderr, "[forkjvm][error] MD5_Update\n");
             return -1;
@@ -208,8 +214,16 @@ int compute_id(char *id, int argc, char **argv)
         if (strcmp(argv[i], "-classpath") == 0 ||
             strcmp(argv[i], "-cp") == 0) {
           classpath = argv[i + 1];
+          last_is_classpath = 1;
         }
+        if (argv[i][0] != '-' && !last_is_classpath) {
+            break;
+        }
+        last_is_classpath = 0;
     }
+    // c args: (0) java.exe, (1) -foo, (2) bar, (3) baz; i == 2, java_argc = 4 - 2 - 1
+    *java_argc = argc - i - 1;
+    *java_argv = argv + i + 1;
 
     if (classpath == NULL)
         classpath = getenv("CLASSPATH");
@@ -423,6 +437,32 @@ int send_fds(int jvmfd)
     if (write_sock(jvmfd, msg, MSG_LEN) != MSG_LEN) {
         perror("[forkjvm][error] (send_fds) write_sock");
         return -1;
+    }
+    return 0;
+}
+
+int send_args(int jvmfd, int argc, char **argv) {
+    int wrote = write_sock(jvmfd, &argc, sizeof(int));
+    if (wrote != sizeof(int)) {
+        fprintf(stderr, "[forkjvm][error] (send_args) write_sock | argc wrote %d, expected %zu | errno = %s\n"
+            , wrote, sizeof(int), strerror(errno));
+        return wrote;
+    }
+    int i;
+    for (i = 0; i < argc; i++) {
+        int len = strlen(argv[i]) + 1;
+        wrote = write_sock(jvmfd, &len, sizeof(int));
+        if (wrote != sizeof(int)) {
+            fprintf(stderr, "[forkjvm][error] (send_args) write_sock | arg %d len | arg = %s | wrote %d, expected %zu | errno = %s\n"
+                , i, argv[i], wrote, sizeof(int), strerror(errno));
+            return wrote;
+        }
+        wrote = write_sock(jvmfd, argv[i], len);
+        if (wrote != len) {
+            fprintf(stderr, "[forkjvm][error] (send_args) write_sock | arg %d buf | arg = %s | wrote %d, expected %d | errno = %s\n"
+                , i, argv[i], wrote, len, strerror(errno));
+            return wrote;
+        }
     }
     return 0;
 }

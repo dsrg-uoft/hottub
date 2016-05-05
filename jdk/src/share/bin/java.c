@@ -439,6 +439,19 @@ ssize_t read_fd(int fd, void *ptr, size_t nbytes, int *recvfd)
     return n;
 }
 
+ssize_t read_sock(int fd, void *ptr, size_t nbytes)
+{
+    struct msghdr   msg;
+    struct iovec    iov[1];
+
+    memset(&msg, 0, sizeof(msg));
+    iov[0].iov_base = ptr;
+    iov[0].iov_len = nbytes;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+    return recvmsg(fd, &msg, 0);
+}
+
 int JNICALL
 JavaMain(void * _args)
 {
@@ -559,10 +572,6 @@ JavaMain(void * _args)
                                        "([Ljava/lang/String;)V");
     CHECK_EXCEPTION_NULL_LEAVE(mainID);
 
-    /* Build platform specific argument array */
-    mainArgs = CreateApplicationArgs(env, argv, argc);
-    CHECK_EXCEPTION_NULL_LEAVE(mainArgs);
-
     if (forkjvmid[0] != '\0') {
         int run_num = 0;
 
@@ -611,8 +620,42 @@ JavaMain(void * _args)
                     close(recvfd);
                 }
             }
+            if (run_num) {
+                int i;
+                for (i = 0; i < argc; i++) {
+                    free(argv[i]);
+                }
+                free(argv);
+            }
+            if (read_sock(clientfd, &argc, sizeof(int)) < 0) {
+                perror("[forkjvm][error][JavaMain] read_sock | argc");
+                error = 1;
+            } else {
+                argv = malloc(argc * sizeof(char*));
+                int i;
+                for (i = 0; i < argc; i++) {
+                    int len;
+                    if (read_sock(clientfd, &len, sizeof(int)) < 0) {
+                        fprintf(stderr, "[forkjvm][error][JavaMain] read_sock | arg %d len | errno = %s\n"
+                                , i, strerror(errno));
+                        error = 1;
+                        break;
+                    }
+                    argv[i] = malloc(len * sizeof(char));
+                    if (read_sock(clientfd, argv[i], len) < 0) {
+                        fprintf(stderr, "[forkjvm][error][JavaMain] read_sock | arg %d buf | errno = %s\n"
+                                , i, strerror(errno));
+                        error = 1;
+                        break;
+                    }
+                }
+            }
             if (error)
                 continue;
+
+            /* Build platform specific argument array */
+            mainArgs = CreateApplicationArgs(env, argv, argc);
+            CHECK_EXCEPTION_NULL_LEAVE(mainArgs);
 
             /* 3. run main */
             struct timespec start, end;
@@ -646,6 +689,10 @@ JavaMain(void * _args)
 
         } while (ret == 0);
     } else {
+        /* Build platform specific argument array */
+        mainArgs = CreateApplicationArgs(env, argv, argc);
+        CHECK_EXCEPTION_NULL_LEAVE(mainArgs);
+
         /* Invoke main method. */
         (*env)->CallStaticVoidMethod(env, mainClass, mainID, mainArgs);
 
