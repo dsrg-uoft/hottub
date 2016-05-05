@@ -573,6 +573,12 @@ JavaMain(void * _args)
                                        "([Ljava/lang/String;)V");
     CHECK_EXCEPTION_NULL_LEAVE(mainID);
 
+    jclass systemClass = (*env)->FindClass(env, "java/lang/System");
+    CHECK_EXCEPTION_NULL_LEAVE(systemClass);
+    jmethodID setPropertyID = (*env)->GetStaticMethodID(env, systemClass, "setProperty",
+                                       "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+    CHECK_EXCEPTION_NULL_LEAVE(setPropertyID);
+
     if (forkjvmid[0] != '\0') {
         int run_num = 0;
 
@@ -648,6 +654,46 @@ JavaMain(void * _args)
                                 , i, strerror(errno));
                         error = 1;
                         break;
+                    }
+                }
+                // java -D args
+                int num_d_args;
+                if (read_sock(clientfd, &num_d_args, sizeof(int)) < 0) {
+                    perror("[forkjvm][error][JavaMain] read_sock | num_d_args");
+                    error = 1;
+                } else {
+                    for (i = 0; i < num_d_args; i++) {
+                        int len;
+                        if (read_sock(clientfd, &len, sizeof(int)) < 0) {
+                            fprintf(stderr, "[forkjvm][error][JavaMain] read_sock | -D arg %d len | errno = %s\n"
+                                    , i, strerror(errno));
+                            error = 1;
+                            break;
+                        }
+                        char* d_arg = malloc(len * sizeof(char));
+                        if (read_sock(clientfd, d_arg, len) < 0) {
+                            fprintf(stderr, "[forkjvm][error][JavaMain] read_sock | -D arg %d buf | errno = %s\n"
+                                    , i, strerror(errno));
+                            error = 1;
+                            break;
+                        }
+                        //fprintf(stderr, "[forkjvm][JavaMain] got d arg %s\n", d_arg);
+                        int pos = strcspn(d_arg, "=");
+                        // -Da=b ; `pos` should be at least 1 before end
+                        if (pos < len - 1) {
+                            // split key, val
+                            d_arg[pos] = '\0';
+                            // ignore "-D"
+                            jstring d_arg_key = (*env)->NewStringUTF(env, d_arg + 2);
+                            // start from second half
+                            jstring d_arg_val = (*env)->NewStringUTF(env, d_arg + pos + 1);
+                            //fprintf(stderr, "[forkjvm][JavaMain] got d arg key %s, val %s\n", d_arg + 2, d_arg + pos + 1);
+                            (*env)->CallStaticObjectMethod(env, systemClass, setPropertyID, d_arg_key, d_arg_val);
+                            // TODO: free?
+                            free(d_arg);
+                        } else {
+                            fprintf(stderr, "[forkjvm][warn][JavaMain] strcspn | d arg %s not valid\n", d_arg);
+                        }
                     }
                 }
             }
