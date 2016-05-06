@@ -3918,7 +3918,7 @@ void InstanceKlass::re_initialize(bool full, TRAPS) {
   }
 
   /* perform parse initialization on everything*/
-  if (full) { //TODO: to parse init for everything once trapping is enabled
+  if (true || full) { //TODO: to parse init for everything once trapping is enabled
     HandleMark hm(THREAD);
     Handle mirror(java_mirror());
     do_local_static_fields(&java_lang_Class::zero_initialize_static_field, mirror, CHECK);

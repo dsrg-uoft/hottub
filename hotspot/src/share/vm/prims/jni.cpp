@@ -5363,9 +5363,15 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
     int sa_file_len = forkjvm_home_len + 53;
     char classpath_path[sa_file_len + 1];
     char classlist_path[sa_file_len + 1];
+    char working_dir[forkjvm_home_len + 39 + 1];
 
     sprintf(classpath_path, "%s/data%s/classpath.txt", forkjvm_home, forkjvmid);
     sprintf(classlist_path, "%s/data%s/classlist.txt", forkjvm_home, forkjvmid);
+    sprintf(working_dir, "%s/data%s", forkjvm_home, forkjvmid);
+
+    if (chdir(working_dir)) {
+      perror("[forkjvm][error][JNI_CleanJavaVM] (chdir)");
+    }
 
     /* forkjvm_home     + "/static_analysis/run.sh" (23) + " " + classpath_path + " " + casslist_path + " log 2>&1" (9) */
     /* forkjvm_home_len + 23                             + 1   + sa_file_len    + 1   + sa_file_len   + 9               */
@@ -5450,7 +5456,7 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
         }
       }
     }
-    fprintf(stderr, "[forkjvm][info][JNI_CleanJavaVM] so fresh and so clean");
+    fprintf(stderr, "[forkjvm][info][JNI_CleanJavaVM] so fresh and so clean\n");
     pclose(output);
   }
 

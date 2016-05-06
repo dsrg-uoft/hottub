@@ -136,6 +136,7 @@ class Shutdown {
      */
     static void halt(int status) {
         synchronized (haltLock) {
+            Thread.currentThread().stop();
             halt0(status);
         }
     }
@@ -181,6 +182,12 @@ class Shutdown {
     static void exit(int status) {
         boolean runMoreFinalizers = false;
         synchronized (lock) {
+            final Thread self = Thread.currentThread();
+            for (Thread th : Thread.getAllStackTraces().keySet()) {
+                if (th != self && !th.isDaemon()) {
+                    th.stop();
+                }
+            }
             if (status != 0) runFinalizersOnExit = false;
             switch (state) {
             case RUNNING:       /* Initiate shutdown */

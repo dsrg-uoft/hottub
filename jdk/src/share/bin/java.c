@@ -732,6 +732,7 @@ JavaMain(void * _args)
             run_num++;
 
             ret = (*env)->ExceptionOccurred(env) == NULL ? 0 : 1;
+            (*env)->ExceptionClear(env);
 
             int i;
             for (i = 0; i < 3; i++) {
@@ -745,7 +746,6 @@ JavaMain(void * _args)
                 fprintf(stderr, "[forkjvm][error][JavaMain] cleanjavavm failed | id = %s\n", forkjvmid);
                 break;
             }
-
         } while (JNI_TRUE /*ret == 0*/);
     } else {
         /* Build platform specific argument array */

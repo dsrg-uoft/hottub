@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 if [[ $# < 2 ]]; then
     echo "run.sh <classpath (file or string)> <classlist file> [log_enable]"
@@ -21,4 +21,4 @@ dir="$(dirname "${BASH_SOURCE[0]}")"
 # add our own jars
 classpath="$dir/static_analysis.jar:$dir/asm-5.1.jar:$dir/asm-tree-5.1.jar:$classpath"
 
-java -cp $classpath StaticAnalysis $classlist $log
+"$dir"/../../bin/java -cp $classpath StaticAnalysis $classlist $log

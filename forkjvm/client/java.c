@@ -237,7 +237,6 @@ int compute_id(char *id, int argc, char **argv, int* java_argc, char*** java_arg
     // c args: (0) java.exe, (1) -foo, (2) bar, (3) baz; i == 2, java_argc = 4 - 2 - 1
     *java_argc = argc - i - 1;
     *java_argv = argv + i + 1;
-    fprintf(stderr, "i is %d, argc is %d, java_argc is %d\n", i, argc, *java_argc);
 
     if (classpath == NULL)
         classpath = getenv("CLASSPATH");
