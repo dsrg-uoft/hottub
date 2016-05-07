@@ -1987,6 +1987,8 @@ class Threads: AllStatic {
   static void _bdel_safepoint_begin(VMThread*);
   static void _bdel_safepoint_end(VMThread*);
 
+  static void kill_daemon_threads();
+
   // RedefineClasses support
   static void metadata_do(void f(Metadata*));
 

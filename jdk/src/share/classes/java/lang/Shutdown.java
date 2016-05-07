@@ -188,6 +188,7 @@ class Shutdown {
                     th.stop();
                 }
             }
+            self.stop();
             if (status != 0) runFinalizersOnExit = false;
             switch (state) {
             case RUNNING:       /* Initiate shutdown */
@@ -240,6 +241,19 @@ class Shutdown {
         synchronized (Shutdown.class) {
             sequence();
         }
+    }
+
+    static void kill_daemon_threads() {
+        /*
+        int count = 0;
+        for (Thread th : Thread.getAllStackTraces().keySet()) {
+            if (th.getId() > 4 && th.isDaemon()) {
+                th.stop();
+                count++;
+            }
+        }
+        System.err.print("[forkjvm] (kill_daemon_threads) killed " + count + " daemon threads\n");
+        */
     }
 
 }

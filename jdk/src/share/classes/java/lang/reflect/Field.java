@@ -1061,7 +1061,7 @@ class Field extends AccessibleObject implements Member {
     }
 
     // security check is done before calling this method
-    private FieldAccessor getFieldAccessor(Object obj)
+    public FieldAccessor getFieldAccessor(Object obj)
         throws IllegalAccessException
     {
         boolean ov = override;

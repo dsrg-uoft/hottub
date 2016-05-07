@@ -3983,7 +3983,10 @@ class CommandLineFlags {
         "Enable ForkJVM to reinitialize classes.")                          \
                                                                             \
   product(bool, ForkJVMDeopt, false,                                        \
-        "Enable ForkJVM to deoptimize all methods.")
+        "Enable ForkJVM to deoptimize all methods.")                        \
+                                                                            \
+  product(bool, ForkJVMTmp, false,                                          \
+        "bad people doing bad things.")
 
 /*
  *  Macros for factoring of globals

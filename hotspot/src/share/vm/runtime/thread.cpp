@@ -3306,6 +3306,29 @@ bool        Threads::_vm_complete = false;
 // All JavaThreads
 #define ALL_JAVA_THREADS(X) for (JavaThread* X = _thread_list; X; X = X->next())
 
+void Threads::kill_daemon_threads() {
+  /*
+  ALL_JAVA_THREADS(p) {
+    if (p->threadObj() != NULL) {
+      if (java_lang_Thread::is_daemon(p->threadObj())) {
+        oop java_thread = JNIHandles::resolve_non_null(p->threadObj());
+        // Check if exception is getting thrown at self (use oop equality, since the
+        // target object might exit)
+        if (java_thread == thread->threadObj()) {
+          //THROW_OOP(java_throwable);
+          tty->print_cr("[forkjvm][warn][kill_daemon_threads] java_thread == thread->threadObj()");
+        } else {
+          // Enques a VM_Operation to stop all threads and then deliver the exception...
+          Thread::send_async_exception(java_thread, JNIHandles::resolve(throwable));
+        }
+      }
+    } else {
+      tty->print_cr("[forkjvm][warn][kill_daemon_threads] threadObj null");
+    }
+  }
+  */
+}
+
 void Threads::_bdel_safepoint_begin(VMThread* vm_thread) {
   if (!Thread::current()->is_VM_thread()) {
     tty->print_cr("_HOTSPOT: doing safepoint begin not vm thread");

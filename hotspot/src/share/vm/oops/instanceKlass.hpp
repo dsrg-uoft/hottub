@@ -1041,8 +1041,10 @@ public:
   // forkjvm
   static fileStream* classlist_file;
   bool is_createvm_initialized();
+  bool is_lame();
   static void record_class(Klass *k, TRAPS);
-  void re_initialize(bool safe, TRAPS);
+  static void re_initialize(Klass *k, TRAPS);
+  void re_initialize(TRAPS);
 
 private:
   // initialization state

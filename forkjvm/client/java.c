@@ -52,12 +52,14 @@ ssize_t read_sock(int fd, void *ptr, size_t nbytes);
 ssize_t write_sock(int fd, void *ptr, size_t nbytes);
 int send_fds(int jvmfd);
 int send_args(int jvmfd, int java_argc, char** java_argv, int num_d_args, int argc, char** argv);
+int send_working_dir(int jvmfd);
+int send_env_var(int jvmfd, char **envp);
 
 /* set up args and call exec */
 int exec_jvm(const char *jvmid, int main_argc, char **main_argv);
 
 /* try to use a jvm from pool or add new jvm to pool */
-int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int argc, char** argv);
+int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int argc, char** argv, char** envp);
 
 /* server initialization utilities */
 int write_server_pid(const char* jvmpath, int pid);
@@ -66,7 +68,7 @@ int setup_server_logs(const char* jvmpath);
 /* fork/re-run jvm */
 
 /* ---------- ENTRY ---------- */
-int main(int argc, char **argv)
+int main(int argc, char **argv, char **envp)
 {
     int status;
     char id[ID_LEN + 1];
@@ -91,7 +93,7 @@ int main(int argc, char **argv)
         return exec_jvm(NULL, argc, argv);
 
     /* try to contact a forkjvm and send fds */
-    status = run_forkjvm(id, java_argc, java_argv, num_d_args, argc, argv);
+    status = run_forkjvm(id, java_argc, java_argv, num_d_args, argc, argv, envp);
     if (status == 1)
         return exec_jvm(id, argc, argv);
     else if (status == -1)
@@ -108,7 +110,7 @@ int main(int argc, char **argv)
  * if there is ever a fatal error return -1 (default to normal exec)
  * if you ever can't connect or lose connection to a jvm just go next
  */
-int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int argc, char** argv)
+int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int argc, char** argv, char** envp)
 {
     /* check for existing forkjvm in id's pool */
     int done = 0;
@@ -176,6 +178,16 @@ int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int a
             }
             // global data for argc and argv :D
             error = send_args(jvmfd, java_argc, java_argv, num_d_args, argc, argv);
+            if (error) {
+                close(jvmfd);
+                continue;
+            }
+            error = send_working_dir(jvmfd);
+            if (error) {
+                close(jvmfd);
+                continue;
+            }
+            error = send_env_var(jvmfd, envp);
             if (error) {
                 close(jvmfd);
                 continue;
@@ -454,7 +466,8 @@ int send_fds(int jvmfd)
     return 0;
 }
 
-static int send_args_i(int jvmfd, int i, void* ptr, size_t len, char* val, char* tag) {
+static int send_args_i(int jvmfd, int i, void* ptr, size_t len, char* val, char* tag)
+{
     int wrote = write_sock(jvmfd, ptr, len);
     if (wrote != len) {
         fprintf(
@@ -466,7 +479,8 @@ static int send_args_i(int jvmfd, int i, void* ptr, size_t len, char* val, char*
     return 0;
 }
 
-int send_args(int jvmfd, int java_argc, char **java_argv, int num_d_args, int argc, char** argv) {
+int send_args(int jvmfd, int java_argc, char **java_argv, int num_d_args, int argc, char** argv)
+{
     int error = send_args_i(jvmfd, -1, &java_argc, sizeof(int), NULL, "java_argc");
     if (error) {
         return error;
@@ -502,6 +516,57 @@ int send_args(int jvmfd, int java_argc, char **java_argv, int num_d_args, int ar
         if (error) {
             return error;
         }
+    }
+    return 0;
+}
+
+int send_working_dir(int jvmfd)
+{
+    char buf[MAX_PATH_SIZE];
+    if (getcwd(buf, MAX_PATH_SIZE) == NULL) {
+        perror("[forkjvm][error] (send_working_dir) getcwd");
+        return -1;
+    }
+    size_t len = strlen(buf);
+    size_t wrote = (size_t) write_sock(jvmfd, &len, sizeof(int));
+    if (wrote != sizeof(int)) {
+        perror("[forkjvm][error] (send_working_dir) write_sock len");
+        return -1;
+    }
+    wrote = (size_t) write_sock(jvmfd, buf, len);
+    if (wrote != len) {
+        perror("[forkjvm][error] (send_working_dir) write_sock buf");
+        return -1;
+    }
+    return 0;
+}
+
+int send_env_var(int jvmfd, char **envp)
+{
+    size_t len = -1;
+    size_t wrote = -1;
+    int i;
+    for (i = 0; envp[i] != NULL; i++) {
+        char *env_var = envp[i];
+        //fprintf(stderr, "[forkjvm][info] (send_env_var) len = %zu, env_var = %s\n", strlen(env_var), env_var);
+        len = strlen(env_var);
+        wrote = (size_t) write_sock(jvmfd, &len, sizeof(int));
+        if (wrote != sizeof(int)) {
+            perror("[forkjvm][error] (send_env_var) write_sock len");
+            return -1;
+        }
+        wrote = (size_t) write_sock(jvmfd, env_var, len);
+        if (wrote != len) {
+            perror("[forkjvm][error] (send_env_var) write_sock env_var");
+            return -1;
+        }
+    }
+    //fprintf(stderr, "[forkjvm][info] (send_env_var) sending done %s\n");
+    len = 0;
+    wrote = (size_t) write_sock(jvmfd, &len, sizeof(int));
+    if (wrote != sizeof(int)) {
+        perror("[forkjvm][error] (send_env_var) write_sock done (0)");
+        return -1;
     }
     return 0;
 }

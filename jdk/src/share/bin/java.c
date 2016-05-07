@@ -578,6 +578,12 @@ JavaMain(void * _args)
     jmethodID setPropertyID = (*env)->GetStaticMethodID(env, systemClass, "setProperty",
                                        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
     CHECK_EXCEPTION_NULL_LEAVE(setPropertyID);
+
+    jclass processEnvironmentClass = (*env)->FindClass(env, "java/lang/ProcessEnvironment");
+    CHECK_EXCEPTION_NULL_LEAVE(processEnvironmentClass);
+    jmethodID setenvID = (*env)->GetStaticMethodID(env, processEnvironmentClass, "setenv", "(Ljava/lang/String;Ljava/lang/String;)V");
+    CHECK_EXCEPTION_NULL_LEAVE(setenvID);
+
     struct timespec jvm_init_end = {0};
     clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_end);
 
@@ -709,6 +715,63 @@ JavaMain(void * _args)
             }
             if (error)
                 continue;
+            int wd_len;
+            if (read_sock(clientfd, &wd_len, sizeof(int)) < 0) {
+                perror("[forkjvm][error][JavaMain] (read_sock) working dir len");
+                error = 1;
+            }
+            char wd_buf[wd_len + 1];
+            if (read_sock(clientfd, wd_buf, wd_len) < 0) {
+                perror("[forkjvm][error][JavaMain] (read_sock) working dir buf");
+                error = 1;
+            }
+            wd_buf[wd_len] = '\0';
+            fprintf(stderr, "[forkjvm] got wd %s\n", wd_buf);
+            if (chdir(wd_buf)) {
+                perror("[forkjvm][error][JavaMain] chdir");
+                error = 1;
+            }
+            if (error)
+                continue;
+            while (1) {
+                int env_str_len;
+                if (read_sock(clientfd, &env_str_len, sizeof(int)) < 0) {
+                    perror("[forkjvm][error][JavaMain] (read_sock) env str len");
+                    error = 1;
+                    break;
+                }
+                if (env_str_len == 0) {
+                    break;
+                }
+                char env_str[env_str_len + 1];
+                if (read_sock(clientfd, env_str, env_str_len) < 0) {
+                    perror("[forkjvm][error][JavaMain] (read_sock) env str");
+                    error = 1;
+                    break;
+                }
+                env_str[env_str_len] = '\0';
+                int pos = strcspn(env_str, "=");
+                if (pos >= env_str_len) {
+                    fprintf(stderr, "[forkjvm][error][JavaMain] env str %s bad\n", env_str);
+                    error = 1;
+                    break;
+                }
+                env_str[pos] = '\0';
+                if (setenv(env_str, env_str + pos + 1, 1)) {
+                    fprintf(stderr, "[forkjvm][error][JavaMain] error setting env %s = %s | errno = %s\n", env_str, env_str + pos + 1, strerror(errno));
+                }
+                jstring env_key = (*env)->NewStringUTF(env, env_str);
+                jstring env_val = (*env)->NewStringUTF(env, env_str + pos + 1);
+                (*env)->CallStaticVoidMethod(env, processEnvironmentClass, setenvID, env_key, env_val);
+                if ((*env)->ExceptionOccurred(env)) {
+                    fprintf(stderr, "[forkjvm][warn][JavaMain] (ProcessEnvironment#setenv) had exception\n");
+                    (*env)->ExceptionClear(env);
+                }
+                // TODO: free mem?
+                fprintf(stderr, "[forkjvm][info][JavaMain] setting env %s = %s\n", env_str, env_str + pos + 1);
+            }
+            if (error)
+                continue;
 
             /* Build platform specific argument array */
             mainArgs = CreateApplicationArgs(env, argv, argc);
@@ -732,6 +795,16 @@ JavaMain(void * _args)
             run_num++;
 
             ret = (*env)->ExceptionOccurred(env) == NULL ? 0 : 1;
+            (*env)->ExceptionClear(env);
+
+            jclass shutdownClass = (*env)->FindClass(env, "java/lang/Shutdown");
+            CHECK_EXCEPTION_NULL_LEAVE(shutdownClass);
+            jmethodID kill_daemon_threads_ID = (*env)->GetStaticMethodID(env, shutdownClass, "kill_daemon_threads", "()V");
+            CHECK_EXCEPTION_NULL_LEAVE(kill_daemon_threads_ID);
+            (*env)->CallStaticVoidMethod(env, shutdownClass, kill_daemon_threads_ID);
+            if ((*env)->ExceptionOccurred(env)) {
+                fprintf(stderr, "[forkjvm][warn][JavaMain] (kill_daemon_threads) had exception\n");
+            }
             (*env)->ExceptionClear(env);
 
             int i;

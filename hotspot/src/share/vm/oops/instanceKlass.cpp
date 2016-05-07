@@ -3895,6 +3895,15 @@ bool InstanceKlass::is_createvm_initialized() {
     return false;
 }
 
+bool InstanceKlass::is_lame() {
+	ResourceMark rm;
+  //if (strcmp(name()->as_C_string(), "org/apache/tez/dag/app/dag/impl/TaskAttemptImpl") == 0)
+  if (strstr(name()->as_C_string(), "TaskAttemptImpl") != NULL)
+    return true;
+  else
+    return false;
+}
+
 void InstanceKlass::record_class(Klass *k, TRAPS) {
   // if the class isn't initialized then no reason to re-initialize it
   if (cast(k)->is_initialized() && !cast(k)->is_createvm_initialized()) {
@@ -3903,7 +3912,24 @@ void InstanceKlass::record_class(Klass *k, TRAPS) {
   }
 }
 
-void InstanceKlass::re_initialize(bool full, TRAPS) {
+void InstanceKlass::re_initialize(Klass *k, TRAPS) {
+
+  if (!cast(k)->class_loader()
+      || !cast(k)->is_lame()) {
+    return;
+  }
+
+  tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] re-initializing super lame class: %s",
+      cast(k)->name()->as_C_string());
+
+  cast(k)->re_initialize(THREAD);
+}
+
+void InstanceKlass::re_initialize(TRAPS) {
+
+  if (!this->class_loader()) {
+    return;
+  }
 
   //{
   //  ResourceMark rm(THREAD);
@@ -3913,34 +3939,25 @@ void InstanceKlass::re_initialize(bool full, TRAPS) {
 
   if (ForkJVMLog) {
     ResourceMark rm(THREAD);
-    tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] re-initializing (full = %d): %s",
-        full, name()->as_C_string());
+    tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] re-initializing: %s",
+        name()->as_C_string());
   }
 
   /* perform parse initialization on everything*/
-  if (true || full) { //TODO: to parse init for everything once trapping is enabled
-    HandleMark hm(THREAD);
-    Handle mirror(java_mirror());
-    do_local_static_fields(&java_lang_Class::zero_initialize_static_field, mirror, CHECK);
-    do_local_static_fields(&java_lang_Class::initialize_static_field, mirror, CHECK);
+  HandleMark hm(THREAD);
+  Handle mirror(java_mirror());
+  do_local_static_fields(&java_lang_Class::zero_initialize_static_field, mirror, CHECK);
+  do_local_static_fields(&java_lang_Class::initialize_static_field, mirror, CHECK);
 
   /* run clinit if safe */
-  //if (full) {
-    call_class_initializer(THREAD);
+  call_class_initializer(THREAD);
 
-    /* static analysis should have made any throw calls unsafe */
-    /* if other exceptions are possible our simple safe cases really shouldn't trigger them... */
-    if (HAS_PENDING_EXCEPTION) {
-      ResourceMark rm(THREAD);
-      tty->print_cr("[forkjvm][error][InstanceKlass::re_initialize] clinit exception class = %s",
-          name()->as_C_string());
-    }
-  } else {
-    /* TODO trap */
-    if (ForkJVMLog) {
-      ResourceMark rm;
-      tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] name = %s | ik = %p | size = %d | sizeof(InstanceKlass) = %d", name()->as_C_string(), this, size(), sizeof(InstanceKlass));
-    }
+  /* static analysis should have made any throw calls unsafe */
+  /* if other exceptions are possible our simple safe cases really shouldn't trigger them... */
+  if (HAS_PENDING_EXCEPTION) {
+    ResourceMark rm(THREAD);
+    tty->print_cr("[forkjvm][error][InstanceKlass::re_initialize] clinit exception class = %s",
+        name()->as_C_string());
   }
 }
 

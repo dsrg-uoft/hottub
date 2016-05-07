@@ -76,8 +76,9 @@ final class ProcessEnvironment
                                Value.valueOf(environ[i]));
 
         theUnmodifiableEnvironment
-            = Collections.unmodifiableMap
-            (new StringEnvironment(theEnvironment));
+            = new StringEnvironment(theEnvironment);
+        //    = Collections.unmodifiableMap
+        //    (new StringEnvironment(theEnvironment));
     }
 
     /* Only for use by System.getenv(String) */
@@ -87,7 +88,13 @@ final class ProcessEnvironment
 
     /* Only for use by System.getenv() */
     static Map<String,String> getenv() {
-        return theUnmodifiableEnvironment;
+        return Collections.unmodifiableMap(theUnmodifiableEnvironment);
+        //return theUnmodifiableEnvironment;
+    }
+
+    private static void setenv(String name, String val) {
+        theEnvironment.put(Variable.valueOf(name), Value.valueOf(val));
+        theUnmodifiableEnvironment.put(name, val);
     }
 
     /* Only for use by ProcessBuilder.environment() */

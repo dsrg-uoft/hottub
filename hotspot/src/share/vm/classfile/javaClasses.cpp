@@ -531,6 +531,30 @@ void java_lang_Class::initialize_static_field(fieldDescriptor* fd, Handle mirror
   }
 }
 
+inline jlong field_offset_to_byte_offset(jlong field_offset) {
+  return field_offset;
+}
+
+inline void* index_oop_from_field_offset_long(oop p, jlong field_offset) {
+  jlong byte_offset = field_offset_to_byte_offset(field_offset);
+#ifdef ASSERT
+  if (p != NULL) {
+    assert(byte_offset >= 0 && byte_offset <= (jlong)MAX_OBJECT_SIZE, "sane offset");
+    if (byte_offset == (jint)byte_offset) {
+      void* ptr_plus_disp = (address)p + byte_offset;
+      assert((void*)p->obj_field_addr<oop>((jint)byte_offset) == ptr_plus_disp,
+             "raw [ptr+disp] must be consistent with oop::field_base");
+    }
+    jlong p_size = HeapWordSize * (jlong)(p->size());
+    assert(byte_offset < p_size, err_msg("Unsafe access: offset " INT64_FORMAT " > object's size " INT64_FORMAT, byte_offset, p_size));
+  }
+#endif
+  if (sizeof(char*) == sizeof(jint))    // (this constant folds!)
+    return (address)p + (jint) byte_offset;
+  else
+    return (address)p +        byte_offset;
+}
+
 void java_lang_Class::zero_initialize_static_field(fieldDescriptor* fd, Handle mirror, TRAPS) {
   assert(mirror.not_null() && fd->is_static(), "just checking");
   BasicType t = fd->field_type();
@@ -562,14 +586,7 @@ void java_lang_Class::zero_initialize_static_field(fieldDescriptor* fd, Handle m
     case T_ARRAY:
     case T_OBJECT:
       // TODO fix this stuff obj seems to work, but not array
-      // oop always seem to be int sized (4 bytes)
-
-      //mirror()->int_field_put(fd->offset(), 0);
-      //mirror()->obj_field_put_raw(fd->offset(), 0);
-
-      // this doesn't work
-      //InstanceKlass::cast(k())->static_field_size();
-      //memset(mirror() + InstanceMirrorKlass::offset_of_static_fields(), 0, InstanceKlass::cast(mirror->klass())->static_field_size());
+      mirror()->obj_field_put(fd->offset(), NULL);
       break;
     default:
       // look in hotspot/src/share/vm/utilities/globalDefinitions.hpp to see type
@@ -579,7 +596,6 @@ void java_lang_Class::zero_initialize_static_field(fieldDescriptor* fd, Handle m
       break;
   }
 }
-
 
 void java_lang_Class::fixup_mirror(KlassHandle k, TRAPS) {
   assert(InstanceMirrorKlass::offset_of_static_fields() != 0, "must have been computed already");
