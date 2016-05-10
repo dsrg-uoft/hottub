@@ -172,6 +172,9 @@ void _bdel_knell(const char* str) {
   if (PrintForcedCompileTime) {
     tty->print_cr("[thread exit] (%s, %ld): Blocking compilation took %.6fs", str, _bdel_sys_gettid(), jt->_blocking_compile_time * 1.0 / 1e9);
   }
+  if (ProfileIntCompThreadExit) {
+    tty->print_cr("[thread exit] (%s, %ld): Int time %.6f, Comp time %.6f", str, _bdel_sys_gettid(), jt->_jvm_state_times[0] * 1.0 / 1e9, jt->_jvm_state_times[1] * 1.0 / 1e9);
+  }
   if (ProfileIntComp && ProfileIntCompStrict) {
     if (jt->_jvm_transitions_pos != 0 || jt->_i2c_stack_pos != 0 || jt->_c2i_stack_pos != 0) {
       tty->print_cr(

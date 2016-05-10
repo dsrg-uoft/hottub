@@ -795,6 +795,15 @@ public final class System {
 
         return (String) props.setProperty(key, value);
     }
+    private static String _setProperty(String key, String value) {
+        try {
+            checkKey(key);
+            return (String) props.setProperty(key, value);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            throw ex;
+        }
+    }
 
     /**
      * Removes the system property indicated by the specified key.

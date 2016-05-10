@@ -575,7 +575,7 @@ JavaMain(void * _args)
 
     jclass systemClass = (*env)->FindClass(env, "java/lang/System");
     CHECK_EXCEPTION_NULL_LEAVE(systemClass);
-    jmethodID setPropertyID = (*env)->GetStaticMethodID(env, systemClass, "setProperty",
+    jmethodID setPropertyID = (*env)->GetStaticMethodID(env, systemClass, "_setProperty",
                                        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
     CHECK_EXCEPTION_NULL_LEAVE(setPropertyID);
 
@@ -705,6 +705,13 @@ JavaMain(void * _args)
                             jstring d_arg_val = (*env)->NewStringUTF(env, d_arg + pos + 1);
                             //fprintf(stderr, "[forkjvm][JavaMain] got d arg key %s, val %s\n", d_arg + 2, d_arg + pos + 1);
                             (*env)->CallStaticObjectMethod(env, systemClass, setPropertyID, d_arg_key, d_arg_val);
+                            if ((*env)->ExceptionOccurred(env)) {
+                                fprintf(stderr, "[forkjvm][warn][JavaMain] (System#_setProperty) for %s had exception\n", d_arg + 2);
+                                (*env)->ExceptionDescribe(env);
+                                (*env)->ExceptionClear(env);
+                            } else {
+                                fprintf(stderr, "[forkjvm][info][JavaMain] (System#_setProperty) for %s ok\n", d_arg + 2);
+                            }
                             // TODO: free?
                             free(d_arg);
                         } else {
@@ -730,6 +737,16 @@ JavaMain(void * _args)
             if (chdir(wd_buf)) {
                 perror("[forkjvm][error][JavaMain] chdir");
                 error = 1;
+            } else {
+                jstring wd_key = (*env)->NewStringUTF(env, "user.dir");
+                jstring wd_val = (*env)->NewStringUTF(env, wd_buf);
+                (*env)->CallStaticObjectMethod(env, systemClass, setPropertyID, wd_key, wd_val);
+                if ((*env)->ExceptionOccurred(env)) {
+                    fprintf(stderr, "[forkjvm][warn][JavaMain] (System#_setProperty) for wd user.dir had exception\n");
+                    (*env)->ExceptionClear(env);
+                } else {
+                    fprintf(stderr, "[forkjvm][info][JavaMain] (System#_setProperty) for wd user.dir ok\n");
+                }
             }
             if (error)
                 continue;

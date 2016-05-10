@@ -5345,6 +5345,9 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
   ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
 
   if (ForkJVMReinit) {
+    InstanceKlass::re_initialize_iteration = 0;
+    SystemDictionary::classes_do(InstanceKlass::re_initialize, thread);
+    InstanceKlass::re_initialize_iteration = 1;
     SystemDictionary::classes_do(InstanceKlass::re_initialize, thread);
 
     if (ForkJVMTmp) {

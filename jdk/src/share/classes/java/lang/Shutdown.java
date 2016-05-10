@@ -136,7 +136,7 @@ class Shutdown {
      */
     static void halt(int status) {
         synchronized (haltLock) {
-            Thread.currentThread().stop();
+            //Thread.currentThread().stop();
             halt0(status);
         }
     }
@@ -182,13 +182,23 @@ class Shutdown {
     static void exit(int status) {
         boolean runMoreFinalizers = false;
         synchronized (lock) {
+            //*
             final Thread self = Thread.currentThread();
+            /*
+            for (Thread th : Thread.getAllStackTraces().keySet()) {
+                // daemons 2, 3, 4 from JVM: reference handler, finalizer, signal dispatcher
+                if (th != self && th.isDaemon() && th.getId() > 4) {
+                    th.stop();
+                }
+            }
+            */
             for (Thread th : Thread.getAllStackTraces().keySet()) {
                 if (th != self && !th.isDaemon()) {
                     th.stop();
                 }
             }
             self.stop();
+            //*/
             if (status != 0) runFinalizersOnExit = false;
             switch (state) {
             case RUNNING:       /* Initiate shutdown */

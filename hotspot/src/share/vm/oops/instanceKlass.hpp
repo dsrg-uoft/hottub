@@ -1045,6 +1045,7 @@ public:
   static void record_class(Klass *k, TRAPS);
   static void re_initialize(Klass *k, TRAPS);
   void re_initialize(TRAPS);
+  static int re_initialize_iteration;
 
 private:
   // initialization state

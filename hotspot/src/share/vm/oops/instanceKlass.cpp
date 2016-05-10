@@ -3896,12 +3896,45 @@ bool InstanceKlass::is_createvm_initialized() {
 }
 
 bool InstanceKlass::is_lame() {
-	ResourceMark rm;
-  //if (strcmp(name()->as_C_string(), "org/apache/tez/dag/app/dag/impl/TaskAttemptImpl") == 0)
-  if (strstr(name()->as_C_string(), "TaskAttemptImpl") != NULL)
+  static const char* banished[] = {
+    "org/apache/hadoop/security/UserGroupInformation"
+    , "org/apache/hadoop/hive/ql/exec/Utilities"
+    , "org/apache/tez/dag/api/TezConfiguration"
+    , "org/apache/tez/runtime/library/api/TezRuntimeConfiguration"
+    , "org/apache/hadoop/hive/conf/HiveConf"
+    , "org/apache/hadoop/hive/ql/exec/tez/ObjectCache"
+    , NULL
+  };
+  ResourceMark rm;
+  if (InstanceKlass::re_initialize_iteration == 0) {
+    if (strstr(name()->as_C_string(), "DefaultMetricsSystem") != NULL) {
+      return true;
+    }
+    return false;
+  }
+  int i;
+  for (i = 0; banished[i] != NULL; i++) {
+    if (strcmp(name()->as_C_string(), banished[i]) == 0) {
+      return true;
+    }
+  }
+
+  return false;
+  /*
+  if (strcmp(name()->as_C_string(), "org/apache/hadoop/security/UserGroupInformation") == 0)
+  //if (strstr(name()->as_C_string(), "TaskAttemptImpl") != NULL)
+    return true;
+  else if (strcmp(name()->as_C_string(), "org/apache/hadoop/hive/ql/exec/Utilities") == 0)
+    return true;
+  else if (strcmp(name()->as_C_string(), "org/apache/tez/dag/api/TezConfiguration") == 0)
+    return true;
+  else if (strcmp(name()->as_C_string(), "org/apache/tez/runtime/library/api/TezRuntimeConfiguration") == 0)
+    return true;
+  else if (strcmp(name()->as_C_string(), "org/apache/hadoop/hive/conf/HiveConf") == 0)
     return true;
   else
     return false;
+  */
 }
 
 void InstanceKlass::record_class(Klass *k, TRAPS) {
@@ -3912,6 +3945,7 @@ void InstanceKlass::record_class(Klass *k, TRAPS) {
   }
 }
 
+int InstanceKlass::re_initialize_iteration = 0;
 void InstanceKlass::re_initialize(Klass *k, TRAPS) {
 
   if (!cast(k)->class_loader()
@@ -3919,8 +3953,8 @@ void InstanceKlass::re_initialize(Klass *k, TRAPS) {
     return;
   }
 
-  tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] re-initializing super lame class: %s",
-      cast(k)->name()->as_C_string());
+  tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] re-initializing super lame class: %s, %d",
+      cast(k)->name()->as_C_string(), InstanceKlass::re_initialize_iteration);
 
   cast(k)->re_initialize(THREAD);
 }
@@ -3937,6 +3971,7 @@ void InstanceKlass::re_initialize(TRAPS) {
   //    return;
   //}
 
+  fprintf(stderr, "[forkjvm][info][InstanceKlass::re_initialize] re-initializing: %s\n", name()->as_C_string());
   if (ForkJVMLog) {
     ResourceMark rm(THREAD);
     tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] re-initializing: %s",

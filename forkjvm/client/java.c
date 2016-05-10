@@ -10,6 +10,8 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <openssl/md5.h>
+#include <time.h>
+#include <stdint.h>
 
 /* 1st char for '\0' (abstract sockets), last char for poolno */
 #define ID_LEN          1 + MD5_DIGEST_LENGTH * 2 + 1
@@ -65,11 +67,21 @@ int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int a
 int write_server_pid(const char* jvmpath, int pid);
 int setup_server_logs(const char* jvmpath);
 
+static uint64_t _now() {
+  struct timespec ts;
+  int status = clock_gettime(CLOCK_MONOTONIC, &ts);
+  (void) status;
+  return (uint64_t) ts.tv_sec * (1000 * 1000 * 1000) + (uint64_t) ts.tv_nsec;
+}
+
+static uint64_t t0;
+
 /* fork/re-run jvm */
 
 /* ---------- ENTRY ---------- */
 int main(int argc, char **argv, char **envp)
 {
+    t0 = _now();
     int status;
     char id[ID_LEN + 1];
     int forkjvm = 0;
@@ -153,7 +165,11 @@ int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int a
                 write_server_pid(jvmpath, pid);
                 // TODO: handle error?
                 poolno--;
-                sleep(3);
+                struct timespec ts;
+                ts.tv_sec = 0;
+                ts.tv_nsec = 200 * 1e6;
+                struct timespec t2;
+                nanosleep(&ts, &t2);
                 continue;
             }
 
@@ -193,7 +209,8 @@ int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int a
                 continue;
             }
 
-            fprintf(stderr, "[forkjvm][info] (run_forkjvm) running server with id %s\n", id);
+            uint64_t t1 = _now();
+            fprintf(stderr, "[forkjvm][info] (run_forkjvm) running server with id %s, took %.6f\n", id, (t1 - t0) / 1e9);
             memset(msg, 0, MSG_LEN);
             if (read_sock(jvmfd, msg, MSG_LEN) == -1)
                 perror("[forkjvm][error] read_sock");
@@ -252,6 +269,7 @@ int compute_id(char *id, int argc, char **argv, int* java_argc, char*** java_arg
 
     if (classpath == NULL)
         classpath = getenv("CLASSPATH");
+        fprintf(stderr, "[forkjvm][info] (compute_id) using environment classpath %s\n", classpath == NULL ? "(null)" : classpath);
         if (classpath == NULL)
             classpath = ".";
 
