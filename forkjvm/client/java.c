@@ -166,7 +166,7 @@ int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int a
                 // TODO: handle error?
                 poolno--;
                 struct timespec ts;
-                ts.tv_sec = 0;
+                ts.tv_sec = 1;
                 ts.tv_nsec = 200 * 1e6;
                 struct timespec t2;
                 nanosleep(&ts, &t2);

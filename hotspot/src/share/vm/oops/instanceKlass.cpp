@@ -3910,6 +3910,11 @@ bool InstanceKlass::is_lame() {
     if (strstr(name()->as_C_string(), "DefaultMetricsSystem") != NULL) {
       return true;
     }
+    if (strstr(name()->as_C_string(), "FileSystem") != NULL) {
+      if (strstr(name()->as_C_string(), "Checksum") == NULL) {
+        return true;
+      }
+    }
     return false;
   }
   int i;
