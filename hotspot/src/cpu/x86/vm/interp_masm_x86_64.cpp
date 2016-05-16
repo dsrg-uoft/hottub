@@ -66,10 +66,14 @@ void InterpreterMacroAssembler::call_VM_leaf_base(address entry_point,
   // the ASSERT path (no restore_bcp). Which caused bizarre failures
   // when jvm built with ASSERTs.
 #ifdef ASSERT
+  void* _addr = (void*) entry_point;
+  if (_addr != (void*) &_c2i_ret_verify_and_update_location && _addr != (void*) &_c2i_ret_verify_location_and_pop && _addr != (void*) &_i2c_osr)
   {
     Label L;
     cmpptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
     jcc(Assembler::equal, L);
+    //lea(c_rarg0, RuntimeAddress(entry_point));
+    //call(RuntimeAddress(CAST_FROM_FN_PTR(address, &_noop12)));
     stop("InterpreterMacroAssembler::call_VM_leaf_base:"
          " last_sp != NULL");
     bind(L);

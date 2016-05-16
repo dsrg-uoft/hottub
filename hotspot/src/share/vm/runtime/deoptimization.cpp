@@ -480,16 +480,16 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
   // and we'd undo the deopt.
 
   frame_pcs[0] = deopt_sender.raw_pc();
+
+#ifndef SHARK
+  assert(CodeCache::find_blob_unsafe(frame_pcs[0]) != NULL, "bad pc");
+#endif // SHARK
   if (ProfileIntComp && deopt_sender.is_compiled_frame()) {
     // see `_c2i_deopt_bless` for more details
     Method* _m = _deopt.cb()->as_nmethod_or_null()->method();
     Method* _n = deopt_sender.cb()->as_nmethod_or_null()->method();
     frame_pcs[0] = (address) _c2i_ret_push(thread, (void*) frame_pcs[0], (void*) NULL, _m);
   }
-
-#ifndef SHARK
-  assert(CodeCache::find_blob_unsafe(frame_pcs[0]) != NULL, "bad pc");
-#endif // SHARK
 
   UnrollBlock* info = new UnrollBlock(array->frame_size() * BytesPerWord,
                                       caller_adjustment * BytesPerWord,
