@@ -539,7 +539,7 @@ inline void* index_oop_from_field_offset_long(oop p, jlong field_offset) {
   jlong byte_offset = field_offset_to_byte_offset(field_offset);
 #ifdef ASSERT
   if (p != NULL) {
-    assert(byte_offset >= 0 && byte_offset <= (jlong)MAX_OBJECT_SIZE, "sane offset");
+    //assert(byte_offset >= 0 && byte_offset <= (jlong)MAX_OBJECT_SIZE, "sane offset");
     if (byte_offset == (jint)byte_offset) {
       void* ptr_plus_disp = (address)p + byte_offset;
       assert((void*)p->obj_field_addr<oop>((jint)byte_offset) == ptr_plus_disp,

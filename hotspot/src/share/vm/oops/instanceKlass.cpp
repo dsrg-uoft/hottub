@@ -3906,6 +3906,7 @@ bool InstanceKlass::is_lame() {
     , NULL
   };
   ResourceMark rm;
+  return strstr(name()->as_C_string(), "FSInputChecker") != NULL;
   if (InstanceKlass::re_initialize_iteration == 0) {
     if (strstr(name()->as_C_string(), "DefaultMetricsSystem") != NULL) {
       return true;

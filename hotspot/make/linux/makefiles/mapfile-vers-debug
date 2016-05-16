@@ -30,10 +30,16 @@ SUNWprivate_1.1 {
                 JNI_CreateJavaVM;
                 JNI_GetCreatedJavaVMs;
                 JNI_GetDefaultJavaVMInitArgs;
+                JNI_CallingJavaMain;
+                JNI_FinishedJavaMain;
                 JNI_CleanJavaVM;
                 JNI_WaitTillLastThread;
 
                 # JVM
+                JVM_BdelGetBlockingCompileTime;
+                JVM_BdelReset;
+                JVM_BdelGetInt;
+                JVM_BdelGetComp;
                 JVM_Accept;
                 JVM_ActiveProcessorCount;
                 JVM_AllocateNewArray;

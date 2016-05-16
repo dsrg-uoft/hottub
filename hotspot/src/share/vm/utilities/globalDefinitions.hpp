@@ -135,7 +135,7 @@ const int jintAsStringSize = 12;
 // log2_intptr(sizeof(class JavaThread)) - log2_intptr(64);
 // see os::set_memory_serialize_page()
 #ifdef _LP64
-const int SerializePageShiftCount = 4;
+const int SerializePageShiftCount = 6;
 #else
 const int SerializePageShiftCount = 3;
 #endif

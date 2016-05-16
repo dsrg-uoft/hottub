@@ -4283,8 +4283,8 @@ void Threads::create_thread_roots_marking_tasks(GCTaskQueue* q) {
 #endif // INCLUDE_ALL_GCS
 
 void Threads::nmethods_do(CodeBlobClosure* cf) {
-  JavaThread* _jt = JavaThread::current();
-  if (_unlikely(!_jt->is_VM_thread())) {
+  Thread* _th = Thread::current();
+  if (_unlikely(!_th->is_VM_thread())) {
     tty->print_cr("_HOTSPOT (%ld): in Threads::nmethods_do, current thread is not VM thread", _bdel_sys_gettid());
     ShouldNotReachHere();
   }
