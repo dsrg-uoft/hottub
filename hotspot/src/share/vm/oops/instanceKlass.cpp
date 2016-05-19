@@ -3906,7 +3906,7 @@ bool InstanceKlass::is_lame() {
     , NULL
   };
   ResourceMark rm;
-  return strstr(name()->as_C_string(), "FSInputChecker") != NULL;
+  /*
   if (InstanceKlass::re_initialize_iteration == 0) {
     if (strstr(name()->as_C_string(), "DefaultMetricsSystem") != NULL) {
       return true;
@@ -3918,6 +3918,7 @@ bool InstanceKlass::is_lame() {
     }
     return false;
   }
+  */
   int i;
   for (i = 0; banished[i] != NULL; i++) {
     if (strcmp(name()->as_C_string(), banished[i]) == 0) {
@@ -3954,13 +3955,17 @@ void InstanceKlass::record_class(Klass *k, TRAPS) {
 int InstanceKlass::re_initialize_iteration = 0;
 void InstanceKlass::re_initialize(Klass *k, TRAPS) {
 
-  if (!cast(k)->class_loader()
-      || !cast(k)->is_lame()) {
+  //if (cast(k)->is_initialized() && !cast(k)->is_createvm_initialized()
+  //if (!cast(k)->class_loader() || !cast(k)->is_lame()) {
+  if (!cast(k)->is_initialized() || !cast(k)->class_loader()) {
     return;
   }
 
-  tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] re-initializing super lame class: %s, %d",
-      cast(k)->name()->as_C_string(), InstanceKlass::re_initialize_iteration);
+  {
+    ResourceMark rm;
+    tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] re-initializing super lame class: %s, %d",
+        cast(k)->name()->as_C_string(), InstanceKlass::re_initialize_iteration);
+  }
 
   cast(k)->re_initialize(THREAD);
 }
@@ -3977,7 +3982,6 @@ void InstanceKlass::re_initialize(TRAPS) {
   //    return;
   //}
 
-  fprintf(stderr, "[forkjvm][info][InstanceKlass::re_initialize] re-initializing: %s\n", name()->as_C_string());
   if (ForkJVMLog) {
     ResourceMark rm(THREAD);
     tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] re-initializing: %s",
