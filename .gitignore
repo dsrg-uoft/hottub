@@ -11,3 +11,5 @@ cscope.*
 /hottub/client/java
 /hottub/client/java.o
 /hottub/static_analysis/build
+/hottub/static_analysis/src/static_analysis.jar
+/hottub/static_analysis/src/*.class

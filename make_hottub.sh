@@ -29,7 +29,7 @@ echo "=== Building $IMG of type $TYPE"
 
 echo "===== Building static analysis"
 cd hottub/static_analysis
-./make.sh
+make
 cd -
 echo
 
