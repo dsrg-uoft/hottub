@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+HOTTUB_DATA="$JAVA_HOME/hottub/data"
+if [ ! -d "$HOTTUB_DATA" ]; then
+    echo "HotTub data not found in $HOTTUB_DATA"
+    exit 1
+fi
+
+for d in "$HOTTUB_DATA"/*; do
+    if [ -d "$d" ]; then
+        echo "HotTub: dir $d..."
+        PIDFILE="$d/pid.txt"
+        if [ -f "$PIDFILE" ]; then
+            PID="$(< "$PIDFILE")"
+            if kill -s 0 "$PID" 2> /dev/null; then
+                echo "HotTub: sending sigterm to $PID"
+                if kill "$PID"; then
+                    sleep 3
+                fi
+                if kill -s 0 "$PID" 2> /dev/null; then
+                    echo "HotTub: killing $PID"
+                    kill -9 "$PID"
+                else
+                    echo "HotTub: pid $PID terminated successfully"
+                fi
+            else
+                echo "HotTub: pid $PID dead"
+            fi
+        fi
+        rm -r "$d"
+    fi
+done

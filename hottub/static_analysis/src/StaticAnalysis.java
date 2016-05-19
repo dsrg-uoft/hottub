@@ -275,6 +275,7 @@ public class StaticAnalysis implements Opcodes {
                 // check interfaces
                 // if any interface is not safe this is not safe
                 // don't ask me why cn.interfaces is an object...
+                @SuppressWarnings("unchecked")
                 List<String> interface_names = (List<String>)cn.interfaces;
                 for (int i = 0; safe && i < interface_names.size(); i++) {
                     String interface_name = interface_names.get(i);

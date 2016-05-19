@@ -5359,7 +5359,7 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
       char forkjvm_home[forkjvm_home_len + 1];
       strncpy(forkjvm_home, java_home, java_home_len);
       forkjvm_home[java_home_len] = '\0';
-      strcat(forkjvm_home, "forkjvm");
+      strcat(forkjvm_home, "hottub");
 
       /* forkjvm_home               + forkjvmid                                   + /classpath.txt
        * forkjvm_home_len + "/data" + '/' + /<32 char md5 hex> + <1 char pool id> + 14

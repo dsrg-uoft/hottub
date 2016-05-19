@@ -8,6 +8,6 @@ cscope.*
 
 /old/
 
-/forkjvm/client/java
-/forkjvm/client/java.o
-/forkjvm/static_analysis/build
+/hottub/client/java
+/hottub/client/java.o
+/hottub/static_analysis/build
