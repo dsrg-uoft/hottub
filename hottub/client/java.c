@@ -410,7 +410,7 @@ int create_datapath(char *datapath) {
     // -8 removes "bin/java"
     datapath_len -= 8;
     datapath[datapath_len] = '\0';
-    strcat(datapath,"forkjvm/data");
+    strcat(datapath,"hottub/data");
     datapath_len += 12;
     return datapath_len;
 }

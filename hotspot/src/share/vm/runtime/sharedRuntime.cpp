@@ -211,6 +211,9 @@ extern "C" {
       tty->print_cr("_HOTSPOT: i2c stack overflowed");
       ShouldNotReachHere();
     }
+    if (ProfileIntCompTrace) {
+      tty->print_cr("_HOTSPOT: i2c call %s#%s", m->klass_name()->as_C_string(), m->name()->as_C_string());
+    }
     jt->_i2c_rbp_stack[jt->_i2c_stack_pos] = rbp;
     jt->_i2c_ret_stack[jt->_i2c_stack_pos++] = ret;
     jt->_i2c_stack_max = _MAX(jt->_i2c_stack_max, jt->_i2c_stack_pos);
