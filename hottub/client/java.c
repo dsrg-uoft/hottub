@@ -61,7 +61,7 @@ int send_env_var(int jvmfd, char **envp);
 int exec_jvm(const char *jvmid, int main_argc, char **main_argv);
 
 /* try to use a jvm from pool or add new jvm to pool */
-int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int argc, char** argv, char** envp);
+int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int argc, char** argv, char** envp, int *ret_val);
 
 /* server initialization utilities */
 int write_server_pid(const char* jvmpath, int pid);
@@ -105,14 +105,15 @@ int main(int argc, char **argv, char **envp)
         return exec_jvm(NULL, argc, argv);
 
     /* try to contact a forkjvm and send fds */
-    status = run_forkjvm(id, java_argc, java_argv, num_d_args, argc, argv, envp);
+    int ret_val = 255;
+    status = run_forkjvm(id, java_argc, java_argv, num_d_args, argc, argv, envp, &ret_val);
     if (status == 1)
         return exec_jvm(id, argc, argv);
     else if (status == -1)
         return exec_jvm(NULL, argc, argv);
 
     /* will only reach on successful forkjvm run */
-    return 0;
+    return ret_val;
 }
 
 /* a. tell the first non-busy jvm in pool to run ("fork")
@@ -122,7 +123,7 @@ int main(int argc, char **argv, char **envp)
  * if there is ever a fatal error return -1 (default to normal exec)
  * if you ever can't connect or lose connection to a jvm just go next
  */
-int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int argc, char** argv, char** envp)
+int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int argc, char** argv, char** envp, int *ret_val)
 {
     /* check for existing forkjvm in id's pool */
     int done = 0;
@@ -137,7 +138,6 @@ int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int a
     int poolno;
     for (poolno = 0; !done && poolno < JVM_POOL_MAX; poolno++) {
         int error;
-        char msg[MSG_LEN];
 
         /* add/update poolno to id and path */
         id[0] = '/';
@@ -211,8 +211,7 @@ int run_forkjvm(char *id, int java_argc, char** java_argv, int num_d_args, int a
 
             uint64_t t1 = _now();
             fprintf(stderr, "[forkjvm][info] (run_forkjvm) running server with id %s, took %.6f\n", id, (t1 - t0) / 1e9);
-            memset(msg, 0, MSG_LEN);
-            if (read_sock(jvmfd, msg, MSG_LEN) == -1)
+            if (read_sock(jvmfd, ret_val, sizeof(int)) == -1)
                 perror("[forkjvm][error] read_sock");
             close(jvmfd);
             done = 1;

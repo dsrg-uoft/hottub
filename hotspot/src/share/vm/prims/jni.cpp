@@ -96,6 +96,8 @@
 #include "runtime/_bdel.hpp"
 
 static jint CurrentVersion = JNI_VERSION_1_8;
+static jint ret_val = 255;
+static jboolean hottub = false;
 
 
 // The DT_RETURN_MARK macros create a scoped object to fire the dtrace
@@ -5337,7 +5339,24 @@ class VM_DeoptimizeTheWorld : public VM_Operation {
   }
 };
 
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_GetRetVal() {
+  return ret_val;
+}
+
+_JNI_IMPORT_OR_EXPORT_ void JNICALL JNI_SetRetVal(jint code) {
+  ret_val = code;
+}
+
+_JNI_IMPORT_OR_EXPORT_ void JNICALL JNI_SetHottub() {
+  hottub = true;
+}
+
+_JNI_IMPORT_OR_EXPORT_ jboolean JNICALL JNI_IsHottub() {
+  return hottub ? 1 : 0;
+}
+
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
+  JNI_SetRetVal(255);
   JavaThread* thread = JavaThread::current();
 
   // transition to vm so that class initialization and gc call works

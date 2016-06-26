@@ -942,6 +942,27 @@ LoadJavaVM(const char *jvmpath, InvocationFunctions *ifn)
         return JNI_FALSE;
     }
 
+    ifn->GetRetVal = (GetRetVal_t)
+        dlsym(libjvm, "JNI_GetRetVal");
+    if (ifn->GetRetVal == NULL) {
+        JLI_ReportErrorMessage(DLL_ERROR2, jvmpath, dlerror());
+        return JNI_FALSE;
+    }
+
+    ifn->SetRetVal = (SetRetVal_t)
+        dlsym(libjvm, "JNI_SetRetVal");
+    if (ifn->SetRetVal == NULL) {
+        JLI_ReportErrorMessage(DLL_ERROR2, jvmpath, dlerror());
+        return JNI_FALSE;
+    }
+
+    ifn->SetHottub = (SetHottub_t)
+        dlsym(libjvm, "JNI_SetHottub");
+    if (ifn->SetHottub == NULL) {
+        JLI_ReportErrorMessage(DLL_ERROR2, jvmpath, dlerror());
+        return JNI_FALSE;
+    }
+
     return JNI_TRUE;
 }
 

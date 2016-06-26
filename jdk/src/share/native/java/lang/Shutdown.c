@@ -49,3 +49,17 @@ Java_java_lang_Shutdown_runAllFinalizers(JNIEnv *env, jclass ignored)
         (*env)->CallStaticVoidMethod(env, cl, mid);
     }
 }
+
+
+JNIEXPORT void JNICALL
+Java_java_lang_Shutdown_saveRetVal(JNIEnv *env, jclass ignored, jint code)
+{
+    JNI_SetRetVal(code);
+}
+
+
+JNIEXPORT jboolean JNICALL
+Java_java_lang_Shutdown_isHottub(JNIEnv *env, jclass ignored)
+{
+    return JNI_IsHottub();
+}

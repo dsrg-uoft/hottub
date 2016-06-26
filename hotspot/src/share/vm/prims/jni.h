@@ -1950,6 +1950,14 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL
 JNI_CleanJavaVM(char * forkjvmid);
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL
 JNI_WaitTillLastThread();
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL
+JNI_GetRetVal();
+_JNI_IMPORT_OR_EXPORT_ void JNICALL
+JNI_SetRetVal(jint code);
+_JNI_IMPORT_OR_EXPORT_ void JNICALL
+JNI_SetHottub();
+_JNI_IMPORT_OR_EXPORT_ jboolean JNICALL
+JNI_IsHottub();
 
 /* Defined by native libraries. */
 JNIEXPORT jint JNICALL

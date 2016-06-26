@@ -34,6 +34,10 @@ SUNWprivate_1.1 {
                 JNI_FinishedJavaMain;
                 JNI_CleanJavaVM;
                 JNI_WaitTillLastThread;
+                JNI_GetRetVal;
+                JNI_SetRetVal;
+                JNI_SetHottub;
+                JNI_IsHottub;
 
                 # JVM
                 JVM_BdelGetBlockingCompileTime;

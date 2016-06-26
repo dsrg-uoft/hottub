@@ -83,6 +83,9 @@ typedef jint (JNICALL *GetDefaultJavaVMInitArgs_t)(void *args);
 typedef jint (JNICALL *GetCreatedJavaVMs_t)(JavaVM **vmBuf, jsize bufLen, jsize *nVMs);
 typedef jint (JNICALL *CleanJavaVM_t)(char *);
 typedef jint (JNICALL *WaitTillLastThread_t)();
+typedef jint (JNICALL *GetRetVal_t)();
+typedef void (JNICALL *SetRetVal_t)(jint);
+typedef void (JNICALL *SetHottub_t)();
 
 typedef struct {
     CreateJavaVM_t CreateJavaVM;
@@ -92,6 +95,9 @@ typedef struct {
     GetCreatedJavaVMs_t GetCreatedJavaVMs;
     CleanJavaVM_t CleanJavaVM;
     WaitTillLastThread_t WaitTillLastThread;
+    GetRetVal_t GetRetVal;
+    SetRetVal_t SetRetVal;
+    SetHottub_t SetHottub;
 } InvocationFunctions;
 
 int

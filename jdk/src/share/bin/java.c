@@ -453,6 +453,19 @@ ssize_t read_sock(int fd, void *ptr, size_t nbytes)
     return recvmsg(fd, &msg, 0);
 }
 
+ssize_t write_sock(int fd, void *ptr, size_t nbytes)
+{
+    struct msghdr   msg;
+    struct iovec    iov[1];
+
+    memset(&msg, 0, sizeof(msg));
+    iov[0].iov_base = ptr;
+    iov[0].iov_len = nbytes;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+    return sendmsg(fd, &msg, 0);
+}
+
 int JNICALL
 JavaMain(void * _args)
 {
@@ -588,6 +601,7 @@ JavaMain(void * _args)
     clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_end);
 
     if (forkjvmid[0] != '\0') {
+        ifn.SetHottub();
 
         unsigned long init_diff;
         double init_ddiff;
@@ -828,6 +842,11 @@ JavaMain(void * _args)
             for (i = 0; i < 3; i++) {
                 dup2(oldfd[i], i);
                 close(oldfd[i]);
+            }
+
+            int ret_val = ifn.GetRetVal();
+            if (write_sock(clientfd, &ret_val, sizeof(int)) != sizeof(int)) {
+                fprintf(stderr, "[forkjvm][warn][JavaMain] (write_sock) problem writing return val errno = %s\n", strerror(errno));
             }
             close(clientfd);
 
