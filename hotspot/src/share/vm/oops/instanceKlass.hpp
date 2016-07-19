@@ -1038,14 +1038,17 @@ public:
   }
   bool check_sharing_error_state();
 
-  // forkjvm
+  // old hottub
   static fileStream* classlist_file;
   bool is_createvm_initialized();
   bool is_lame();
-  static void record_class(Klass *k, TRAPS);
-  static void re_initialize(Klass *k, TRAPS);
-  void re_initialize(TRAPS);
   static int re_initialize_iteration;
+  static void record_class(Klass *k, TRAPS);
+  // hottub
+  bool re_init;
+  bool re_init_safe();
+  static void re_zero_init(Klass *k, TRAPS);
+  static void re_clinit(Klass *this_k, TRAPS);
 
 private:
   // initialization state

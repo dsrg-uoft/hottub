@@ -5364,12 +5364,17 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
   ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
 
   if (ForkJVMReinit) {
-    InstanceKlass::re_initialize_iteration = 0;
-    SystemDictionary::classes_do(InstanceKlass::re_initialize, thread);
-    //InstanceKlass::re_initialize_iteration = 1;
-    //SystemDictionary::classes_do(InstanceKlass::re_initialize, thread);
+    jlong t0 = os::javaTimeNanos();
+    SystemDictionary::classes_do(InstanceKlass::re_zero_init, thread);
+    jlong t1 = os::javaTimeNanos();
+    SystemDictionary::classes_do(InstanceKlass::re_clinit, thread);
+    jlong t2 = os::javaTimeNanos();
+    tty->print("[forkjvm][info][JNI_CleanJavaVM] re_zero_init = %luns, "
+            "re_clinit = %luns, total = %luns\n",
+            t1 - t0, t2 - t1, (t1 - t0) + (t2 - t1));
 
-    if (ForkJVMTmp) {
+#if 0
+    if (false && ForkJVMTmp) {
 
       /* phase1: write classpath + classlist file */
       const char* java_home = Arguments::get_java_home();
@@ -5478,7 +5483,8 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
             int safe = line[len - 2] - '0';
             //tty->print_cr("[forkjvm][hmm][JNI_CleanJavaVM] class %s is safe %d", class_name->as_C_string(), safe);
             if (safe)
-              InstanceKlass::cast(klass)->re_initialize(thread);
+              InstanceKlass::re_zero_init(InstanceKlass::cast(klass), thread);
+              InstanceKlass::re_clinit(InstanceKlass::cast(klass), thread);
           } else {
             tty->print_cr("[forkjvm][error][JNI_CleanJavaVM] never found symbol = %s", line);
           }
@@ -5486,7 +5492,8 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
       }
       pclose(output);
     }
-    fprintf(stderr, "[forkjvm][info][JNI_CleanJavaVM] so fresh and so clean\n");
+#endif
+    tty->print("[forkjvm][info][JNI_CleanJavaVM] so fresh and so clean\n");
   }
 
   /* phase4: run gc */

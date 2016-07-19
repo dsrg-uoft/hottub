@@ -171,6 +171,7 @@ HS_DTRACE_PROBE_DECL5(hotspot, class__initialization__end,
 #endif //  ndef DTRACE_ENABLED
 
 #include "runtime/_bdel.hpp"
+#include "utilities/clinit_analysis.hpp"
 
 volatile int InstanceKlass::_total_instanceKlass_count = 0;
 fileStream* InstanceKlass::classlist_file = NULL;
@@ -3952,58 +3953,53 @@ void InstanceKlass::record_class(Klass *k, TRAPS) {
   }
 }
 
-int InstanceKlass::re_initialize_iteration = 0;
-void InstanceKlass::re_initialize(Klass *k, TRAPS) {
+// zero initialize all initialized classes
+void InstanceKlass::re_zero_init(Klass *k, TRAPS) {
+  InstanceKlass *ik = cast(k);
+  ik->re_init = false;
 
-  //if (cast(k)->is_initialized() && !cast(k)->is_createvm_initialized()
-  //if (!cast(k)->class_loader() || !cast(k)->is_lame()) {
-  if (!cast(k)->is_initialized() || !cast(k)->class_loader()) {
+  if (!ik->re_init_safe()) {
     return;
   }
-
-  {
+  if (true || ForkJVMLog) {
     ResourceMark rm;
-    tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] re-initializing super lame class: %s, %d",
-        cast(k)->name()->as_C_string(), InstanceKlass::re_initialize_iteration);
+    tty->print("[hottub][info][InstanceKlass::re_zero_init] zero init "
+        "class: %s\n", ik->name()->as_C_string());
   }
 
-  cast(k)->re_initialize(THREAD);
+  HandleMark hm(THREAD);
+  Handle mirror(ik->java_mirror());
+  ik->do_local_static_fields(&java_lang_Class::zero_initialize_static_field,
+      mirror, CHECK);
+  ik->do_local_static_fields(&java_lang_Class::initialize_static_field,
+      mirror, CHECK);
 }
 
-void InstanceKlass::re_initialize(TRAPS) {
+// run clinit for all initialized classes
+void InstanceKlass::re_clinit(Klass *this_k, TRAPS) {
+  InstanceKlass *this_ik = cast(this_k);
 
-  if (!this->class_loader()) {
+  if (!this_ik->re_init_safe() || this_ik->re_init) {
     return;
   }
-
-  //{
-  //  ResourceMark rm(THREAD);
-  //  if (strncmp(name()->as_C_string(), "hi_world", 8) != 0)
-  //    return;
-  //}
-
-  if (ForkJVMLog) {
-    ResourceMark rm(THREAD);
-    tty->print_cr("[forkjvm][info][InstanceKlass::re_initialize] re-initializing: %s",
-        name()->as_C_string());
+  if (true || ForkJVMLog) {
+    ResourceMark rm;
+    tty->print("[hottub][info][InstanceKlass::re_clinit] clinit class: %s\n",
+        this_ik->name()->as_C_string());
   }
 
-  /* perform parse initialization on everything*/
-  HandleMark hm(THREAD);
-  Handle mirror(java_mirror());
-  do_local_static_fields(&java_lang_Class::zero_initialize_static_field, mirror, CHECK);
-  do_local_static_fields(&java_lang_Class::initialize_static_field, mirror, CHECK);
+  ClinitAnalysis clinit_analysis(this_ik, THREAD);
+  clinit_analysis.run_analysis();
+  clinit_analysis.run_clinits();
+}
 
-  /* run clinit if safe */
-  call_class_initializer(THREAD);
-
-  /* static analysis should have made any throw calls unsafe */
-  /* if other exceptions are possible our simple safe cases really shouldn't trigger them... */
-  if (HAS_PENDING_EXCEPTION) {
-    ResourceMark rm(THREAD);
-    tty->print_cr("[forkjvm][error][InstanceKlass::re_initialize] clinit exception class = %s",
-        name()->as_C_string());
+bool InstanceKlass::re_init_safe() {
+  //if (cast(k)->is_initialized() && !cast(k)->is_createvm_initialized()
+  //if (!cast(k)->class_loader() || !cast(k)->is_lame()) {
+  if (!is_initialized() || !class_loader()) {
+    return false;
   }
+  return true;
 }
 
 // Construct a PreviousVersionNode entry for the array hung off
