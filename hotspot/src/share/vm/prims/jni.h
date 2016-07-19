@@ -1947,7 +1947,7 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL
 JNI_GetCreatedJavaVMs(JavaVM **, jsize, jsize *);
 
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL
-JNI_CleanJavaVM(char * forkjvmid);
+JNI_CleanJavaVM(char * hottubid);
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL
 JNI_WaitTillLastThread();
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL

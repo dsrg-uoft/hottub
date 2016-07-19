@@ -260,7 +260,7 @@ class Shutdown {
                 count++;
             }
         }
-        System.err.print("[forkjvm] (kill_daemon_threads) killed " + count + " daemon threads\n");
+        System.err.print("[HotTub][info][Shutdown::kill_daemon_threads] killed " + count + " daemon threads\n");
         */
     }
 

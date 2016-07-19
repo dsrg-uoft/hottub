@@ -1217,7 +1217,7 @@ void InstanceKlass::call_class_initializer_impl(instanceKlassHandle this_oop, TR
   }
 
   methodHandle h_method(THREAD, this_oop->class_initializer());
-  // forkjvm makes this possible
+  // HotTub makes this possible
   //assert(!this_oop->is_initialized(), "we cannot initialize twice");
   if (TraceClassInitialization) {
     tty->print("%d Initializing ", call_class_initializer_impl_counter++);
@@ -3961,9 +3961,9 @@ void InstanceKlass::re_zero_init(Klass *k, TRAPS) {
   if (!ik->re_init_safe()) {
     return;
   }
-  if (true || ForkJVMLog) {
+  if (true || HotTubLog) {
     ResourceMark rm;
-    tty->print("[hottub][info][InstanceKlass::re_zero_init] zero init "
+    tty->print("[HotTub][info][InstanceKlass::re_zero_init] zero init "
         "class: %s\n", ik->name()->as_C_string());
   }
 
@@ -3982,9 +3982,9 @@ void InstanceKlass::re_clinit(Klass *this_k, TRAPS) {
   if (!this_ik->re_init_safe() || this_ik->re_init) {
     return;
   }
-  if (true || ForkJVMLog) {
+  if (true || HotTubLog) {
     ResourceMark rm;
-    tty->print("[hottub][info][InstanceKlass::re_clinit] clinit class: %s\n",
+    tty->print("[HotTub][info][InstanceKlass::re_clinit] clinit class: %s\n",
         this_ik->name()->as_C_string());
   }
 

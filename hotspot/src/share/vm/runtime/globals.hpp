@@ -3979,17 +3979,17 @@ class CommandLineFlags {
              "Use the FP register for holding the frame pointer "           \
              "and not as a general purpose register.")                      \
                                                                             \
-  product(bool, ForkJVMLog, false,                                          \
-        "Enable ForkJVM logs and static analysis logs.")                    \
+  product(bool, HotTubLog, false,                                           \
+        "Enable HotTub logs and static analysis logs.")                     \
                                                                             \
-  product(bool, ForkJVMReinit, false,                                       \
-        "Enable ForkJVM to reinitialize classes.")                          \
+  product(bool, HotTubReinit, false,                                        \
+        "Enable HotTub to reinitialize classes.")                           \
                                                                             \
-  product(bool, ForkJVMDeopt, false,                                        \
-        "Enable ForkJVM to deoptimize all methods.")                        \
+  product(bool, HotTubDeopt, false,                                         \
+        "Enable HotTub to de-optimize all methods.")                        \
                                                                             \
-  product(bool, ForkJVMTmp, false,                                          \
-        "bad people doing bad things.")
+  product(bool, HotTubTmp, false,                                           \
+        "Enable temporary HotTub features.")
 
 /*
  *  Macros for factoring of globals

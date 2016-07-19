@@ -590,7 +590,7 @@ void java_lang_Class::zero_initialize_static_field(fieldDescriptor* fd, Handle m
       break;
     default:
       // look in hotspot/src/share/vm/utilities/globalDefinitions.hpp to see type
-      tty->print_cr("[forkjvm][error][java_lang_Class::zero_initialize_static_field] type = %d", t);
+      tty->print_cr("[hottub][error][java_lang_Class::zero_initialize_static_field] type = %d", t);
       THROW_MSG(vmSymbols::java_lang_ClassFormatError(),
           "zero_initialize_static_field found Illegal ConstantValue attribute in class file");
       break;

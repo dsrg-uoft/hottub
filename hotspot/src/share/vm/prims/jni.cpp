@@ -5355,7 +5355,8 @@ _JNI_IMPORT_OR_EXPORT_ jboolean JNICALL JNI_IsHottub() {
   return hottub ? 1 : 0;
 }
 
-_JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *hottubid) {
+  //TODO: remove hottubid? not used with new static analysis
   JNI_SetRetVal(255);
   JavaThread* thread = JavaThread::current();
 
@@ -5363,18 +5364,19 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
   // not sure how legal this transition is... (although seems to cause no asserts)
   ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
 
-  if (ForkJVMReinit) {
+  if (HotTubReinit) {
     jlong t0 = os::javaTimeNanos();
     SystemDictionary::classes_do(InstanceKlass::re_zero_init, thread);
     jlong t1 = os::javaTimeNanos();
     SystemDictionary::classes_do(InstanceKlass::re_clinit, thread);
     jlong t2 = os::javaTimeNanos();
-    tty->print("[forkjvm][info][JNI_CleanJavaVM] re_zero_init = %luns, "
+    tty->print("[hottub][info][JNI_CleanJavaVM] re_zero_init = %luns, "
             "re_clinit = %luns, total = %luns\n",
             t1 - t0, t2 - t1, (t1 - t0) + (t2 - t1));
 
 #if 0
-    if (false && ForkJVMTmp) {
+    // TODO: if we ever re-enable this need to update path names!
+    if (false && HotTubTmp) {
 
       /* phase1: write classpath + classlist file */
       const char* java_home = Arguments::get_java_home();
@@ -5407,7 +5409,7 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
       /* forkjvm_home_len + 23                             + 1   + sa_file_len    + 1   + sa_file_len   + 9               */
       int sa_cmd_len = forkjvm_home_len + 23 + 2 + sa_file_len * 2 + 9;
       char sa_cmd[sa_cmd_len + 1];
-      if (ForkJVMLog) {
+      if (HotTubLog) {
         sprintf(sa_cmd, "%s/static_analysis/run.sh %s %s log 2>&1",
             forkjvm_home, classpath_path, classlist_path);
       } else {
@@ -5433,7 +5435,7 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
       FILE* output = popen(sa_cmd, "r");
 
       while (fgets(line, 1023, output)) {
-        if (ForkJVMLog)
+        if (HotTubLog)
           tty->print("[forkjvm]%s", line);
 
         /* lines starting with [<category>] are a log and not a result */
@@ -5493,25 +5495,25 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *forkjvmid) {
       pclose(output);
     }
 #endif
-    tty->print("[forkjvm][info][JNI_CleanJavaVM] so fresh and so clean\n");
+    tty->print("[hottub][info][JNI_CleanJavaVM] so fresh and so clean\n");
   }
 
   /* phase4: run gc */
 
-  if (ForkJVMDeopt) {
-    tty->print_cr("[forkjvm][info][JNI_CleanJavaVM] VMThread::execute VM_DeoptimizeTheWorld");
+  if (HotTubDeopt) {
+    tty->print_cr("[hottub][info][JNI_CleanJavaVM] VMThread::execute VM_DeoptimizeTheWorld");
     VM_DeoptimizeTheWorld op;
     VMThread::execute(&op);
   }
 
   {
     HandleMark hm(thread);
-    if (ForkJVMLog)
+    if (HotTubLog)
       Universe::heap()->print();
 
     ((ParallelScavengeHeap *)Universe::heap())->collect(GCCause::_jvmti_force_gc);
 
-    if (ForkJVMLog)
+    if (HotTubLog)
       Universe::heap()->print();
   }
 

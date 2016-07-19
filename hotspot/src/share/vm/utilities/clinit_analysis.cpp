@@ -45,9 +45,9 @@ bool ClinitAnalysis::push_ik(InstanceKlass *ik) {
 bool ClinitAnalysis::push_super(InstanceKlass *this_ik) {
   InstanceKlass* super_ik = InstanceKlass::cast(this_ik->super());
   if (super_ik != NULL && !this_ik->is_interface() && push_ik(super_ik)) {
-    if (ForkJVMLog) {
+    if (HotTubLog) {
       ResourceMark rm;
-      tty->print("[hottub][trace][ClinitAnalysis::push_super] class = %s\n",
+      tty->print("[HotTub][trace][ClinitAnalysis::push_super] class = %s\n",
           super_ik->name()->as_C_string());
     }
     return true;
@@ -69,9 +69,9 @@ bool ClinitAnalysis::push_super_interface(InstanceKlass *this_ik) {
         }
       }
       if (push_ik(ik)) {
-        if (ForkJVMLog) {
+        if (HotTubLog) {
           ResourceMark rm;
-          tty->print("[hottub][trace][ClinitAnalysis::push_super_interface] "
+          tty->print("[HotTub][trace][ClinitAnalysis::push_super_interface] "
               "class = %s\n", ik->name()->as_C_string());
         }
         return true;
@@ -86,9 +86,9 @@ bool ClinitAnalysis::push_super_interface(InstanceKlass *this_ik) {
 // 2. add method invokes to method_stack
 // TODO other types of invoke / get / put
 void ClinitAnalysis::analyze_method(Method *this_m) {
-  if (ForkJVMLog) {
+  if (HotTubLog) {
     ResourceMark rm;
-    tty->print("[hottub][trace][ClinitAnalysis::analyze_method] method = %s\n",
+    tty->print("[HotTub][trace][ClinitAnalysis::analyze_method] method = %s\n",
         this_m->name_and_sig_as_C_string());
   }
   HandleMark hm;
@@ -109,9 +109,9 @@ void ClinitAnalysis::analyze_method(Method *this_m) {
 
       // reference found
       bool result = push_ik(ik);
-      if (ForkJVMLog && result) {
+      if (HotTubLog && result) {
         ResourceMark rm;
-        tty->print("[hottub][trace][ClinitAnalysis::analyze_method] "
+        tty->print("[HotTub][trace][ClinitAnalysis::analyze_method] "
             "get/putstatic = %s\n", ik->name()->as_C_string());
       }
 
@@ -130,9 +130,9 @@ void ClinitAnalysis::analyze_method(Method *this_m) {
         if (push_ik(ik)) {
           method_stack.push(mh());
           method_visit_stack.push(mh());
-          if (ForkJVMLog) {
+          if (HotTubLog) {
             ResourceMark rm;
-            tty->print("[hottub][trace][ClinitAnalysis::analyze_method] "
+            tty->print("[HotTub][trace][ClinitAnalysis::analyze_method] "
                 "invokestatic = %s\n", mh()->name_and_sig_as_C_string());
           }
         }
@@ -150,9 +150,9 @@ void ClinitAnalysis::run_analysis() {
   //    - same as super
   // 3. initialize all classes referenced by clinit
   //    - will only reach this after all supers and super interfaces are done
-  if (ForkJVMLog) {
+  if (HotTubLog) {
     ResourceMark rm;
-    tty->print("[hottub][info][ClinitAnalysis::run_analysis] start! "
+    tty->print("[HotTub][info][ClinitAnalysis::run_analysis] start! "
         "class = %s\n", start_ik->name()->as_C_string());
   }
 
@@ -163,9 +163,9 @@ void ClinitAnalysis::run_analysis() {
     InstanceKlass *ik = ik_stack.pop();
     ik_stack.push(ik);
     assert(ik->re_init_safe() && !ik->re_init, "bad InstanceKlass");
-    if (ForkJVMLog) {
+    if (HotTubLog) {
       ResourceMark rm;
-      tty->print("[hottub][trace][ClinitAnalysis::run_analysis] analyzing "
+      tty->print("[HotTub][trace][ClinitAnalysis::run_analysis] analyzing "
           "class = %s\n", ik->name()->as_C_string());
     }
 
@@ -202,9 +202,9 @@ void ClinitAnalysis::run_clinits() {
   while (!clinit_stack.is_empty()) {
     InstanceKlass *ik = clinit_stack.pop();
 
-    if (ForkJVMLog) {
+    if (HotTubLog) {
       ResourceMark rm;
-      tty->print("[hottub][info][ClinitAnalysis::run_clinits] class "
+      tty->print("[HotTub][info][ClinitAnalysis::run_clinits] class "
           "clinit = %s\n", ik->name()->as_C_string());
     }
 
@@ -213,7 +213,7 @@ void ClinitAnalysis::run_clinits() {
 
     if (HAS_PENDING_EXCEPTION) {
       ResourceMark rm(THREAD);
-      tty->print("[hottub][error][ClinitAnalysis::run_clinits] "
+      tty->print("[HotTub][error][ClinitAnalysis::run_clinits] "
           "clinit exception: class = %s, exception = %s\n",
           ik->name()->as_C_string(), PENDING_EXCEPTION->print_value_string());
       CLEAR_PENDING_EXCEPTION;
@@ -225,7 +225,7 @@ void ClinitAnalysis::print_method(methodHandle mh, TRAPS) {
   assert(mh() != NULL, "no null methods");
 
   ResourceMark rm;
-  tty->print("[hottub][info][ClinitAnalysis::print_method] printing: %s\n",
+  tty->print("[HotTub][info][ClinitAnalysis::print_method] printing: %s\n",
       mh()->name_and_sig_as_C_string());
 
   BytecodeStream bcs(mh);
@@ -243,13 +243,13 @@ void ClinitAnalysis::print_method(methodHandle mh, TRAPS) {
       Klass* k = pool->klass_ref_at(index, CHECK);
       KlassHandle kh(THREAD, k);
       if (kh.is_null()) {
-        tty->print("[hottub][info][ClinitAnalysis::print_method] %s kh NULL\n",
+        tty->print("[HotTub][info][ClinitAnalysis::print_method] %s kh NULL\n",
             Bytecodes::name(c));
       } else {
-        tty->print("[hottub][info][ClinitAnalysis::print_method] field klass: %s\n",
+        tty->print("[HotTub][info][ClinitAnalysis::print_method] field klass: %s\n",
             kh()->name()->as_C_string());
         InstanceKlass* ik = InstanceKlass::cast(kh());
-        tty->print("[hottub][info][ClinitAnalysis::print_method] field instance klass: %s\n",
+        tty->print("[HotTub][info][ClinitAnalysis::print_method] field instance klass: %s\n",
             ik->name()->as_C_string());
       }
 
@@ -263,9 +263,9 @@ void ClinitAnalysis::print_method(methodHandle mh, TRAPS) {
       KlassHandle resolved_kh = fail_mary.resolved_klass();
       methodHandle resolved_mh = fail_mary.resolved_method();
 
-      tty->print("[hottub][info][ClinitAnalysis::print_method] invoke static klass: %s\n",
+      tty->print("[HotTub][info][ClinitAnalysis::print_method] invoke static klass: %s\n",
           resolved_kh->name()->as_C_string());
-      tty->print("[hottub][info][ClinitAnalysis::print_method] invoke static method: %s\n",
+      tty->print("[HotTub][info][ClinitAnalysis::print_method] invoke static method: %s\n",
           resolved_mh()->name_and_sig_as_C_string());
     }
   }

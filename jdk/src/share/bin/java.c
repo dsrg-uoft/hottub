@@ -53,7 +53,7 @@
 
 #include "java.h"
 #include <sys/time.h> // for clocking jvm init time
-// forkjvm
+// hottub
 #include <sys/un.h>
 #include <sys/socket.h>
 
@@ -172,11 +172,11 @@ static jlong threadStackSize    = 0;  /* stack size of the new thread */
 static jlong maxHeapSize        = 0;  /* max heap size */
 static jlong initialHeapSize    = 0;  /* inital heap size */
 
-// forkjvm
-static jboolean forkjvm = JNI_FALSE;
+// hottub
+static jboolean hottub = JNI_FALSE;
 // '_' + md5 digest in hex + pool id + null
 //  1  +     16      x 2   +    1    +  1    = 35
-static char forkjvmid[35];
+static char hottubid[35];
 static int (*clock_gettime_func)(clockid_t, struct timespec*) = NULL;
 static struct timespec jvm_init_start = {0};
 
@@ -379,7 +379,7 @@ int listen_sock(const char *path)
 
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd == -1) {
-        fprintf(stderr, "[forkjvm][error][listen_sock] socket | path = %s | errno = %s\n", path + 1, strerror(errno));
+        fprintf(stderr, "[hottub][error][bin listen_sock] socket | path = %s | errno = %s\n", path + 1, strerror(errno));
         return -1;
     }
 
@@ -389,12 +389,12 @@ int listen_sock(const char *path)
     addr.sun_path[0] = '\0';
 
     if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        fprintf(stderr, "[forkjvm][error][listen_sock] bind | path = %s | errno = %s\n", path + 1, strerror(errno));
+        fprintf(stderr, "[hottub][error][bin listen_sock] bind | path = %s | errno = %s\n", path + 1, strerror(errno));
         return -1;
     }
 
     if (listen(fd, 0) == -1) {
-        fprintf(stderr, "[forkjvm][error][listen_sock] listen | path = %s | errno = %s\n", path + 1, strerror(errno));
+        fprintf(stderr, "[hottub][error][bin listen_sock] listen | path = %s | errno = %s\n", path + 1, strerror(errno));
         return -1;
     }
 
@@ -430,9 +430,9 @@ ssize_t read_fd(int fd, void *ptr, size_t nbytes, int *recvfd)
     if ((cmptr = CMSG_FIRSTHDR(&msg)) != NULL &&
             cmptr->cmsg_len == CMSG_LEN(sizeof(int))) {
         if (cmptr->cmsg_level != SOL_SOCKET)
-            fprintf(stderr, "[forkjvm][error][read_fd] control level != SOL_SOCKET");
+            fprintf(stderr, "[hottub][error][bin read_fd] control level != SOL_SOCKET");
         if (cmptr->cmsg_type != SCM_RIGHTS)
-            fprintf(stderr, "[forkjvm][error][read_fd] control type != SCM_RIGHTS");
+            fprintf(stderr, "[hottub][error][bin read_fd] control type != SCM_RIGHTS");
         *recvfd = *((int *) CMSG_DATA(cmptr));
     } else
         *recvfd = -1;       /* descriptor was not passed */
@@ -600,7 +600,7 @@ JavaMain(void * _args)
     struct timespec jvm_init_end = {0};
     clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_end);
 
-    if (forkjvmid[0] != '\0') {
+    if (hottubid[0] != '\0') {
         ifn.SetHottub();
 
         unsigned long init_diff;
@@ -608,7 +608,7 @@ JavaMain(void * _args)
         init_diff = 1e9 * (jvm_init_end.tv_sec - jvm_init_start.tv_sec)
             + jvm_init_end.tv_nsec - jvm_init_start.tv_nsec;
         init_ddiff = init_diff / 1e9;
-        fprintf(stderr, "[forkjvm][info][JavaMain] jvm_init | diff= %luns (%fs)\n",
+        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init | diff= %luns (%fs)\n",
                 init_diff, init_ddiff);
 
         int run_num = 0;
@@ -620,13 +620,13 @@ JavaMain(void * _args)
             char msg[5];
             int oldfd[3] = { 0 };
 
-            if ((jvmfd = listen_sock(forkjvmid)) == -1) {
+            if ((jvmfd = listen_sock(hottubid)) == -1) {
                 ret = 1;
                 break;
             }
             if ((clientfd = accept(jvmfd, NULL, NULL)) == -1) {
-                fprintf(stderr, "[forkjvm][error][JavaMain] accept | id = %s | errno = %s\n",
-                        forkjvmid, strerror(errno));
+                fprintf(stderr, "[hottub][error][bin JavaMain] accept | id = %s | errno = %s\n",
+                        hottubid, strerror(errno));
                 close(clientfd);
                 close(jvmfd);
                 continue;
@@ -642,8 +642,8 @@ JavaMain(void * _args)
 
                 read = read_fd(clientfd, msg, sizeof(msg), &recvfd);
                 if (read == -1) {
-                    fprintf(stderr, "[forkjvm][error][JavaMain] read_fd | id = %s | errno = %s\n",
-                            forkjvmid, strerror(errno));
+                    fprintf(stderr, "[hottub][error][bin JavaMain] read_fd | id = %s | errno = %s\n",
+                            hottubid, strerror(errno));
                     error = 1;
                     close(clientfd);
                     break;
@@ -665,7 +665,7 @@ JavaMain(void * _args)
                 free(argv);
             }
             if (read_sock(clientfd, &argc, sizeof(int)) < 0) {
-                perror("[forkjvm][error][JavaMain] read_sock | argc");
+                perror("[hottub][error][bin JavaMain] read_sock | argc");
                 error = 1;
             } else {
                 argv = malloc(argc * sizeof(char*));
@@ -673,14 +673,14 @@ JavaMain(void * _args)
                 for (i = 0; i < argc; i++) {
                     int len;
                     if (read_sock(clientfd, &len, sizeof(int)) < 0) {
-                        fprintf(stderr, "[forkjvm][error][JavaMain] read_sock | arg %d len | errno = %s\n"
+                        fprintf(stderr, "[hottub][error][bin JavaMain] read_sock | arg %d len | errno = %s\n"
                                 , i, strerror(errno));
                         error = 1;
                         break;
                     }
                     argv[i] = malloc(len * sizeof(char));
                     if (read_sock(clientfd, argv[i], len) < 0) {
-                        fprintf(stderr, "[forkjvm][error][JavaMain] read_sock | arg %d buf | errno = %s\n"
+                        fprintf(stderr, "[hottub][error][bin JavaMain] read_sock | arg %d buf | errno = %s\n"
                                 , i, strerror(errno));
                         error = 1;
                         break;
@@ -689,25 +689,25 @@ JavaMain(void * _args)
                 // java -D args
                 int num_d_args;
                 if (read_sock(clientfd, &num_d_args, sizeof(int)) < 0) {
-                    perror("[forkjvm][error][JavaMain] read_sock | num_d_args");
+                    perror("[hottub][error][bin JavaMain] read_sock | num_d_args");
                     error = 1;
                 } else {
                     for (i = 0; i < num_d_args; i++) {
                         int len;
                         if (read_sock(clientfd, &len, sizeof(int)) < 0) {
-                            fprintf(stderr, "[forkjvm][error][JavaMain] read_sock | -D arg %d len | errno = %s\n"
+                            fprintf(stderr, "[hottub][error][bin JavaMain] read_sock | -D arg %d len | errno = %s\n"
                                     , i, strerror(errno));
                             error = 1;
                             break;
                         }
                         char* d_arg = malloc(len * sizeof(char));
                         if (read_sock(clientfd, d_arg, len) < 0) {
-                            fprintf(stderr, "[forkjvm][error][JavaMain] read_sock | -D arg %d buf | errno = %s\n"
+                            fprintf(stderr, "[hottub][error][bin JavaMain] read_sock | -D arg %d buf | errno = %s\n"
                                     , i, strerror(errno));
                             error = 1;
                             break;
                         }
-                        //fprintf(stderr, "[forkjvm][JavaMain] got d arg %s\n", d_arg);
+                        //fprintf(stderr, "[hottub][trace][bin JavaMain] got d arg %s\n", d_arg);
                         int pos = strcspn(d_arg, "=");
                         // -Da=b ; `pos` should be at least 1 before end
                         if (pos < len - 1) {
@@ -717,19 +717,19 @@ JavaMain(void * _args)
                             jstring d_arg_key = (*env)->NewStringUTF(env, d_arg + 2);
                             // start from second half
                             jstring d_arg_val = (*env)->NewStringUTF(env, d_arg + pos + 1);
-                            //fprintf(stderr, "[forkjvm][JavaMain] got d arg key %s, val %s\n", d_arg + 2, d_arg + pos + 1);
+                            //fprintf(stderr, "[hottub][trace][bin JavaMain] got d arg key %s, val %s\n", d_arg + 2, d_arg + pos + 1);
                             (*env)->CallStaticObjectMethod(env, systemClass, setPropertyID, d_arg_key, d_arg_val);
                             if ((*env)->ExceptionOccurred(env)) {
-                                fprintf(stderr, "[forkjvm][warn][JavaMain] (System#_setProperty) for %s had exception\n", d_arg + 2);
+                                fprintf(stderr, "[hottub][warn][bin JavaMain] (System#_setProperty) for %s had exception\n", d_arg + 2);
                                 (*env)->ExceptionDescribe(env);
                                 (*env)->ExceptionClear(env);
                             } else {
-                                fprintf(stderr, "[forkjvm][info][JavaMain] (System#_setProperty) for %s ok\n", d_arg + 2);
+                                fprintf(stderr, "[hottub][info][bin JavaMain] (System#_setProperty) for %s ok\n", d_arg + 2);
                             }
                             // TODO: free?
                             free(d_arg);
                         } else {
-                            fprintf(stderr, "[forkjvm][warn][JavaMain] strcspn | d arg %s not valid\n", d_arg);
+                            fprintf(stderr, "[hottub][warn][bin JavaMain] strcspn | d arg %s not valid\n", d_arg);
                         }
                     }
                 }
@@ -738,28 +738,30 @@ JavaMain(void * _args)
                 continue;
             int wd_len;
             if (read_sock(clientfd, &wd_len, sizeof(int)) < 0) {
-                perror("[forkjvm][error][JavaMain] (read_sock) working dir len");
+                perror("[hottub][error][bin JavaMain] (read_sock) working dir len");
                 error = 1;
             }
             char wd_buf[wd_len + 1];
             if (read_sock(clientfd, wd_buf, wd_len) < 0) {
-                perror("[forkjvm][error][JavaMain] (read_sock) working dir buf");
+                perror("[hottub][error][bin JavaMain] (read_sock) working dir buf");
                 error = 1;
             }
             wd_buf[wd_len] = '\0';
-            fprintf(stderr, "[forkjvm] got wd %s\n", wd_buf);
+            // TODO: add trace flag?
+            //fprintf(stderr, "[hottub][trace][bin JavaMain] got wd %s\n", wd_buf);
             if (chdir(wd_buf)) {
-                perror("[forkjvm][error][JavaMain] chdir");
+                perror("[hottub][error][bin JavaMain] chdir");
                 error = 1;
             } else {
                 jstring wd_key = (*env)->NewStringUTF(env, "user.dir");
                 jstring wd_val = (*env)->NewStringUTF(env, wd_buf);
                 (*env)->CallStaticObjectMethod(env, systemClass, setPropertyID, wd_key, wd_val);
                 if ((*env)->ExceptionOccurred(env)) {
-                    fprintf(stderr, "[forkjvm][warn][JavaMain] (System#_setProperty) for wd user.dir had exception\n");
+                    fprintf(stderr, "[hottub][warn][bin JavaMain] (System#_setProperty) for wd user.dir had exception\n");
                     (*env)->ExceptionClear(env);
                 } else {
-                    fprintf(stderr, "[forkjvm][info][JavaMain] (System#_setProperty) for wd user.dir ok\n");
+                    // TODO: add trace flag?
+                    //fprintf(stderr, "[hottub][info][bin JavaMain] (System#_setProperty) for wd user.dir ok\n");
                 }
             }
             if (error)
@@ -767,7 +769,7 @@ JavaMain(void * _args)
             while (1) {
                 int env_str_len;
                 if (read_sock(clientfd, &env_str_len, sizeof(int)) < 0) {
-                    perror("[forkjvm][error][JavaMain] (read_sock) env str len");
+                    perror("[hottub][error][bin JavaMain] (read_sock) env str len");
                     error = 1;
                     break;
                 }
@@ -776,30 +778,31 @@ JavaMain(void * _args)
                 }
                 char env_str[env_str_len + 1];
                 if (read_sock(clientfd, env_str, env_str_len) < 0) {
-                    perror("[forkjvm][error][JavaMain] (read_sock) env str");
+                    perror("[hottub][error][bin JavaMain] (read_sock) env str");
                     error = 1;
                     break;
                 }
                 env_str[env_str_len] = '\0';
                 int pos = strcspn(env_str, "=");
                 if (pos >= env_str_len) {
-                    fprintf(stderr, "[forkjvm][error][JavaMain] env str %s bad\n", env_str);
+                    fprintf(stderr, "[hottub][error][bin JavaMain] env str %s bad\n", env_str);
                     error = 1;
                     break;
                 }
                 env_str[pos] = '\0';
                 if (setenv(env_str, env_str + pos + 1, 1)) {
-                    fprintf(stderr, "[forkjvm][error][JavaMain] error setting env %s = %s | errno = %s\n", env_str, env_str + pos + 1, strerror(errno));
+                    fprintf(stderr, "[hottub][error][bin JavaMain] error setting env %s = %s | errno = %s\n", env_str, env_str + pos + 1, strerror(errno));
                 }
                 jstring env_key = (*env)->NewStringUTF(env, env_str);
                 jstring env_val = (*env)->NewStringUTF(env, env_str + pos + 1);
                 (*env)->CallStaticVoidMethod(env, processEnvironmentClass, setenvID, env_key, env_val);
                 if ((*env)->ExceptionOccurred(env)) {
-                    fprintf(stderr, "[forkjvm][warn][JavaMain] (ProcessEnvironment#setenv) had exception\n");
+                    fprintf(stderr, "[hottub][warn][bin JavaMain] (ProcessEnvironment#setenv) had exception\n");
                     (*env)->ExceptionClear(env);
                 }
                 // TODO: free mem?
-                fprintf(stderr, "[forkjvm][info][JavaMain] setting env %s = %s\n", env_str, env_str + pos + 1);
+                // TODO add trace flag?
+                //fprintf(stderr, "[hottub][trace][bin JavaMain] setting env %s = %s\n", env_str, env_str + pos + 1);
             }
             if (error)
                 continue;
@@ -821,8 +824,8 @@ JavaMain(void * _args)
             clock_gettime_func(CLOCK_MONOTONIC, &end);
             diff = 1e9 * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
             ddiff = diff / 1e9;
-            fprintf(stderr, "[forkjvm][info][JavaMain] CallStaticVoidMethod | run = %d | identity= %s | diff= %luns (%fs)\n",
-                    run_num, forkjvmid, diff, ddiff);
+            fprintf(stderr, "[hottub][info][bin JavaMain] CallStaticVoidMethod | run = %d | identity= %s | diff= %luns (%fs)\n",
+                    run_num, hottubid, diff, ddiff);
             run_num++;
 
             ret = (*env)->ExceptionOccurred(env) == NULL ? 0 : 1;
@@ -834,14 +837,14 @@ JavaMain(void * _args)
             CHECK_EXCEPTION_NULL_LEAVE(kill_daemon_threads_ID);
             (*env)->CallStaticVoidMethod(env, shutdownClass, kill_daemon_threads_ID);
             if ((*env)->ExceptionOccurred(env)) {
-                fprintf(stderr, "[forkjvm][warn][JavaMain] (kill_daemon_threads) had exception\n");
+                fprintf(stderr, "[hottub][warn][bin JavaMain] (kill_daemon_threads) had exception\n");
             }
             (*env)->ExceptionClear(env);
 
             int ret_val = ifn.GetRetVal();
             //TODO: broken pipe problem?
             if (write_sock(clientfd, &ret_val, sizeof(int)) != sizeof(int)) {
-                fprintf(stderr, "[forkjvm][warn][JavaMain] (write_sock) problem writing return val errno = %s\n", strerror(errno));
+                fprintf(stderr, "[hottub][warn][bin JavaMain] (write_sock) problem writing return val errno = %s\n", strerror(errno));
             }
 
             /* 4. clean up jvm */
@@ -851,8 +854,8 @@ JavaMain(void * _args)
                 dup2(oldfd[i], i);
                 close(oldfd[i]);
             }
-            if (ifn.CleanJavaVM(forkjvmid)) {
-                fprintf(stderr, "[forkjvm][error][JavaMain] cleanjavavm failed | id = %s\n", forkjvmid);
+            if (ifn.CleanJavaVM(hottubid)) {
+                fprintf(stderr, "[hottub][error][bin JavaMain] cleanjavavm failed | id = %s\n", hottubid);
                 break;
             }
         } while (JNI_TRUE /*ret == 0*/);
@@ -1547,11 +1550,11 @@ ParseArguments(int *pargc, char ***pargv,
             ; /* Processing of platform dependent options */
         } else if (RemovableOption(arg)) {
             ; /* Do not pass option to vm. */
-        } else if (JLI_StrCmp(arg, "-forkjvm") == 0) {
-            forkjvm = JNI_TRUE;
-        } else if (JLI_StrCCmp(arg, "-forkjvmid=") == 0) {
-            char *p = arg + 11;
-            strcpy(forkjvmid, p);
+        } else if (JLI_StrCmp(arg, "-hottub") == 0) {
+            hottub = JNI_TRUE;
+        } else if (JLI_StrCCmp(arg, "-hottubid=") == 0) {
+            char *p = arg + 10;
+            strcpy(hottubid, p);
         } else {
             AddOption(arg, NULL);
         }
