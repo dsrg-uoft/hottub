@@ -838,19 +838,19 @@ JavaMain(void * _args)
             }
             (*env)->ExceptionClear(env);
 
+            int ret_val = ifn.GetRetVal();
+            //TODO: broken pipe problem?
+            if (write_sock(clientfd, &ret_val, sizeof(int)) != sizeof(int)) {
+                fprintf(stderr, "[forkjvm][warn][JavaMain] (write_sock) problem writing return val errno = %s\n", strerror(errno));
+            }
+
+            /* 4. clean up jvm */
+            close(clientfd);
             int i;
             for (i = 0; i < 3; i++) {
                 dup2(oldfd[i], i);
                 close(oldfd[i]);
             }
-
-            int ret_val = ifn.GetRetVal();
-            if (write_sock(clientfd, &ret_val, sizeof(int)) != sizeof(int)) {
-                fprintf(stderr, "[forkjvm][warn][JavaMain] (write_sock) problem writing return val errno = %s\n", strerror(errno));
-            }
-            close(clientfd);
-
-            /* 4. clean up everything */
             if (ifn.CleanJavaVM(forkjvmid)) {
                 fprintf(stderr, "[forkjvm][error][JavaMain] cleanjavavm failed | id = %s\n", forkjvmid);
                 break;
