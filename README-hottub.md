@@ -3,13 +3,10 @@ HotTub
 HotTub is built on top of OpenJDK 8.
 OpenJDK 8 uses mercurial for version control - for reasons best not discussed, we used git.
 
-Note: Newest changes are in 'forkjvm' branch. Merging with master will happen... eventually.
-
 ## Building
 First configure openjdk8 normally.
 
 Examples:
-
 * bash ./configure --with-boot-jdk=/usr/lib/jvm/java-7-openjdk-amd64
 * bash ./configure --with-boot-jdk=/usr/lib/jvm/java-7-openjdk-amd64 --with-debug-level=slowdebug
 
