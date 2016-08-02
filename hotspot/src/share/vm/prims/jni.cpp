@@ -5356,14 +5356,14 @@ _JNI_IMPORT_OR_EXPORT_ jboolean JNICALL JNI_IsHottub() {
 }
 
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *hottubid) {
-  //TODO: remove hottubid? not used with new static analysis
+  //TODO: remove hottubid? not needed, but could be useful in the future...
   JNI_SetRetVal(255);
   JavaThread* thread = JavaThread::current();
 
   // transition to vm so that class initialization and gc call works
-  // not sure how legal this transition is... (although seems to cause no asserts)
   ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
 
+  // reinit TODO: enable this by default
   if (HotTubReinit) {
     jlong t0 = os::javaTimeNanos();
     SystemDictionary::classes_do(InstanceKlass::re_zero_init, thread);
@@ -5371,13 +5371,11 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *hottubid) {
     SystemDictionary::classes_do(InstanceKlass::re_clinit, thread);
     jlong t2 = os::javaTimeNanos();
     tty->print("[hottub][info][JNI_CleanJavaVM] re_zero_init = %luns, "
-            "re_clinit = %luns, total = %luns\n",
-            t1 - t0, t2 - t1, (t1 - t0) + (t2 - t1));
-
-    tty->print("[hottub][info][JNI_CleanJavaVM] so fresh and so clean\n");
+               "re_clinit = %luns, total = %luns\n",
+               t1 - t0, t2 - t1, (t1 - t0) + (t2 - t1));
   }
 
-  /* phase4: run gc */
+  // run gc
 
   if (HotTubDeopt) {
     tty->print_cr("[hottub][info][JNI_CleanJavaVM] VMThread::execute VM_DeoptimizeTheWorld");
@@ -5387,13 +5385,19 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *hottubid) {
 
   {
     HandleMark hm(thread);
-    if (HotTubLog)
-      Universe::heap()->print();
+    if (HotTubLog) {
+        tty->print("[hottub][info][JNI_CleanJavaVM] before gc heap->print\n");
+        Universe::heap()->print();
+    }
 
+    jlong t0 = os::javaTimeNanos();
     ((ParallelScavengeHeap *)Universe::heap())->collect(GCCause::_jvmti_force_gc);
+    jlong t1 = os::javaTimeNanos();
 
-    if (HotTubLog)
+    if (HotTubLog) {
+      tty->print("[hottub][info][JNI_CleanJavaVM] after gc heap->print (time = %luns)\n", t1 - t0);
       Universe::heap()->print();
+    }
   }
 
   // transition back to native to not confuse anything else
