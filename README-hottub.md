@@ -24,7 +24,6 @@ The script `make_hottub.sh` builds the static analysis files, "client" files, an
 * -XX:+HotTubReinit : enable class re-initialization
 * -XX:+HotTubLog    : enable logging
 * -XX:+HotTubTmp    : enable temporary features
-* -XX:+HotTubDeopt  : de-optimize everything after a run
 
 ## Diffs
 Notes will be added soon.

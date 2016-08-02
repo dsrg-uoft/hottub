@@ -5376,13 +5376,6 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *hottubid) {
   }
 
   // run gc
-
-  if (HotTubDeopt) {
-    tty->print_cr("[hottub][info][JNI_CleanJavaVM] VMThread::execute VM_DeoptimizeTheWorld");
-    VM_DeoptimizeTheWorld op;
-    VMThread::execute(&op);
-  }
-
   {
     HandleMark hm(thread);
     if (HotTubLog) {

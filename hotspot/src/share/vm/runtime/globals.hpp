@@ -3985,9 +3985,6 @@ class CommandLineFlags {
   product(bool, HotTubReinit, false,                                        \
         "Enable HotTub to reinitialize classes.")                           \
                                                                             \
-  product(bool, HotTubDeopt, false,                                         \
-        "Enable HotTub to de-optimize all methods.")                        \
-                                                                            \
   product(bool, HotTubTmp, false,                                           \
         "Enable temporary HotTub features.")
 
