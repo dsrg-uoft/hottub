@@ -96,7 +96,7 @@
 #include "runtime/_bdel.hpp"
 
 static jint CurrentVersion = JNI_VERSION_1_8;
-static jint ret_val = 255;
+static jint ret_val = 0;
 static jboolean hottub = false;
 
 
@@ -5357,7 +5357,7 @@ _JNI_IMPORT_OR_EXPORT_ jboolean JNICALL JNI_IsHottub() {
 
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *hottubid) {
   //TODO: remove hottubid? not needed, but could be useful in the future...
-  JNI_SetRetVal(255);
+  JNI_SetRetVal(0);
   JavaThread* thread = JavaThread::current();
 
   // transition to vm so that class initialization and gc call works
