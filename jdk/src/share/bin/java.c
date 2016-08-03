@@ -469,6 +469,9 @@ ssize_t write_sock(int fd, void *ptr, size_t nbytes)
 int JNICALL
 JavaMain(void * _args)
 {
+    struct timespec jvm_init_javamain = {0};
+    clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_javamain);
+
     JavaMainArgs *args = (JavaMainArgs *)_args;
     int argc = args->argc;
     char **argv = args->argv;
@@ -533,6 +536,9 @@ JavaMain(void * _args)
     }
 
     ret = 1;
+
+    struct timespec jvm_init_cl = {0};
+    clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_cl);
 
     /*
      * Get the application's main class.
@@ -603,13 +609,19 @@ JavaMain(void * _args)
     if (hottubid[0] != '\0') {
         ifn.SetHottub();
 
-        unsigned long init_diff;
-        double init_ddiff;
-        init_diff = 1e9 * (jvm_init_end.tv_sec - jvm_init_start.tv_sec)
-            + jvm_init_end.tv_nsec - jvm_init_start.tv_nsec;
-        init_ddiff = init_diff / 1e9;
-        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init | diff= %luns (%fs)\n",
-                init_diff, init_ddiff);
+        unsigned long tstart, tjavamain, tcl, ttotal;
+        tstart = 1e9 * (jvm_init_javamain.tv_sec - jvm_init_start.tv_sec) +
+            (jvm_init_javamain.tv_nsec - jvm_init_start.tv_nsec);
+        tjavamain = 1e9 * (jvm_init_cl.tv_sec - jvm_init_javamain.tv_sec) +
+            (jvm_init_cl.tv_nsec - jvm_init_javamain.tv_nsec);
+        tcl = 1e9 * (jvm_init_end.tv_sec - jvm_init_cl.tv_sec) +
+            (jvm_init_end.tv_nsec - jvm_init_cl.tv_nsec);
+        ttotal = 1e9 * (jvm_init_end.tv_sec - jvm_init_start.tv_sec) +
+            (jvm_init_end.tv_nsec - jvm_init_start.tv_nsec);
+        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init start %luns\n", tstart);
+        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init javamain %luns\n", tjavamain);
+        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init cl %luns\n", tcl);
+        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init total %luns\n", ttotal);
 
         int run_num = 0;
         do {
