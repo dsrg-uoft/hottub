@@ -9,7 +9,7 @@ fi
 for d in "$HOTTUB_DATA"/*; do
     if [ -d "$d" ]; then
         echo "HotTub: dir $d..."
-        PIDFILE="$d/pid.txt"
+        PIDFILE="$d/server.pid"
         if [ -f "$PIDFILE" ]; then
             PID="$(< "$PIDFILE")"
             if kill -s 0 "$PID" 2> /dev/null; then

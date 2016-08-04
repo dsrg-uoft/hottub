@@ -424,8 +424,9 @@ ssize_t read_fd(int fd, void *ptr, size_t nbytes, int *recvfd)
     msg.msg_iov = iov;
     msg.msg_iovlen = 1;
 
-    if ((n = recvmsg(fd, &msg, 0)) <= 0)
+    if ((n = recvmsg(fd, &msg, 0)) <= 0) {
         return n;
+    }
 
     if ((cmptr = CMSG_FIRSTHDR(&msg)) != NULL &&
             cmptr->cmsg_len == CMSG_LEN(sizeof(int))) {
@@ -434,8 +435,9 @@ ssize_t read_fd(int fd, void *ptr, size_t nbytes, int *recvfd)
         if (cmptr->cmsg_type != SCM_RIGHTS)
             fprintf(stderr, "[hottub][error][bin read_fd] control type != SCM_RIGHTS");
         *recvfd = *((int *) CMSG_DATA(cmptr));
-    } else
+    } else {
         *recvfd = -1;       /* descriptor was not passed */
+    }
 
     return n;
 }
@@ -618,10 +620,10 @@ JavaMain(void * _args)
             (jvm_init_end.tv_nsec - jvm_init_cl.tv_nsec);
         ttotal = 1e9 * (jvm_init_end.tv_sec - jvm_init_start.tv_sec) +
             (jvm_init_end.tv_nsec - jvm_init_start.tv_nsec);
-        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init start %luns\n", tstart);
-        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init javamain %luns\n", tjavamain);
-        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init cl %luns\n", tcl);
-        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init total %luns\n", ttotal);
+        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init start    %12luns\n", tstart);
+        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init javamain %12luns\n", tjavamain);
+        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init cl       %12luns\n", tcl);
+        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init total    %12luns\n", ttotal);
 
         int run_num = 0;
         do {
@@ -629,7 +631,6 @@ JavaMain(void * _args)
             /* close listening socket when doing a run so new clients go to next jvm */
             int jvmfd;
             int clientfd;
-            char msg[5];
             int oldfd[3] = { 0 };
 
             if ((jvmfd = listen_sock(hottubid)) == -1) {
@@ -652,7 +653,7 @@ JavaMain(void * _args)
                 int recvfd;
                 int fd;
 
-                read = read_fd(clientfd, msg, sizeof(msg), &recvfd);
+                read = read_fd(clientfd, &fd, sizeof(int), &recvfd);
                 if (read == -1) {
                     fprintf(stderr, "[hottub][error][bin JavaMain] read_fd | id = %s | errno = %s\n",
                             hottubid, strerror(errno));
@@ -663,7 +664,6 @@ JavaMain(void * _args)
                     /* done */
                     break;
                 } else {
-                    fd = atoi(msg);
                     oldfd[fd] = dup(fd);
                     dup2(recvfd, fd);
                     close(recvfd);
@@ -719,6 +719,7 @@ JavaMain(void * _args)
                             error = 1;
                             break;
                         }
+                        // TODO: add trace flag?
                         //fprintf(stderr, "[hottub][trace][bin JavaMain] got d arg %s\n", d_arg);
                         int pos = strcspn(d_arg, "=");
                         // -Da=b ; `pos` should be at least 1 before end
@@ -729,6 +730,7 @@ JavaMain(void * _args)
                             jstring d_arg_key = (*env)->NewStringUTF(env, d_arg + 2);
                             // start from second half
                             jstring d_arg_val = (*env)->NewStringUTF(env, d_arg + pos + 1);
+                            // TODO: add trace flag?
                             //fprintf(stderr, "[hottub][trace][bin JavaMain] got d arg key %s, val %s\n", d_arg + 2, d_arg + pos + 1);
                             (*env)->CallStaticObjectMethod(env, systemClass, setPropertyID, d_arg_key, d_arg_val);
                             if ((*env)->ExceptionOccurred(env)) {

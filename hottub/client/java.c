@@ -12,114 +12,47 @@
 #include <openssl/md5.h>
 #include <time.h>
 #include <stdint.h>
+#include "java.h"
 
-/* 1st char for '\0' (abstract sockets), last char for poolno */
-#define ID_LEN          1 + MD5_DIGEST_LENGTH * 2 + 1
-#define MSG_LEN         5 /* fd limit is 4k so 4 char + null */
-#define MAX_PATH_SIZE   1024
-/* note an increase in pool digits requires string modification */
-#define JVM_POOL_MAX 5
-
-/* -- unix abstract socket java client --
- * always do a normal jvm exec on critical error
- *
- * 1. check if it is a hottub if not just exec
- * 2. compute id using args and classpath contents
- * 3. try to mkdir for poolno
- * 4a. if mkdir success start a new hottub
- * 4b. if mkdir fails try to contact jvm with that poolno
- *      5a. if you successfully contact a jvm send fds to it
- *          6. wait until jvm finishes
- *      5b. if you never successfully contact a jvm do normal exec
- *           - this means entire pool is busy and pool is full
+/* TODO error handling should be revised a bit... I think the goal should be if
+ * anything we do fails just exec a normal JVM... I don't think trying to
+ * recover and continue is important seeing as if any file/socket operations
+ * fail with anything special the normal JVM is probably just as screwed as we
+ * are
  */
 
-/* id building */
-int compute_id(char *id, int argc, char **argv, int* java_argc,
-               char*** java_argv, int* num_d_args);
-int md5add_classpath(MD5_CTX *md5ctx, const char *classpath);
-int is_wildcard(const char *filename);
-int strsuffix(const char *str, const char *suffix);
-char *next_dirent(DIR *dir);
-int md5add_wildcard(MD5_CTX *md5ctx, const char *wildcard);
-int md5add_file(MD5_CTX *md5ctx, const char *filename);
-
-/* path building */
-int create_datapath(char *datapath);
-int create_execpath(char *execpath);
-
-/* socket stuff */
-int connect_sock(const char *path);
-ssize_t write_fd(int fd, void *ptr, size_t nbytes, int sendfd);
-ssize_t read_sock(int fd, void *ptr, size_t nbytes);
-ssize_t write_sock(int fd, void *ptr, size_t nbytes);
-int send_fds(int jvmfd);
-int send_args(int jvmfd, int java_argc, char** java_argv, int num_d_args,
-              int argc, char** argv);
-int send_working_dir(int jvmfd);
-int send_env_var(int jvmfd, char **envp);
-
-/* set up args and call exec */
-int exec_jvm(const char *jvmid, int main_argc, char **main_argv);
-
-/* try to use a jvm from pool or add new jvm to pool */
-int run_hottub(char *id, int java_argc, char** java_argv, int num_d_args,
-               int argc, char** argv, char** envp, int *ret_val);
-
-/* server initialization utilities */
-int write_server_pid(const char* jvmpath, int pid);
-int setup_server_logs(const char* jvmpath);
-
-static uint64_t _now() {
-  struct timespec ts;
-  int status = clock_gettime(CLOCK_MONOTONIC, &ts);
-  (void) status;
-  return (uint64_t) ts.tv_sec * (1000 * 1000 * 1000) + (uint64_t) ts.tv_nsec;
-}
+/* TODO use Makefile to set log level based on openjdk build level
+ * ie. if slowdebug set trace, if release set info
+ */
 
 static uint64_t t0;
-
-/* fork/re-run jvm */
 
 /* ---------- ENTRY ---------- */
 int main(int argc, char **argv, char **envp)
 {
     t0 = _now();
-    int status;
     char id[ID_LEN + 1];
     int hottub = 0;
     int i;
 
-    /* check if this is a hottub */
     for (i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-hottub") == 0) {
+        if (strncmp(argv[i], "-hottub", 7) == 0) {
             hottub = 1;
             break;
         }
     }
-    if (!hottub)
-        return exec_jvm(NULL, argc, argv);
-
-    /* compute identity */
-    int java_argc;
-    char **java_argv;
-    int num_d_args = 0;
-    if (compute_id(id, argc, argv, &java_argc, &java_argv, &num_d_args) == -1) {
+    if (!hottub) {
         return exec_jvm(NULL, argc, argv);
     }
 
-    /* try to contact a hottub and send fds */
-    int ret_val = 255;
-    status = run_hottub(id, java_argc, java_argv, num_d_args, argc, argv, envp,
-                        &ret_val);
-    if (status == 1) {
-        return exec_jvm(id, argc, argv);
-    } else if (status == -1) {
+    args_info args = {0};
+    args.argc = argc;
+    args.argv = argv;
+    if (compute_id(id, &args) == -1) {
         return exec_jvm(NULL, argc, argv);
     }
 
-    /* will only reach on successful hottub run */
-    return ret_val;
+    return run_hottub(id, &args, envp);
 }
 
 /* a. tell the first non-busy jvm in pool to run ("fork")
@@ -130,12 +63,10 @@ int main(int argc, char **argv, char **envp)
  * if there is ever a fatal error return -1 (default to normal exec)
  * if you ever can't connect or lose connection to a jvm just go next
  */
-int run_hottub(char *id, int java_argc, char** java_argv, int num_d_args,
-               int argc, char** argv, char** envp, int *ret_val)
+int run_hottub(char *id, args_info *args, char** envp)
 {
     /* check for existing hottub in id's pool */
-    int done = 0;
-    char datapath[MAX_PATH_SIZE];
+    char datapath[MAX_PATH_LEN];
     int datapath_len;
 
     datapath_len = create_datapath(datapath);
@@ -144,8 +75,9 @@ int run_hottub(char *id, int java_argc, char** java_argv, int num_d_args,
     sprintf(jvmpath, "%s%s", datapath, id);
 
     int poolno;
-    for (poolno = 0; !done && poolno < JVM_POOL_MAX; poolno++) {
+    for (poolno = 0; poolno < JVM_POOL_MAX; poolno++) {
         int error;
+        int try_connect = 0;
 
         /* add/update poolno to id and path */
         id[0] = '/';
@@ -153,47 +85,54 @@ int run_hottub(char *id, int java_argc, char** java_argv, int num_d_args,
         jvmpath[datapath_len + ID_LEN - 1] = '0' + poolno;
         fprintf(stderr, "[hottub][info][client run_hottub] trying id %s\n", id);
 
-        /* check if a directory exists make it if it doesn't
-         * if success then we need to start a new jvm
-         * if fail try to contact jvm
+        /* try to create a directory for server 'poolno' in the pool
+         * a. if it doesn't exist no server exists -> create a server
+         * b. if EEXIST then try and connect to the existing server
          */
         if (mkdir(jvmpath, 0775) == 0) {
-            /* - fork and make the child exec to become the jvm server
-             * - parent retires the poolno again after sleeping to give the serve
-             *   a chance to start
-             */
-
-            int pid = fork();
+            pid_t pid = fork();
             if (pid == 0) {
                 setsid();
                 setup_server_logs(jvmpath);
                 // TODO: we can continue with error here, but parent and child
                 //       have same std* fds
-                return 1;
+                return exec_jvm(id, args->argc, args->argv);
             } else {
-                write_server_pid(jvmpath, pid);
-                // TODO: handle error?
-                // TODO: need a beter way to do this
-                poolno--;
-                struct timespec ts;
-                ts.tv_sec = 4;
-                ts.tv_nsec = 200 * 1e6;
-                struct timespec t2;
-                nanosleep(&ts, &t2);
-                continue;
+                create_pid_file(jvmpath, SERVER, pid);
+                try_connect = 1;
             }
-
         } else if (errno == EEXIST) {
+            try_connect = 1;
+        } else {
+            fprintf(stderr, "[hottub][error][client run_hottub] mkdir | "
+                    "jvmpath = %s | errno = %s\n", jvmpath, strerror(errno));
+            return -1;
+        }
+
+        if (try_connect && create_pid_file(jvmpath, CLIENT, getpid()) == 0) {
             int jvmfd;
-            jvmfd = connect_sock(id);
-            if (jvmfd <= 0) {
-                if (jvmfd == -2) {
-                    fprintf(stderr, "[hottub][error][client run_hottub] socket"
-                            " | id = %s | errno = %s\n", id, strerror(errno));
-                } else if (jvmfd == -1) {
-                    fprintf(stderr, "[hottub][info][client run_hottub] connect"
-                            " | id = %s | errno = %s\n", id, strerror(errno));
+            int i;
+            for (i = 0; i < RETRY_COUNT; i++) {
+                jvmfd = connect_sock(id);
+                if (jvmfd > 0) {
+                    break;
+                } else {
+                    if (jvmfd == -2) {
+                        fprintf(stderr, "[hottub][error][client run_hottub] socket"
+                                " | id = %s | errno = %s\n", id, strerror(errno));
+                    } else if (jvmfd == -1 && errno != ECONNREFUSED) {
+                        fprintf(stderr, "[hottub][info][client run_hottub] connect"
+                                " | id = %s | errno = %s\n", id, strerror(errno));
+                    }
+                    struct timespec ts;
+                    ts.tv_sec = 0;
+                    ts.tv_nsec = 200 * 1e6;
+                    struct timespec t2;
+                    nanosleep(&ts, &t2);
                 }
+            }
+            // if we never connected go next
+            if (jvmfd <= 0) {
                 continue;
             }
 
@@ -206,8 +145,7 @@ int run_hottub(char *id, int java_argc, char** java_argv, int num_d_args,
                 continue;
             }
             // global data for argc and argv :D
-            error = send_args(jvmfd, java_argc, java_argv, num_d_args, argc,
-                              argv);
+            error = send_args(jvmfd, args);
             if (error) {
                 close(jvmfd);
                 continue;
@@ -226,23 +164,20 @@ int run_hottub(char *id, int java_argc, char** java_argv, int num_d_args,
             uint64_t t1 = _now();
             fprintf(stderr, "[hottub][info][client run_hottub] running server "
                     "with id %s, took %.6f\n", id, (t1 - t0) / 1e9);
-            if (read_sock(jvmfd, ret_val, sizeof(int)) == -1) {
+            int ret_val = 255;
+            if (read_sock(jvmfd, &ret_val, sizeof(int)) == -1) {
                 perror("[hottub][error][client run_hottub] read_sock");
             }
             close(jvmfd);
-            done = 1;
-        } else {
-            fprintf(stderr, "[hottub][error][client run_hottub] mkdir | "
-                    "jvmpath = %s | errno = %s\n", jvmpath, strerror(errno));
-            return -1;
+            remove_pid_file(jvmpath, CLIENT);
+            return ret_val;
         }
     }
-    // if no jvm was available and the pool is full fallback exec a normal jvm
-    return done ? 0 : -1;
+    // if we reach here no jvm was available -> fallback exec a normal jvm
+    return exec_jvm(NULL, args->argc, args->argv);
 }
 
-int compute_id(char *id, int argc, char **argv, int* java_argc,
-               char*** java_argv, int* num_d_args)
+int compute_id(char *id, args_info *args)
 {
     /* openssl is 1 success, 0 error */
     unsigned char digest[MD5_DIGEST_LENGTH];
@@ -255,33 +190,33 @@ int compute_id(char *id, int argc, char **argv, int* java_argc,
         return -1;
     }
     /* add in all the args */
-    for (i = 1; i < argc; i++) {
-        if (strlen(argv[i]) > 2 && argv[i][0] == '-' && argv[i][1] == 'D') {
-            (*num_d_args)++;
+    for (i = 1; i < args->argc; i++) {
+        if (strlen(args->argv[i]) > 2 && args->argv[i][0] == '-' && args->argv[i][1] == 'D') {
+            args->javaD_argc++;
             continue;
         }
-        if (!MD5_Update(&md5ctx, argv[i], strlen(argv[i]))) {
+        if (!MD5_Update(&md5ctx, args->argv[i], strlen(args->argv[i]))) {
             fprintf(stderr, "[hottub][error][client compute_id] MD5_Update\n");
             return -1;
         }
         /* locate classpath while adding args */
-        if (strcmp(argv[i], "-classpath") == 0 ||
-                strcmp(argv[i], "-cp") == 0) {
-            classpath = argv[i + 1];
+        if (strcmp(args->argv[i], "-classpath") == 0 ||
+                strcmp(args->argv[i], "-cp") == 0) {
+            classpath = args->argv[i + 1];
             i++;
-            if (!MD5_Update(&md5ctx, argv[i], strlen(argv[i]))) {
+            if (!MD5_Update(&md5ctx, args->argv[i], strlen(args->argv[i]))) {
                 fprintf(stderr, "[hottub][error][client compute_id] MD5_Update\n");
                 return -1;
             }
             continue;
         }
-        if (argv[i][0] != '-') {
+        if (args->argv[i][0] != '-') {
             break;
         }
     }
     // c args: (0) java.exe, (1) -foo, (2) bar, (3) baz; i == 2, java_argc = 4 - 2 - 1
-    *java_argc = argc - i - 1;
-    *java_argv = argv + i + 1;
+    args->java_argc = args->argc - i - 1;
+    args->java_argv = args->argv + i + 1;
 
     if (classpath == NULL) {
         classpath = getenv("CLASSPATH");
@@ -417,13 +352,13 @@ int md5add_file(MD5_CTX *md5ctx, const char *filename)
 }
 
 int create_datapath(char *datapath) {
-    int datapath_len = readlink("/proc/self/exe", datapath, MAX_PATH_SIZE);
+    int datapath_len = readlink("/proc/self/exe", datapath, MAX_PATH_LEN);
     if (datapath_len == -1) {
         perror("[hottub][error][client create_datapath] readlink");
         return -1;;
-    } else if (datapath_len > MAX_PATH_SIZE) {
+    } else if (datapath_len > MAX_PATH_LEN) {
         fprintf(stderr, "[hottub][error][client create_datapath] readlink "
-                "MAX_PATH_SIZE too small\n");
+                "MAX_PATH_LEN too small\n");
         return -1;
     }
     // -8 removes "bin/java"
@@ -436,7 +371,7 @@ int create_datapath(char *datapath) {
 
 int create_execpath(char *execpath)
 {
-    int exec_path_len = readlink("/proc/self/exe", execpath, MAX_PATH_SIZE);
+    int exec_path_len = readlink("/proc/self/exe", execpath, MAX_PATH_LEN);
     if (exec_path_len == -1) {
         perror("[hottub][error][client create_execpath] readlink");
         return exec_path_len;
@@ -450,7 +385,7 @@ int create_execpath(char *execpath)
 int exec_jvm(const char *id, int main_argc, char **main_argv)
 {
     char *argv[main_argc + 2];
-    char execpath[MAX_PATH_SIZE];
+    char execpath[MAX_PATH_LEN];
 
     create_execpath(execpath);
     argv[0] = "java_real";
@@ -474,38 +409,26 @@ int exec_jvm(const char *id, int main_argc, char **main_argv)
 
 int send_fds(int jvmfd)
 {
-    /* get the limit of fds, go through them checking if they are open and
-     * sending to server
-     */
-    struct rlimit fd_lim;
-    char msg[MSG_LEN];
-    memset(msg, 0, MSG_LEN);
-
-    /* send fds to hottub */
-    if (getrlimit(RLIMIT_NOFILE, &fd_lim) == -1) {
-        perror("[hottub][error][client send_fds] getrlimit");
-        return -2;
-    }
-
+    // only send stdin, stdout, stderr
+    // explicitly using fds is not allowed
     int fd;
-    for (fd = 0; fd < 3 /* rlim.rlim_cur */; fd++) {
+    for (fd = 0; fd < 3; fd++) {
         if (fcntl(fd, F_GETFD) != -1) {
-            sprintf(msg, "%d", fd);
-            if (write_fd(jvmfd, msg, MSG_LEN, fd) != MSG_LEN) {
+            if (write_fd(jvmfd, &fd, sizeof(int), fd) != sizeof(int)) {
                 perror("[hottub][error][client send_fds] write_fd");
                 return -1;
             }
         }
     }
-    /* send go msg aka no fd */
-    if (write_sock(jvmfd, msg, MSG_LEN) != MSG_LEN) {
+    // write to the socket with no fd to signal finish
+    if (write_sock(jvmfd, &fd, sizeof(int)) != sizeof(int)) {
         perror("[hottub][error][client send_fds] write_sock");
         return -1;
     }
     return 0;
 }
 
-static int send_args_i(int jvmfd, int i, void* ptr, size_t len, char* val, char* tag)
+int send_args_i(int jvmfd, int i, void *ptr, size_t len, char *val, char *tag)
 {
     int wrote = write_sock(jvmfd, ptr, len);
     if (wrote != len) {
@@ -517,40 +440,40 @@ static int send_args_i(int jvmfd, int i, void* ptr, size_t len, char* val, char*
     return 0;
 }
 
-int send_args(int jvmfd, int java_argc, char **java_argv, int num_d_args, int argc, char** argv)
+int send_args(int jvmfd, args_info *args)
 {
-    int error = send_args_i(jvmfd, -1, &java_argc, sizeof(int), NULL, "java_argc");
+    int error = send_args_i(jvmfd, -1, &args->java_argc, sizeof(int), NULL, "java_argc");
     if (error) {
         return error;
     }
     int i;
-    for (i = 0; i < java_argc; i++) {
-        int len = strlen(java_argv[i]) + 1;
-        error = send_args_i(jvmfd, i, &len, sizeof(int), java_argv[i], "java_arg len");
+    for (i = 0; i < args->java_argc; i++) {
+        int len = strlen(args->java_argv[i]) + 1;
+        error = send_args_i(jvmfd, i, &len, sizeof(int), args->java_argv[i], "java_arg len");
         if (error) {
             return error;
         }
-        error = send_args_i(jvmfd, i, java_argv[i], len, java_argv[i], "java_arg buf");
+        error = send_args_i(jvmfd, i, args->java_argv[i], len, args->java_argv[i], "java_arg buf");
         if (error) {
             return error;
         }
     }
 
     // java -D args
-    error = send_args_i(jvmfd, -1, &num_d_args, sizeof(int), NULL, "argc");
+    error = send_args_i(jvmfd, -1, &args->javaD_argc, sizeof(int), NULL, "argc");
     if (error) {
         return error;
     }
-    for (i = 0; i < argc; i++) {
-        int len = strlen(argv[i]) + 1;
-        if (len <= 3 || argv[i][0] != '-' || argv[i][1] != 'D') {
+    for (i = 0; i < args->argc; i++) {
+        int len = strlen(args->argv[i]) + 1;
+        if (len <= 3 || args->argv[i][0] != '-' || args->argv[i][1] != 'D') {
             continue;
         }
-        error = send_args_i(jvmfd, i, &len, sizeof(int), argv[i], "arg len");
+        error = send_args_i(jvmfd, i, &len, sizeof(int), args->argv[i], "arg len");
         if (error) {
             return error;
         }
-        error = send_args_i(jvmfd, i, argv[i], len, argv[i], "arg buf");
+        error = send_args_i(jvmfd, i, args->argv[i], len, args->argv[i], "arg buf");
         if (error) {
             return error;
         }
@@ -560,8 +483,8 @@ int send_args(int jvmfd, int java_argc, char **java_argv, int num_d_args, int ar
 
 int send_working_dir(int jvmfd)
 {
-    char buf[MAX_PATH_SIZE];
-    if (getcwd(buf, MAX_PATH_SIZE) == NULL) {
+    char buf[MAX_PATH_LEN];
+    if (getcwd(buf, MAX_PATH_LEN) == NULL) {
         perror("[hottub][error][client send_working_dir] getcwd");
         return -1;
     }
@@ -586,8 +509,9 @@ int send_env_var(int jvmfd, char **envp)
     int i;
     for (i = 0; envp[i] != NULL; i++) {
         char *env_var = envp[i];
-        //fprintf(stderr, "[hottub][info][client send_env_var] len = %zu,
-        //        env_var = %s\n", strlen(env_var), env_var);
+        // TODO: add trace flag?
+        //fprintf(stderr, "[hottub][info][client send_env_var] len = %zu, "
+        //        "env_var = %s\n", strlen(env_var), env_var);
         len = strlen(env_var);
         wrote = (size_t) write_sock(jvmfd, &len, sizeof(int));
         if (wrote != sizeof(int)) {
@@ -600,7 +524,8 @@ int send_env_var(int jvmfd, char **envp)
             return -1;
         }
     }
-    //fprintf(stderr, "[hottub][info][client send_env_varj sending done %s\n");
+    // TODO: add trace flag?
+    //fprintf(stderr, "[hottub][info][client send_env_varj sending done\n");
     len = 0;
     wrote = (size_t) write_sock(jvmfd, &len, sizeof(int));
     if (wrote != sizeof(int)) {
@@ -617,16 +542,19 @@ int connect_sock(const char *path)
     int fd;
 
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (fd == -1)
+    if (fd == -1) {
         return -2;
+    }
 
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
     addr.sun_path[0] = '\0';
 
-    if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1)
+    if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+        close(fd);
         return -1;
+    }
 
     return fd;
 }
@@ -686,35 +614,57 @@ ssize_t write_sock(int fd, void *ptr, size_t nbytes)
     return sendmsg(fd, &msg, 0);
 }
 
-int write_server_pid(const char* jvmpath, int pid) {
-    // build path <jvmpath>/pid.txt
-    int jvmpath_len = strlen(jvmpath);
-    int pidfile_len = strlen("pid.txt");
-    char path[jvmpath_len + 1 + pidfile_len + 1];
-    strcpy(path, jvmpath);
-    path[jvmpath_len] = '/';
-    strcpy(path + jvmpath_len + 1, "pid.txt");
-    path[jvmpath_len + 1 + pidfile_len] = '\0';
+int create_pid_file(const char *jvmpath, const char *filename, pid_t pid)
+{
+    int path_len = strlen(jvmpath) + strlen(filename) + 1;
+    char path[path_len];
+    snprintf(path, path_len, "%s%s", jvmpath, filename);
 
-    FILE* f = fopen(path, "w");
-    if (f == NULL) {
-        perror("[hottub][error][client write_server_pid] fopen");
-        return errno;
+    int pid_fd = creat(path, 0775);
+    if (pid_fd != -1) {
+        FILE *f = fdopen(pid_fd, "w");
+        if (f == NULL) {
+            perror("[hottub][error][client create_pid_file] fdopen");
+            return -1;
+        }
+        int ret = fprintf(f, "%d\n", pid);
+        if (ret < 0) {
+            fprintf(stderr, "[hottub][error][client create_pid_file] fprintf "
+                    "returned %d, ferror %d\n", ret, ferror(f));
+            return -1;
+        }
+        ret = fclose(f);
+        if (ret) {
+            fprintf(stderr, "[hottub][error][client create_pid_file] fclose "
+                    "returned %d\n", ret);
+            return -1;
+        }
+        return 0;
+    } else if (errno == EEXIST) {
+        // don't print an error as this is a valid/expected case
+        return 1;
+    } else {
+        fprintf(stderr, "[hottub][error][client create_pid_file] creat "
+                "%s errno = %s\n", filename, strerror(errno));
+        return -1;
     }
-    int ret = fprintf(f, "%d\n", pid);
-    if (ret < 0) {
-        fprintf(stderr, "[hottub][error][client write_server_pid] fprintf "
-                "returned %d, ferror %d\n", ret, ferror(f));
-    }
-    ret = fclose(f);
-    if (ret) {
-        fprintf(stderr, "[hottub][error][client write_server_pid] fclose "
-                "returned %d\n", ret);
-    }
-    return ret;
 }
 
-int setup_server_logs(const char *jvmpath) {
+int remove_pid_file(const char *jvmpath, const char *filename)
+{
+    int path_len = strlen(jvmpath) + strlen(filename) + 1;
+    char path[path_len];
+    snprintf(path, path_len, "%s%s", jvmpath, filename);
+    if (remove(path) == -1) {
+        fprintf(stderr, "[hottub][error][client remove_pid_file] remove "
+                "%s errno = %s\n", filename, strerror(errno));
+        return -1;
+    }
+    return 0;
+}
+
+int setup_server_logs(const char *jvmpath)
+{
     int path_len = strlen(jvmpath) + strlen("/stdout") + 1;
     char stdout_path[path_len];
     char stderr_path[path_len];
@@ -746,4 +696,12 @@ int setup_server_logs(const char *jvmpath) {
         ret = -3;
     }
     return ret;
+}
+
+uint64_t _now()
+{
+  struct timespec ts;
+  int status = clock_gettime(CLOCK_MONOTONIC, &ts);
+  (void) status;
+  return (uint64_t) ts.tv_sec * (1000 * 1000 * 1000) + (uint64_t) ts.tv_nsec;
 }

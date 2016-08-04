@@ -10,5 +10,5 @@ clean:
 java: java.o
 	gcc -o java java.o -lcrypto -lrt
 
-java.o: java.c
+java.o: java.c java.h
 	gcc $(CFLAGS) -c java.c
