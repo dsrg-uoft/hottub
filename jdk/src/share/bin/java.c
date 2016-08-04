@@ -177,8 +177,6 @@ static jboolean hottub = JNI_FALSE;
 // '_' + md5 digest in hex + pool id + null
 //  1  +     16      x 2   +    1    +  1    = 35
 static char hottubid[35];
-static int (*clock_gettime_func)(clockid_t, struct timespec*) = NULL;
-static struct timespec jvm_init_start = {0};
 
 /*
  * Entry point.
@@ -198,14 +196,6 @@ JLI_Launch(int argc, char ** argv,              /* main argc, argc */
         jint ergo                               /* ergonomics class policy */
 )
 {
-    /* clock the start of jvm init and save it */
-    void* handle = dlopen("librt.so.1", RTLD_LAZY);
-    if (handle == NULL) {
-        handle = dlopen("librt.so", RTLD_LAZY);
-    }
-    clock_gettime_func = (int(*)(clockid_t, struct timespec*))dlsym(handle, "clock_gettime");
-    clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_start);
-
     int mode = LM_UNKNOWN;
     char *what = NULL;
     char *cpath = 0;
@@ -471,9 +461,6 @@ ssize_t write_sock(int fd, void *ptr, size_t nbytes)
 int JNICALL
 JavaMain(void * _args)
 {
-    struct timespec jvm_init_javamain = {0};
-    clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_javamain);
-
     JavaMainArgs *args = (JavaMainArgs *)_args;
     int argc = args->argc;
     char **argv = args->argv;
@@ -539,9 +526,6 @@ JavaMain(void * _args)
 
     ret = 1;
 
-    struct timespec jvm_init_cl = {0};
-    clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_cl);
-
     /*
      * Get the application's main class.
      *
@@ -605,25 +589,8 @@ JavaMain(void * _args)
     jmethodID setenvID = (*env)->GetStaticMethodID(env, processEnvironmentClass, "setenv", "(Ljava/lang/String;Ljava/lang/String;)V");
     CHECK_EXCEPTION_NULL_LEAVE(setenvID);
 
-    struct timespec jvm_init_end = {0};
-    clock_gettime_func(CLOCK_MONOTONIC, &jvm_init_end);
-
     if (hottubid[0] != '\0') {
         ifn.SetHottub();
-
-        unsigned long tstart, tjavamain, tcl, ttotal;
-        tstart = 1e9 * (jvm_init_javamain.tv_sec - jvm_init_start.tv_sec) +
-            (jvm_init_javamain.tv_nsec - jvm_init_start.tv_nsec);
-        tjavamain = 1e9 * (jvm_init_cl.tv_sec - jvm_init_javamain.tv_sec) +
-            (jvm_init_cl.tv_nsec - jvm_init_javamain.tv_nsec);
-        tcl = 1e9 * (jvm_init_end.tv_sec - jvm_init_cl.tv_sec) +
-            (jvm_init_end.tv_nsec - jvm_init_cl.tv_nsec);
-        ttotal = 1e9 * (jvm_init_end.tv_sec - jvm_init_start.tv_sec) +
-            (jvm_init_end.tv_nsec - jvm_init_start.tv_nsec);
-        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init start    %12luns\n", tstart);
-        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init javamain %12luns\n", tjavamain);
-        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init cl       %12luns\n", tcl);
-        fprintf(stderr, "[hottub][info][bin JavaMain] jvm_init total    %12luns\n", ttotal);
 
         int run_num = 0;
         do {
@@ -829,6 +796,12 @@ JavaMain(void * _args)
             struct timespec start, end;
             unsigned long diff;
             double ddiff;
+
+            void* handle = dlopen("librt.so.1", RTLD_LAZY);
+            if (handle == NULL) {
+                handle = dlopen("librt.so", RTLD_LAZY);
+            }
+            int (*clock_gettime_func)(clockid_t, struct timespec*) = dlsym(handle, "clock_gettime");
 
             clock_gettime_func(CLOCK_MONOTONIC, &start);
             ifn.CallingJavaMain();
