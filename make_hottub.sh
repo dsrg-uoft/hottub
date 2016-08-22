@@ -20,7 +20,7 @@ if [ "$#" != "1" ] && [ "$#" != "2" ]; then
     exit 1
 fi
 
-IMG="j2sdk-image.$1"
+IMG="j2sdk-image.java8.$1"
 TYPE="${2:-release}"
 DIR="build/linux-x86_64-normal-server-$TYPE"
 BUILD_HOME="$DIR/images/j2sdk-image"
