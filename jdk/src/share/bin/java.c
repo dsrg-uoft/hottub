@@ -612,10 +612,6 @@ JavaMain(void * _args)
             }
             close(jvmfd);
 
-            // we want to run this before we switch to client fds to keep logs
-            // this is inefficient if we fail setup later, but whatever
-            ifn.InitHotTubVM(run_num);
-
             /* 2. fixup file descriptors */
             int error = 0;
             while(!error) {
@@ -790,6 +786,10 @@ JavaMain(void * _args)
             }
             if (error)
                 continue;
+
+            // we want to run this before we switch to client fds to keep logs
+            // this is inefficient if we fail setup later, but whatever
+            ifn.InitHotTubVM(run_num);
 
             /* Build platform specific argument array */
             mainArgs = CreateApplicationArgs(env, argv, argc);
