@@ -3352,6 +3352,21 @@ public final class Class<T> implements java.io.Serializable,
     private volatile transient Map<String, T> enumConstantDirectory = null;
 
     /**
+     * Attempt to clear class data.
+     * For HotTub use in between runs. These Class fields are similar
+     * essentially static data that _should_ be reset.
+     * In practice the only data in need of clearing is the enum constants as
+     * running clinit on an enum class will create new constants.
+     * We must run clinit for other operations that an enum class may perform,
+     * so the other option would be to move the constant initializations out of
+     * clinit, which is much more complicated (change javac etc).
+     */
+    void cleanClass() {
+        enumConstants = null;
+        enumConstantDirectory = null;
+    }
+
+    /**
      * Casts an object to the class or interface represented
      * by this {@code Class} object.
      *

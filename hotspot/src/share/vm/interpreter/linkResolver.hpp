@@ -123,10 +123,14 @@ class LinkResolver: AllStatic {
   friend class klassVtable;
   friend class klassItable;
 
- private:
+ // hottub
+ public:
   static void lookup_method_in_klasses          (methodHandle& result, KlassHandle klass, Symbol* name, Symbol* signature, bool checkpolymorphism, bool in_imethod_resolve, TRAPS);
-  static void lookup_instance_method_in_klasses (methodHandle& result, KlassHandle klass, Symbol* name, Symbol* signature, TRAPS);
   static void lookup_method_in_interfaces       (methodHandle& result, KlassHandle klass, Symbol* name, Symbol* signature, TRAPS);
+  static void resolve_method          (methodHandle& resolved_method, KlassHandle resolved_klass, Symbol* method_name, Symbol* method_signature, KlassHandle current_klass, bool check_access, bool require_methodref, TRAPS);
+
+ private:
+  static void lookup_instance_method_in_klasses (methodHandle& result, KlassHandle klass, Symbol* name, Symbol* signature, TRAPS);
   static void lookup_polymorphic_method         (methodHandle& result, KlassHandle klass, Symbol* name, Symbol* signature,
                                                  KlassHandle current_klass, Handle *appendix_result_or_null, Handle *method_type_result, TRAPS);
 
@@ -135,7 +139,6 @@ class LinkResolver: AllStatic {
   static void resolve_pool  (KlassHandle& resolved_klass, Symbol*& method_name, Symbol*& method_signature, KlassHandle& current_klass, constantPoolHandle pool, int index, TRAPS);
 
   static void resolve_interface_method(methodHandle& resolved_method, KlassHandle resolved_klass, Symbol* method_name, Symbol* method_signature, KlassHandle current_klass, bool check_access, bool nostatics, TRAPS);
-  static void resolve_method          (methodHandle& resolved_method, KlassHandle resolved_klass, Symbol* method_name, Symbol* method_signature, KlassHandle current_klass, bool check_access, bool require_methodref, TRAPS);
 
   static void linktime_resolve_static_method    (methodHandle& resolved_method, KlassHandle resolved_klass, Symbol* method_name, Symbol* method_signature, KlassHandle current_klass, bool check_access, TRAPS);
   static void linktime_resolve_special_method   (methodHandle& resolved_method, KlassHandle resolved_klass, Symbol* method_name, Symbol* method_signature, KlassHandle current_klass, bool check_access, TRAPS);

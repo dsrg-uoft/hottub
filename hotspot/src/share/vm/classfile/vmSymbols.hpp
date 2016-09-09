@@ -753,6 +753,8 @@
    do_name(     getSuperclass_name,                              "getSuperclass")                                       \
   do_intrinsic(_getComponentType,         java_lang_Class,        getComponentType_name, void_class_signature,   F_RN)  \
    do_name(     getComponentType_name,                           "getComponentType")                                    \
+  do_intrinsic(_cleanClass,               java_lang_Class,        cleanClass_name, void_method_signature,        F_RN)  \
+   do_name(     cleanClass_name,                                 "cleanClass")                                          \
                                                                                                                         \
   do_intrinsic(_getClassAccessFlags,      sun_reflect_Reflection, getClassAccessFlags_name, class_int_signature, F_SN)  \
    do_name(     getClassAccessFlags_name,                        "getClassAccessFlags")                                 \
@@ -1058,6 +1060,8 @@
     /*the compiler does have special inlining code for these; bytecode inline is just fine */                           \
                                                                                                                         \
   do_intrinsic(_fillInStackTrace,         java_lang_Throwable, fillInStackTrace_name, void_throwable_signature,  F_RNY) \
+  do_intrinsic(__debug_print,             java_lang_Throwable, __debug_print_name,    throwable_void_signature,  F_S)   \
+   do_name(    __debug_print_name,                            "__debug_print")                                          \
                                                                                                                           \
   do_intrinsic(_StringBuilder_void,   java_lang_StringBuilder, object_initializer_name, void_method_signature,     F_R)   \
   do_intrinsic(_StringBuilder_int,    java_lang_StringBuilder, object_initializer_name, int_void_signature,        F_R)   \

@@ -227,6 +227,7 @@ public abstract class Enum<E extends Enum<E>>
      *         is null
      * @since 1.5
      */
+    // TODO: fuck this function
     public static <T extends Enum<T>> T valueOf(Class<T> enumType,
                                                 String name) {
         T result = enumType.enumConstantDirectory().get(name);

@@ -12,6 +12,7 @@
 #include <openssl/md5.h>
 #include <time.h>
 #include <stdint.h>
+#include <signal.h>
 #include "java.h"
 
 /* TODO error handling should be revised a bit... I think the goal should be if
@@ -26,6 +27,42 @@
  */
 
 static uint64_t t0;
+static int connected;
+static char jvmpath[MAX_PATH_LEN + ID_LEN + 1];
+
+void signal_handler(int signum)
+{
+    if (connected) {
+        pid_t server_pid = get_server_pid();
+        fprintf(stderr, "[hottub][%s][client signal_handler] TODO forwarding %s to %d\n",
+                server_pid == -1 ? "error" : "info", strsignal(signum), server_pid);
+        if (server_pid != -1) {
+            // TODO handle properly in jvm (rather than register handlers)
+            if (kill(server_pid, signum) == -1) {
+                fprintf(stderr, "[hottub][error][client signal_handler] forwarding "
+                        "%s to %d\n", strsignal(signum), server_pid);
+            }
+        }
+        remove_pid_file(CLIENT);
+        exit(0);
+    } else {
+        fprintf(stderr, "[hottub][error][client signal_handler] received "
+                "%s\n", strsignal(signum));
+        exit(signum);
+    }
+}
+
+void setup_signal_handling()
+{
+    struct sigaction new_action;
+    new_action.sa_handler = signal_handler;
+    sigemptyset(&new_action.sa_mask);
+    new_action.sa_flags = 0;
+
+    sigaction(SIGINT, &new_action, NULL);
+    sigaction(SIGHUP, &new_action, NULL);
+    sigaction(SIGTERM, &new_action, NULL);
+}
 
 /* ---------- ENTRY ---------- */
 int main(int argc, char **argv, char **envp)
@@ -71,7 +108,9 @@ int run_hottub(char *id, args_info *args, char** envp)
 
     datapath_len = create_datapath(datapath);
 
-    char jvmpath[datapath_len + ID_LEN + 1];
+    // there isn't much point in freeing this on all paths
+    // it has the same life time as this client
+    //jvmpath = (char *)malloc(datapath_len + ID_LEN + 1);
     sprintf(jvmpath, "%s%s", datapath, id);
 
     int poolno;
@@ -93,12 +132,13 @@ int run_hottub(char *id, args_info *args, char** envp)
             pid_t pid = fork();
             if (pid == 0) {
                 setsid();
-                setup_server_logs(jvmpath);
+                setup_server_logs();
                 // TODO: we can continue with error here, but parent and child
                 //       have same std* fds
                 return exec_jvm(id, args->argc, args->argv);
             } else {
-                create_pid_file(jvmpath, SERVER, pid);
+                setup_signal_handling(pid);
+                create_pid_file(SERVER, pid);
                 try_connect = 1;
             }
         } else if (errno == EEXIST) {
@@ -109,7 +149,7 @@ int run_hottub(char *id, args_info *args, char** envp)
             return -1;
         }
 
-        if (try_connect && create_pid_file(jvmpath, CLIENT, getpid()) == 0) {
+        if (try_connect && create_pid_file(CLIENT, getpid()) == 0) {
             int jvmfd;
             int i;
             for (i = 0; i < RETRY_COUNT; i++) {
@@ -133,47 +173,70 @@ int run_hottub(char *id, args_info *args, char** envp)
             }
             // if we never connected go next
             if (jvmfd <= 0) {
+                remove_pid_file(CLIENT);
                 continue;
             }
+
+            // TODO signal handling is tricky should revisit......
+            connected = 1;
 
             error = send_fds(jvmfd);
             if (error == -2) {
                 close(jvmfd);
+                remove_pid_file(CLIENT);
                 return -1;
             } else if (error == -1) {
                 close(jvmfd);
+                remove_pid_file(CLIENT);
                 continue;
             }
             // global data for argc and argv :D
             error = send_args(jvmfd, args);
             if (error) {
                 close(jvmfd);
+                remove_pid_file(CLIENT);
                 continue;
             }
             error = send_working_dir(jvmfd);
             if (error) {
                 close(jvmfd);
+                remove_pid_file(CLIENT);
                 continue;
             }
             error = send_env_var(jvmfd, envp);
             if (error) {
                 close(jvmfd);
+                remove_pid_file(CLIENT);
                 continue;
             }
 
             uint64_t t1 = _now();
             fprintf(stderr, "[hottub][info][client run_hottub] running server "
-                    "with id %s, took %.6f\n", id, (t1 - t0) / 1e9);
+                    "with id %s, took %.6fs\n", id, (t1 - t0) / 1e9);
             int ret_val = 255;
-            if (read_sock(jvmfd, &ret_val, sizeof(int)) == -1) {
+            // block until receive ret_val
+            // we might get interrupted during this, but keep faithful that
+            // server will give us our return value
+            //do {
+            error = read_sock(jvmfd, &ret_val, sizeof(int));
+            if (error == -1) {
                 perror("[hottub][error][client run_hottub] read_sock");
+            } else if (error < sizeof(int)) {
+                fprintf(stderr, "[hottub][error][client run_hottub] read_sock "
+                        "read %d bytes for ret_val\n", error);
             }
+            //} while (errno == EINTR);
+            fprintf(stderr, "[hottub][info][client run_hottub] ret_val = %d\n", ret_val);
+            shutdown(jvmfd, SHUT_RDWR);
             close(jvmfd);
-            remove_pid_file(jvmpath, CLIENT);
+            remove_pid_file(CLIENT);
             return ret_val;
         }
     }
     // if we reach here no jvm was available -> fallback exec a normal jvm
+    uint64_t t1 = _now();
+    fprintf(stderr, "[hottub][info][client run_hottub] running fallback server "
+            "took %.6fs\n", (t1 - t0) / 1e9);
     return exec_jvm(NULL, args->argc, args->argv);
 }
 
@@ -510,8 +573,8 @@ int send_env_var(int jvmfd, char **envp)
     for (i = 0; envp[i] != NULL; i++) {
         char *env_var = envp[i];
         // TODO: add trace flag?
-        //fprintf(stderr, "[hottub][info][client send_env_var] len = %zu, "
-        //        "env_var = %s\n", strlen(env_var), env_var);
+        fprintf(stderr, "[hottub][info][client send_env_var] len = %zu, "
+                "env_var = %s\n", strlen(env_var), env_var);
         len = strlen(env_var);
         wrote = (size_t) write_sock(jvmfd, &len, sizeof(int));
         if (wrote != sizeof(int)) {
@@ -525,7 +588,7 @@ int send_env_var(int jvmfd, char **envp)
         }
     }
     // TODO: add trace flag?
-    //fprintf(stderr, "[hottub][info][client send_env_varj sending done\n");
+    fprintf(stderr, "[hottub][info][client send_env_varj sending done\n");
     len = 0;
     wrote = (size_t) write_sock(jvmfd, &len, sizeof(int));
     if (wrote != sizeof(int)) {
@@ -614,13 +677,13 @@ ssize_t write_sock(int fd, void *ptr, size_t nbytes)
     return sendmsg(fd, &msg, 0);
 }
 
-int create_pid_file(const char *jvmpath, const char *filename, pid_t pid)
+int create_pid_file(const char *filename, pid_t pid)
 {
     int path_len = strlen(jvmpath) + strlen(filename) + 1;
     char path[path_len];
     snprintf(path, path_len, "%s%s", jvmpath, filename);
 
-    int pid_fd = creat(path, 0775);
+    int pid_fd = open(path, O_CREAT|O_EXCL|O_WRONLY, 0775);
     if (pid_fd != -1) {
         FILE *f = fdopen(pid_fd, "w");
         if (f == NULL) {
@@ -628,7 +691,10 @@ int create_pid_file(const char *jvmpath, const char *filename, pid_t pid)
             return -1;
         }
         int ret = fprintf(f, "%d\n", pid);
-        if (ret < 0) {
+        if (ret > 0) {
+            fprintf(stderr, "[hottub][info][client create_pid_file] wrote "
+                    "%s = %d\n", filename, pid);
+        } else {
             fprintf(stderr, "[hottub][error][client create_pid_file] fprintf "
                     "returned %d, ferror %d\n", ret, ferror(f));
             return -1;
@@ -650,20 +716,36 @@ int create_pid_file(const char *jvmpath, const char *filename, pid_t pid)
     }
 }
 
-int remove_pid_file(const char *jvmpath, const char *filename)
+int remove_pid_file(const char *filename)
 {
     int path_len = strlen(jvmpath) + strlen(filename) + 1;
     char path[path_len];
     snprintf(path, path_len, "%s%s", jvmpath, filename);
     if (remove(path) == -1) {
         fprintf(stderr, "[hottub][error][client remove_pid_file] remove "
-                "%s errno = %s\n", filename, strerror(errno));
+                "%s errno = %s\n", path, strerror(errno));
         return -1;
     }
     return 0;
 }
 
-int setup_server_logs(const char *jvmpath)
+pid_t get_server_pid()
+{
+    int path_len = strlen(jvmpath) + strlen(SERVER) + 1;
+    char path[path_len];
+    snprintf(path, path_len, "%s%s", jvmpath, SERVER);
+
+    FILE *file = fopen(path, "r");
+    if (file == NULL) {
+        return -1;
+    }
+    pid_t pid = -1;
+    fscanf(file, "%d", &pid);
+    fclose(file);
+    return pid;
+}
+
+int setup_server_logs()
 {
     int path_len = strlen(jvmpath) + strlen("/stdout") + 1;
     char stdout_path[path_len];

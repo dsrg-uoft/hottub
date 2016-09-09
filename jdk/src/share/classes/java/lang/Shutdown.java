@@ -146,7 +146,7 @@ class Shutdown {
     private static native void runAllFinalizers();
 
     private static native void saveRetVal(int status);
-    private static native boolean isHottub();
+    private static native boolean isHotTubVM();
 
     /* The actual shutdown sequence is defined here.
      *
@@ -183,7 +183,7 @@ class Shutdown {
     static void exit(int status) {
         boolean runMoreFinalizers = false;
         synchronized (lock) {
-            if (isHottub()) {
+            if (isHotTubVM()) {
                 final Thread self = Thread.currentThread();
                 saveRetVal(status);
                 for (Thread th : Thread.getAllStackTraces().keySet()) {
@@ -252,16 +252,14 @@ class Shutdown {
     }
 
     static void kill_daemon_threads() {
-        /*
-        int count = 0;
-        for (Thread th : Thread.getAllStackTraces().keySet()) {
-            if (th.getId() > 4 && th.isDaemon()) {
-                th.stop();
-                count++;
-            }
-        }
-        System.err.print("[HotTub][info][Shutdown::kill_daemon_threads] killed " + count + " daemon threads\n");
-        */
+        //int count = 0;
+        //for (Thread th : Thread.getAllStackTraces().keySet()) {
+        //    if (th.getId() > 4 && th.isDaemon()) {
+        //        th.stop();
+        //        count++;
+        //    }
+        //}
+        //System.err.print("[hottub][info][Shutdown::kill_daemon_threads] killed " + count + "\n");
     }
 
 }

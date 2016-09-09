@@ -590,9 +590,8 @@ JavaMain(void * _args)
     CHECK_EXCEPTION_NULL_LEAVE(setenvID);
 
     if (hottubid[0] != '\0') {
-        ifn.SetHottub();
-
         int run_num = 0;
+
         do {
             /* 1. wait for a request */
             /* close listening socket when doing a run so new clients go to next jvm */
@@ -612,6 +611,10 @@ JavaMain(void * _args)
                 continue;
             }
             close(jvmfd);
+
+            // we want to run this before we switch to client fds to keep logs
+            // this is inefficient if we fail setup later, but whatever
+            ifn.InitHotTubVM(run_num);
 
             /* 2. fixup file descriptors */
             int error = 0;
@@ -792,46 +795,55 @@ JavaMain(void * _args)
             mainArgs = CreateApplicationArgs(env, argv, argc);
             CHECK_EXCEPTION_NULL_LEAVE(mainArgs);
 
-            /* 3. run main */
-            struct timespec start, end;
-            unsigned long diff;
-            double ddiff;
+            /* run main */
+            struct timespec t0, t1, t2;
+            unsigned long d10, d21, total;
+            double total_s;
 
             void* handle = dlopen("librt.so.1", RTLD_LAZY);
             if (handle == NULL) {
                 handle = dlopen("librt.so", RTLD_LAZY);
             }
-            int (*clock_gettime_func)(clockid_t, struct timespec*) = dlsym(handle, "clock_gettime");
+            int (*clock_gettime_func)(clockid_t, struct timespec*) =
+              dlsym(handle, "clock_gettime");
 
-            clock_gettime_func(CLOCK_MONOTONIC, &start);
+            clock_gettime_func(CLOCK_MONOTONIC, &t0);
+
+            // call main and wait till everything finishes
             ifn.CallingJavaMain();
             (*env)->CallStaticVoidMethod(env, mainClass, mainID, mainArgs);
             ifn.WaitTillLastThread();
             ifn.FinishedJavaMain();
-            clock_gettime_func(CLOCK_MONOTONIC, &end);
-            diff = 1e9 * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-            ddiff = diff / 1e9;
-            fprintf(stderr, "[hottub][info][bin JavaMain] CallStaticVoidMethod | run = %d | identity= %s | diff= %luns (%fs)\n",
-                    run_num, hottubid, diff, ddiff);
-            run_num++;
+
+            clock_gettime_func(CLOCK_MONOTONIC, &t1);
 
             ret = (*env)->ExceptionOccurred(env) == NULL ? 0 : 1;
             (*env)->ExceptionClear(env);
 
+            // kill daemon threads
             jclass shutdownClass = (*env)->FindClass(env, "java/lang/Shutdown");
             CHECK_EXCEPTION_NULL_LEAVE(shutdownClass);
-            jmethodID kill_daemon_threads_ID = (*env)->GetStaticMethodID(env, shutdownClass, "kill_daemon_threads", "()V");
+            jmethodID kill_daemon_threads_ID = (*env)->GetStaticMethodID(env,
+                shutdownClass, "kill_daemon_threads", "()V");
             CHECK_EXCEPTION_NULL_LEAVE(kill_daemon_threads_ID);
             (*env)->CallStaticVoidMethod(env, shutdownClass, kill_daemon_threads_ID);
             if ((*env)->ExceptionOccurred(env)) {
-                fprintf(stderr, "[hottub][warn][bin JavaMain] (kill_daemon_threads) had exception\n");
+                fprintf(stderr, "[hottub][warn][bin JavaMain] (kill_daemon_threads) "
+                    "had exception\n");
             }
             (*env)->ExceptionClear(env);
 
             int ret_val = ifn.GetRetVal();
-            //TODO: broken pipe problem?
+            //TODO: broken pipe problem? (caused by client getting signalled I think)
             if (write_sock(clientfd, &ret_val, sizeof(int)) != sizeof(int)) {
-                fprintf(stderr, "[hottub][warn][bin JavaMain] (write_sock) problem writing return val errno = %s\n", strerror(errno));
+                fprintf(stderr, "[hottub][warn][bin JavaMain] (write_sock) "
+                   "problem writing return val errno = %s\n", strerror(errno));
+            }
+            shutdown(clientfd, SHUT_WR);
+            // wait for client to finish
+            if (read_sock(clientfd, &ret_val, sizeof(int)) == -1) {
+                fprintf(stderr, "[hottub][warn][bin JavaMain] (read_sock) "
+                   "problem reading end errno = %s\n", strerror(errno));
             }
 
             /* 4. clean up jvm */
@@ -841,10 +853,23 @@ JavaMain(void * _args)
                 dup2(oldfd[i], i);
                 close(oldfd[i]);
             }
-            if (ifn.CleanJavaVM(hottubid)) {
-                fprintf(stderr, "[hottub][error][bin JavaMain] cleanjavavm failed | id = %s\n", hottubid);
+
+            if (ifn.CleanHotTubVM(hottubid)) {
+                fprintf(stderr, "[hottub][error][bin JavaMain] CleanHotTubVM failed "
+                    "id = %s\n", hottubid);
                 break;
             }
+
+            clock_gettime_func(CLOCK_MONOTONIC, &t2);
+            d10 = 1e9 * (t1.tv_sec - t0.tv_sec) + t1.tv_nsec - t0.tv_nsec;
+            d21 = 1e9 * (t2.tv_sec - t1.tv_sec) + t2.tv_nsec - t1.tv_nsec;
+            total = d21 + d10;
+            total_s = total / 1e9;
+            fprintf(stderr, "[hottub][info][bin JavaMain] identity = %s, run = %d, "
+               "main = %luns, other = %luns, total = %luns (%fs)\n",
+               hottubid, run_num, d10, d21, total, total_s);
+
+            run_num++;
         } while (JNI_TRUE /*ret == 0*/);
     } else {
         /* Build platform specific argument array */

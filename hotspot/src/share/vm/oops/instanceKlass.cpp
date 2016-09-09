@@ -174,7 +174,11 @@ HS_DTRACE_PROBE_DECL5(hotspot, class__initialization__end,
 #include "utilities/clinit_analysis.hpp"
 
 volatile int InstanceKlass::_total_instanceKlass_count = 0;
-fileStream* InstanceKlass::classlist_file = NULL;
+// hottub
+fileStream* InstanceKlass::classlist_file = NULL; // TODO remove...
+GrowableArray<InstanceKlass*>* InstanceKlass::clinit_record = NULL;
+
+
 
 InstanceKlass* InstanceKlass::allocate_instance_klass(
                                               ClassLoaderData* loader_data,
@@ -922,7 +926,15 @@ void InstanceKlass::initialize_impl(instanceKlassHandle this_oop, TRAPS) {
                              jt->get_thread_stat()->perf_recursion_counts_addr(),
                              jt->get_thread_stat()->perf_timers_addr(),
                              PerfClassTraceTime::CLASS_CLINIT);
+
     this_oop->call_class_initializer(THREAD);
+    if (this_oop->class_loader()) {
+      MutexLocker(ClinitRecord_lock, THREAD);
+      if (clinit_record == NULL) {
+        clinit_record = new (ResourceObj::C_HEAP, mtInternal) GrowableArray<InstanceKlass*>(0, true);
+      }
+      clinit_record->append(this_oop());
+    }
   }
 
   // Step 9
@@ -3908,7 +3920,7 @@ bool InstanceKlass::is_lame() {
   };
   ResourceMark rm;
   /*
-  if (InstanceKlass::re_initialize_iteration == 0) {
+  if (InstanceKlass::reinitialize_iteration == 0) {
     if (strstr(name()->as_C_string(), "DefaultMetricsSystem") != NULL) {
       return true;
     }
@@ -3945,61 +3957,195 @@ bool InstanceKlass::is_lame() {
   */
 }
 
-void InstanceKlass::record_class(Klass *k, TRAPS) {
-  // if the class isn't initialized then no reason to re-initialize it
-  if (cast(k)->is_initialized() && !cast(k)->is_createvm_initialized()) {
-    ResourceMark rm(THREAD);
-    InstanceKlass::classlist_file->print_cr("%s", k->name()->as_C_string());
-  }
-}
-
-// zero initialize all initialized classes
-void InstanceKlass::re_zero_init(Klass *k, TRAPS) {
+// zero the class' static fields
+// also set unsafe classes to reinit true
+void InstanceKlass::zero_init(Klass *k, TRAPS) {
   InstanceKlass *ik = cast(k);
-  ik->re_init = false;
-
-  if (!ik->re_init_safe()) {
+  // TODO: double check resource mark cleans this...
+  ik->child_set = new GrowableArray<InstanceKlass*>();
+  if (!ik->reinit_safe()) {
+    ik->reinit = true;
     return;
   }
-  if (true || HotTubLog) {
-    ResourceMark rm;
-    tty->print("[HotTub][info][InstanceKlass::re_zero_init] zero init "
-        "class: %s\n", ik->name()->as_C_string());
+  if (HotTubLog) {
+    tty->print("[HotTub][trace][InstanceKlass::zero_init] class: %s\n",
+        ik->name()->as_C_string());
   }
+  // TODO: double check resource mark cleans this...
+  //ik->child_set = new GrowableArray<InstanceKlass*>();
+  ik->reinit = false;
+  Handle mirror(THREAD, ik->java_mirror());
+  ik->do_local_static_fields(&java_lang_Class::zero_static_field, mirror, CHECK);
+  ik->do_local_static_fields(&java_lang_Class::initialize_static_field, mirror, CHECK);
 
-  HandleMark hm(THREAD);
-  Handle mirror(ik->java_mirror());
-  ik->do_local_static_fields(&java_lang_Class::zero_initialize_static_field,
-      mirror, CHECK);
-  ik->do_local_static_fields(&java_lang_Class::initialize_static_field,
-      mirror, CHECK);
+  // TODO: FIX THIS catch stupid exceptions from cleaning daemons...
+  if (HAS_PENDING_EXCEPTION) {
+    ResourceMark rm;
+    tty->print("[HotTub][info][InstanceKlass::zero_init] cleaning exception: class = %s, "
+        "exception = %s\n", ik->name()->as_C_string(), PENDING_EXCEPTION->print_string());
+    Handle e(THREAD, PENDING_EXCEPTION);
+    CLEAR_PENDING_EXCEPTION;
+    instanceKlassHandle klass(THREAD, SystemDictionary::Throwable_klass());
+    JavaValue result(T_VOID);
+    _native_call_begin((JavaThread*) THREAD, NULL, 10);
+    JavaCalls::call_static(&result, klass, vmSymbols::__debug_print_name(),
+        vmSymbols::throwable_void_signature(), e, THREAD);
+    _native_call_end((JavaThread*) THREAD, NULL, 10);
+  }
+  // TODO: FIX THIS catch stupid exceptions from cleaning daemons...
+
+  JavaValue result(T_VOID);
+  KlassHandle kh(THREAD, mirror()->klass());
+  _native_call_begin((JavaThread*) THREAD, NULL, 10);
+  JavaCalls::call_special(&result, mirror, kh, vmSymbols::cleanClass_name(),
+      vmSymbols::void_method_signature(), THREAD);
+  _native_call_end((JavaThread*) THREAD, NULL, 10);
+
+  // really should never throw execption, but whatever
+  if (HAS_PENDING_EXCEPTION) {
+    ResourceMark rm;
+    tty->print("[HotTub][error][InstanceKlass::zero_init] exception: class = %s, "
+        "exception = %s\n", ik->name()->as_C_string(), PENDING_EXCEPTION->print_string());
+
+    Handle e(THREAD, PENDING_EXCEPTION);
+    CLEAR_PENDING_EXCEPTION;
+
+    instanceKlassHandle klass(THREAD, SystemDictionary::Throwable_klass());
+    JavaValue result(T_VOID);
+    _native_call_begin((JavaThread*) THREAD, NULL, 10);
+    JavaCalls::call_static(&result, klass, vmSymbols::__debug_print_name(),
+        vmSymbols::throwable_void_signature(), e, THREAD);
+    _native_call_end((JavaThread*) THREAD, NULL, 10);
+  }
 }
 
-// run clinit for all initialized classes
-void InstanceKlass::re_clinit(Klass *this_k, TRAPS) {
+void InstanceKlass::fill_child_set(Klass *this_k, TRAPS) {
+  // TODO re-evaluate
+  // We want to avoid wasting time on system classes. It is possible user
+  // class implements a system class, so the user must be a child of the
+  // system.
   InstanceKlass *this_ik = cast(this_k);
-
-  if (!this_ik->re_init_safe() || this_ik->re_init) {
-    return;
-  }
-  if (true || HotTubLog) {
-    ResourceMark rm;
-    tty->print("[HotTub][info][InstanceKlass::re_clinit] clinit class: %s\n",
+  //if (!this_ik->reinit_safe()) {
+  //if (!this_ik->!class_loader()) {
+  //  return;
+  //}
+  if (HotTubLog) { //TODO add trace
+    tty->print("[HotTub][trace][InstanceKlass::fill_child_set] class: %s\n",
         this_ik->name()->as_C_string());
   }
+  InstanceKlass* super_ik = InstanceKlass::cast(this_ik->super());
+  if (super_ik) { // can be null for java/lang/object
+    super_ik->child_set->append_if_missing(this_ik);
+    if (HotTubLog) { //TODO add trace
+      tty->print("[HotTub][trace][InstanceKlass::fill_child_set] super = %s "
+          "adding child = %s\n", super_ik->name()->as_C_string(),
+          this_ik->name()->as_C_string());
+    }
+  }
 
-  ClinitAnalysis clinit_analysis(this_ik, THREAD);
-  clinit_analysis.run_analysis();
-  clinit_analysis.run_clinits();
+  for (int i = 0; i < this_ik->local_interfaces()->length(); ++i) {
+    Klass* iface = this_ik->local_interfaces()->at(i);
+    InstanceKlass* iface_ik = InstanceKlass::cast(iface);
+    iface_ik->child_set->append_if_missing(this_ik);
+    if (HotTubLog) { //TODO add trace
+      tty->print("[HotTub][trace][InstanceKlass::fill_child_set] interface = %s "
+          "adding child = %s\n", iface_ik->name()->as_C_string(),
+          this_ik->name()->as_C_string());
+    }
+  }
 }
 
-bool InstanceKlass::re_init_safe() {
+// run clinit for the class and all classes it depends on
+void InstanceKlass::clinit(Klass *this_k, TRAPS) {
+  InstanceKlass *this_ik = cast(this_k);
+
+  if (!this_ik->should_reinit()) {
+    return;
+  }
+  if (HotTubLog) {
+    tty->print("[HotTub][trace][InstanceKlass::re_clinit] clinit class: %s\n",
+        this_ik->name()->as_C_string());
+  }
+  ClinitAnalysis::run(this_ik, THREAD);
+}
+
+bool InstanceKlass::should_reinit() {
+  if (!reinit && reinit_safe() && class_initializer()) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool InstanceKlass::reinit_safe() {
   //if (cast(k)->is_initialized() && !cast(k)->is_createvm_initialized()
   //if (!cast(k)->class_loader() || !cast(k)->is_lame()) {
   if (!is_initialized() || !class_loader()) {
+    if (HotTubLog) {
+      tty->print("[HotTub][trace][InstanceKlass::reinit_safe] skipping "
+          "class: %s is_initialized = %s class_loader = %s\n",
+          name()->as_C_string(), is_initialized() ? "true" : "false",
+          class_loader() ? "not null" : "null");
+    }
     return false;
   }
   return true;
+}
+
+// TODO call this in the correct place....
+void InstanceKlass::clinit_record_initialize() {
+  clinit_record = new (ResourceObj::C_HEAP, mtInternal) GrowableArray<InstanceKlass*>(0, true);
+}
+
+void InstanceKlass::clinit_replay(TRAPS) {
+  for (int i = 0; i < clinit_record->length(); i++) {
+    InstanceKlass* ik = clinit_record->at(i);
+    // TODO: pretty sure this check is redundant as it is checked when recording
+    if (!ik->class_loader()) {
+      continue;
+    }
+    if (HotTubLog) {
+      ResourceMark rm;
+      tty->print("[HotTub][info][InstanceKlass::clinit_replay] ik = %s\n",
+          ik->name()->as_C_string());
+    }
+
+    // TODO: FIX THIS catch stupid exceptions from cleaning daemons...
+    if (HAS_PENDING_EXCEPTION) {
+      ResourceMark rm;
+      tty->print("[HotTub][info][InstanceKlass::clinit_replay] "
+          "cleaning exception: class = %s, exception = %s\n",
+          ik->name()->as_C_string(), PENDING_EXCEPTION->print_string());
+      Handle e(THREAD, PENDING_EXCEPTION);
+      CLEAR_PENDING_EXCEPTION;
+      instanceKlassHandle klass(THREAD, SystemDictionary::Throwable_klass());
+      JavaValue result(T_VOID);
+      _native_call_begin((JavaThread*) THREAD, NULL, 10);
+      JavaCalls::call_static(&result, klass, vmSymbols::__debug_print_name(),
+          vmSymbols::throwable_void_signature(), e, THREAD);
+      _native_call_end((JavaThread*) THREAD, NULL, 10);
+    }
+    // TODO: FIX THIS catch stupid exceptions from cleaning daemons...
+
+    ik->call_class_initializer(THREAD);
+
+    if (HAS_PENDING_EXCEPTION) {
+      ResourceMark rm;
+      tty->print("[HotTub][error][InstanceKlass::clinit_replay] "
+          "exception: class = %s, exception = %s\n",
+          ik->name()->as_C_string(), PENDING_EXCEPTION->print_string());
+
+      Handle e(THREAD, PENDING_EXCEPTION);
+      CLEAR_PENDING_EXCEPTION;
+
+      instanceKlassHandle klass(THREAD, SystemDictionary::Throwable_klass());
+      JavaValue result(T_VOID);
+      _native_call_begin((JavaThread*) THREAD, NULL, 10);
+      JavaCalls::call_static(&result, klass, vmSymbols::__debug_print_name(),
+          vmSymbols::throwable_void_signature(), e, THREAD);
+      _native_call_end((JavaThread*) THREAD, NULL, 10);
+    }
+  }
 }
 
 // Construct a PreviousVersionNode entry for the array hung off

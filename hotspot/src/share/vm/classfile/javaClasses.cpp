@@ -555,7 +555,7 @@ inline void* index_oop_from_field_offset_long(oop p, jlong field_offset) {
     return (address)p +        byte_offset;
 }
 
-void java_lang_Class::zero_initialize_static_field(fieldDescriptor* fd, Handle mirror, TRAPS) {
+void java_lang_Class::zero_static_field(fieldDescriptor* fd, Handle mirror, TRAPS) {
   assert(mirror.not_null() && fd->is_static(), "just checking");
   BasicType t = fd->field_type();
   switch (t) {

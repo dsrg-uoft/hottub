@@ -928,13 +928,6 @@ LoadJavaVM(const char *jvmpath, InvocationFunctions *ifn)
         return JNI_FALSE;
     }
 
-    ifn->CleanJavaVM = (CleanJavaVM_t)
-        dlsym(libjvm, "JNI_CleanJavaVM");
-    if (ifn->CleanJavaVM == NULL) {
-        JLI_ReportErrorMessage(DLL_ERROR2, jvmpath, dlerror());
-        return JNI_FALSE;
-    }
-
     ifn->WaitTillLastThread = (WaitTillLastThread_t)
         dlsym(libjvm, "JNI_WaitTillLastThread");
     if (ifn->WaitTillLastThread == NULL) {
@@ -956,9 +949,16 @@ LoadJavaVM(const char *jvmpath, InvocationFunctions *ifn)
         return JNI_FALSE;
     }
 
-    ifn->SetHottub = (SetHottub_t)
-        dlsym(libjvm, "JNI_SetHottub");
-    if (ifn->SetHottub == NULL) {
+    ifn->InitHotTubVM = (InitHotTubVM_t)
+        dlsym(libjvm, "JNI_InitHotTubVM");
+    if (ifn->InitHotTubVM == NULL) {
+        JLI_ReportErrorMessage(DLL_ERROR2, jvmpath, dlerror());
+        return JNI_FALSE;
+    }
+
+    ifn->CleanHotTubVM = (CleanHotTubVM_t)
+        dlsym(libjvm, "JNI_CleanHotTubVM");
+    if (ifn->CleanHotTubVM == NULL) {
         JLI_ReportErrorMessage(DLL_ERROR2, jvmpath, dlerror());
         return JNI_FALSE;
     }

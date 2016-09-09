@@ -59,7 +59,7 @@ Java_java_lang_Shutdown_saveRetVal(JNIEnv *env, jclass ignored, jint code)
 
 
 JNIEXPORT jboolean JNICALL
-Java_java_lang_Shutdown_isHottub(JNIEnv *env, jclass ignored)
+Java_java_lang_Shutdown_isHotTubVM(JNIEnv *env, jclass ignored)
 {
-    return JNI_IsHottub();
+    return JNI_IsHotTubVM();
 }

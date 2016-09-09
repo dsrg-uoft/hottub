@@ -1042,13 +1042,21 @@ public:
   static fileStream* classlist_file;
   bool is_createvm_initialized();
   bool is_lame();
-  static int re_initialize_iteration;
+  static int reinitialize_iteration;
   static void record_class(Klass *k, TRAPS);
   // hottub
-  bool re_init;
-  bool re_init_safe();
-  static void re_zero_init(Klass *k, TRAPS);
-  static void re_clinit(Klass *this_k, TRAPS);
+  bool reinit;
+  bool should_reinit();
+  bool reinit_safe();
+  static void fill_child_set(Klass *this_k, TRAPS);
+  static void clinit(Klass *this_k, TRAPS);
+  GrowableArray<InstanceKlass*> *child_set;
+
+  // hottub super new
+  static void zero_init(Klass *k, TRAPS);
+  static void clinit_replay(TRAPS);
+  static void clinit_record_initialize();
+  static GrowableArray<InstanceKlass*> *clinit_record;
 
 private:
   // initialization state

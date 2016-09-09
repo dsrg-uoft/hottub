@@ -154,6 +154,9 @@ extern Mutex*   JfrThreadGroups_lock;            // protects JFR access to Threa
 extern Mutex*   UnsafeJlong_lock;                // provides Unsafe atomic updates to jlongs on platforms that don't support cx8
 #endif
 
+// hottub
+extern Mutex*   ClinitRecord_lock;               // record global ordering of class initialization
+
 // A MutexLocker provides mutual exclusion with respect to a given mutex
 // for the scope which contains the locker.  The lock is an OS lock, not
 // an object lock, and the two do not interoperate.  Do not use Mutex-based

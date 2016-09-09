@@ -1947,17 +1947,17 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL
 JNI_GetCreatedJavaVMs(JavaVM **, jsize, jsize *);
 
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL
-JNI_CleanJavaVM(char * hottubid);
-_JNI_IMPORT_OR_EXPORT_ jint JNICALL
 JNI_WaitTillLastThread();
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL
 JNI_GetRetVal();
 _JNI_IMPORT_OR_EXPORT_ void JNICALL
 JNI_SetRetVal(jint code);
-_JNI_IMPORT_OR_EXPORT_ void JNICALL
-JNI_SetHottub();
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL
+JNI_InitHotTubVM(jint run_num);
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL
+JNI_CleanHotTubVM(char * hottubid);
 _JNI_IMPORT_OR_EXPORT_ jboolean JNICALL
-JNI_IsHottub();
+JNI_IsHotTubVM();
 
 /* Defined by native libraries. */
 JNIEXPORT jint JNICALL

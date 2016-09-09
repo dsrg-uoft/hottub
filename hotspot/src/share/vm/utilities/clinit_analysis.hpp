@@ -3,33 +3,40 @@
 
 #include "memory/allocation.hpp"
 #include "runtime/handles.hpp"
-#include "utilities/stack.hpp"
+#include "utilities/growableArray.hpp"
+#include "interpreter/bytecodeStream.hpp"
+
 
 class ClinitAnalysis: public StackObj {
 private:
+  class Implementations {
+  public:
+    GrowableArray<InstanceKlass*> klasses;
+    GrowableArray<Method*> methods;
+    int length();
+    bool contains(InstanceKlass *ik, Method *m);
+    bool append_if_missing(InstanceKlass *ik, Method *m);
+  };
+
   Thread *THREAD;
-  InstanceKlass *start_ik;
-  Stack<Method*       , mtInternal> method_stack;
-  Stack<Method*       , mtInternal> method_visit_stack;
-  Stack<InstanceKlass*, mtInternal> ik_stack;
-  Stack<InstanceKlass*, mtInternal> ik_visit_stack;
-  Stack<InstanceKlass*, mtInternal> clinit_stack;
+  // having this static is an optimization
+  // if we have already seen a method tracing into it again will not produce
+  // any class not already initialized
+  static GrowableArray<Method*> *visited_method_set;
 
-  bool ik_visit_contains(InstanceKlass *this_ik);
-  bool method_visit_contains(Method *this_m);
-
-  bool push_ik(InstanceKlass *this_ik);
-  bool push_super(InstanceKlass *this_ik);
-  bool push_super_interface(InstanceKlass *this_ik);
-
-  void analyze_method(Method *m);
+  ClinitAnalysis(Thread *thread);
+  void call_clinit(InstanceKlass *ik);
+  void handle_get_put(constantPoolHandle pool, BytecodeStream *bcs);
+  void handle_invoke_static_special(constantPoolHandle pool, BytecodeStream *bcs);
+  void find_implementations(Implementations *impls, InstanceKlass *this_ik,
+      Symbol *method_name, Symbol *method_signature);
+  void handle_invoke_virtual_interface(constantPoolHandle pool, BytecodeStream *bcs);
+  void analyze(Method *m);
+  void analyze(InstanceKlass *ik);
 
 public:
-  ClinitAnalysis(InstanceKlass *ik, Thread *thread);
-  void run_analysis();
-  void run_clinits();
-
-  static void print_method(methodHandle mh, TRAPS);
+  static void initialize();
+  static void run(InstanceKlass *ik, TRAPS);
 };
 
 #endif // SHARE_VM_UTILITIES_CLINIT_ANALYSIS_HPP

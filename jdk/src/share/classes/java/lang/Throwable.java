@@ -1078,4 +1078,14 @@ public class Throwable implements Serializable {
         else
             return suppressedExceptions.toArray(EMPTY_THROWABLE_ARRAY);
     }
+
+    public static void __debug_print(Throwable t) {
+        System.out.print("t: "+t+"\n");
+        System.out.print("t.getMessage: "+t.getMessage()+"\n");
+        System.out.print("t.getLocalizedMessage: "+t.getLocalizedMessage()+"\n");
+        System.out.print("t.getCause: "+t.getCause()+"\n");
+        System.out.print("t.getCause: "+t.getCause()+"\n");
+        System.out.print("Arrays.toString(t.getStackTrace()): "+Arrays.toString(t.getStackTrace())+"\n");
+        t.printStackTrace();
+    }
 }

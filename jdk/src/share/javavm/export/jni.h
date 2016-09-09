@@ -1943,8 +1943,9 @@ JNI_CreateJavaVM(JavaVM **pvm, void **penv, void *args);
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL
 JNI_GetCreatedJavaVMs(JavaVM **, jsize, jsize *);
 
+// is this necessary? what does this allow even call from java??
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL
-JNI_CleanJavaVM(char *hottubid);
+JNI_CleanHotTubVM(char *hottubid);
 
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL
 JNI_WaitTillLastThread();

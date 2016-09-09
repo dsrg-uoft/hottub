@@ -94,6 +94,7 @@
 #endif
 
 #include "runtime/_bdel.hpp"
+#include "utilities/clinit_analysis.hpp"
 
 static jint CurrentVersion = JNI_VERSION_1_8;
 static jint ret_val = 0;
@@ -5347,62 +5348,111 @@ _JNI_IMPORT_OR_EXPORT_ void JNICALL JNI_SetRetVal(jint code) {
   ret_val = code;
 }
 
-_JNI_IMPORT_OR_EXPORT_ void JNICALL JNI_SetHottub() {
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_InitHotTubVM(jint run_num) {
   hottub = true;
+
+  if (run_num) {
+    jlong t0 = os::javaTimeNanos();
+
+    JavaThread* thread = JavaThread::current();
+    // transition to vm so that clinit can run
+    ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
+    InstanceKlass::clinit_replay(thread);
+    ThreadStateTransition::transition(thread, _thread_in_vm, _thread_in_native);
+
+    jlong t1 = os::javaTimeNanos();
+    tty->print("[hottub][info][JNI_InitHotTubVM] clinit_replay = %luns\n", t1 - t0);
+  }
 }
 
-_JNI_IMPORT_OR_EXPORT_ jboolean JNICALL JNI_IsHottub() {
+_JNI_IMPORT_OR_EXPORT_ jboolean JNICALL JNI_IsHotTubVM() {
   return hottub ? 1 : 0;
 }
 
-_JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanJavaVM(char *hottubid) {
-  //TODO: remove hottubid? not needed, but could be useful in the future...
+_JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanHotTubVM(char *hottubid) {
+  //TODO: remove hottubid? not needed, but could be useful in the future......lol
+  // try to cleanup client regardless because fuck grant proposals
+  // just remove_pid_file from client inlined and hardcoded
+  // move this back to java.c when everything is in /tmp rather than in jvm directory
+  // $java_home/hottub/data/$hottubid/client.pid
+  const char* java_home = Arguments::get_java_home();
+  int java_home_len = strlen(java_home) - 3; // -3 for jre
+  int path_len = java_home_len;
+  path_len    += strlen("hottub/data");
+  path_len    += strlen(hottubid);
+  path_len    += strlen("/client.pid");
+  path_len    += 1;
+  char path[path_len];
+  strncpy(path, java_home, java_home_len);
+  path[java_home_len] = '\0';
+  snprintf(path + java_home_len, path_len - java_home_len,
+      "hottub/data%s/client.pid", hottubid);
+  tty->print("[hottub][info][JNI_CleanHotTubVM] path = %s\n", path);
+  if (remove(path) == -1) {
+    tty->print("[hottub][info][JNI_CleanHotTubVM] remove %s errno = %s\n",
+        path, strerror(errno));
+  }
+
   JNI_SetRetVal(0);
   JavaThread* thread = JavaThread::current();
 
-  // transition to vm so that class initialization and gc call works
-  ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
+  // attempt to clean all exceptions
+  JavaThread *jt = Threads::first();
+  while (jt != NULL) {
+    jt->clear_pending_exception();
+    //void exit(bool destroy_vm, ExitType exit_type = normal_exit);
+    //void clear_exception_oop_and_pc() {
+
+    jt = jt->next();
+  }
 
   // reinit TODO: enable this by default
   if (HotTubReinit) {
-    jlong t0 = os::javaTimeNanos();
-    SystemDictionary::classes_do(InstanceKlass::re_zero_init, thread);
-    jlong t1 = os::javaTimeNanos();
-    SystemDictionary::classes_do(InstanceKlass::re_clinit, thread);
-    jlong t2 = os::javaTimeNanos();
-    tty->print("[hottub][info][JNI_CleanJavaVM] re_zero_init = %luns, "
-               "re_clinit = %luns, total = %luns\n",
-               t1 - t0, t2 - t1, (t1 - t0) + (t2 - t1));
-  }
+    // transition to vm so that class initialization and gc call works
+    ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
 
-  // run gc
-  {
-    HandleMark hm(thread);
-    if (HotTubLog) {
-        tty->print("[hottub][info][JNI_CleanJavaVM] before gc heap->print\n");
+    // surround everything with resource mark and handle mark
+    // most importantly for GrowableArray
+    ResourceMark rm;
+    HandleMark hm;
+
+    jlong t0 = os::javaTimeNanos();
+    SystemDictionary::classes_do(InstanceKlass::zero_init, thread);
+    jlong t1 = os::javaTimeNanos();
+
+    // run gc
+    {
+      if (HotTubLog) {
+        tty->print("[hottub][info][JNI_CleanHotTubVM] before gc heap->print\n");
         Universe::heap()->print();
+      }
+
+      jlong t0 = os::javaTimeNanos();
+      ((ParallelScavengeHeap *)Universe::heap())->collect(GCCause::_jvmti_force_gc);
+      jlong t1 = os::javaTimeNanos();
+
+      if (HotTubLog) {
+        tty->print("[hottub][info][JNI_CleanHotTubVM] after gc heap->print "
+            "(time = %luns)\n", t1 - t0);
+        Universe::heap()->print();
+      }
     }
 
-    jlong t0 = os::javaTimeNanos();
-    ((ParallelScavengeHeap *)Universe::heap())->collect(GCCause::_jvmti_force_gc);
-    jlong t1 = os::javaTimeNanos();
+    jlong t3 = os::javaTimeNanos();
+    tty->print("[hottub][info][JNI_CleanHotTubVM] re_zero_init = %luns, "
+        "gc = %luns, total = %luns\n",
+        t1 - t0, t3 - t1, (t1 - t0) + (t3 - t1));
 
-    if (HotTubLog) {
-      tty->print("[hottub][info][JNI_CleanJavaVM] after gc heap->print (time = %luns)\n", t1 - t0);
-      Universe::heap()->print();
-    }
+    // transition back to native to not confuse anything else
+    ThreadStateTransition::transition(thread, _thread_in_vm, _thread_in_native);
   }
-
-  // transition back to native to not confuse anything else
-  ThreadStateTransition::transition(thread, _thread_in_vm, _thread_in_native);
-
   return JNI_OK;
 }
 
 extern "C" {
 
 #ifndef USDT2
-DT_RETURN_MARK_DECL(DestroyJavaVM, jint);
+  DT_RETURN_MARK_DECL(DestroyJavaVM, jint);
 #else /* USDT2 */
 DT_RETURN_MARK_DECL(DestroyJavaVM, jint
                     , HOTSPOT_JNI_DESTROYJAVAVM_RETURN(_ret_ref));
@@ -5660,7 +5710,7 @@ jint JNICALL JNI_WaitTillLastThread() {
   ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
   // Wait until we are the last non-daemon thread to execute
   { MutexLocker nu(Threads_lock);
-    while (Threads::number_of_non_daemon_threads() > 1 )
+    while (Threads::number_of_non_daemon_threads() > 1)
       // This wait should make safepoint checks, wait without a timeout,
       // and wait as a suspend-equivalent condition.
       //

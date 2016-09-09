@@ -138,6 +138,8 @@ Mutex*   JfrThreadGroups_lock         = NULL;
 Mutex*   UnsafeJlong_lock             = NULL;
 #endif
 
+Mutex*   ClinitRecord_lock            = NULL;
+
 #define MAX_NUM_MUTEX 128
 static Monitor * _mutex_array[MAX_NUM_MUTEX];
 static int _num_mutex;
@@ -291,6 +293,8 @@ void mutex_init() {
 #ifndef SUPPORTS_NATIVE_CX8
   def(UnsafeJlong_lock             , Mutex,   special,     false);
 #endif
+
+  def(ClinitRecord_lock            , Mutex,   leaf,        false);
 }
 
 GCMutexLocker::GCMutexLocker(Monitor * mutex) {
