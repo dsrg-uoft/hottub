@@ -13,6 +13,7 @@
 #include <time.h>
 #include <stdint.h>
 #include <signal.h>
+#include <sys/wait.h>
 #include "java.h"
 
 /* TODO error handling should be revised a bit... I think the goal should be if
@@ -37,14 +38,15 @@ void signal_handler(int signum)
         fprintf(stderr, "[hottub][%s][client signal_handler] TODO forwarding %s to %d\n",
                 server_pid == -1 ? "error" : "info", strsignal(signum), server_pid);
         if (server_pid != -1) {
+            exit_if_server_dead("signal_handler", server_pid);
             // TODO handle properly in jvm (rather than register handlers)
             if (kill(server_pid, signum) == -1) {
                 fprintf(stderr, "[hottub][error][client signal_handler] forwarding "
                         "%s to %d\n", strsignal(signum), server_pid);
             }
         }
-        remove_pid_file(CLIENT);
-        exit(0);
+        //remove_pid_file(CLIENT);
+        //exit(0);
     } else {
         fprintf(stderr, "[hottub][error][client signal_handler] received "
                 "%s\n", strsignal(signum));
@@ -128,8 +130,9 @@ int run_hottub(char *id, args_info *args, char** envp)
          * a. if it doesn't exist no server exists -> create a server
          * b. if EEXIST then try and connect to the existing server
          */
+        pid_t pid;
         if (mkdir(jvmpath, 0775) == 0) {
-            pid_t pid = fork();
+            pid = fork();
             if (pid == 0) {
                 setsid();
                 setup_server_logs();
@@ -142,6 +145,8 @@ int run_hottub(char *id, args_info *args, char** envp)
                 try_connect = 1;
             }
         } else if (errno == EEXIST) {
+            pid = get_server_pid();
+            setup_signal_handling(pid);
             try_connect = 1;
         } else {
             fprintf(stderr, "[hottub][error][client run_hottub] mkdir | "
@@ -152,9 +157,10 @@ int run_hottub(char *id, args_info *args, char** envp)
         if (try_connect && create_pid_file(CLIENT, getpid()) == 0) {
             int jvmfd;
             int i;
+            pid_t server_pid = get_server_pid();
             for (i = 0; i < RETRY_COUNT; i++) {
                 jvmfd = connect_sock(id);
-                if (jvmfd > 0) {
+                if (jvmfd > 0 || is_process_dead(server_pid)) {
                     break;
                 } else {
                     if (jvmfd == -2) {
@@ -214,18 +220,34 @@ int run_hottub(char *id, args_info *args, char** envp)
             fprintf(stderr, "[hottub][info][client run_hottub] running server "
                     "with id %s, took %.6fs\n", id, (t1 - t0) / 1e9);
             int ret_val = 255;
+            error = 0;
+            size_t to_read = sizeof(int);
+            char* ret_val_ptr = (char*) &ret_val;
+            // TODO: better
+            pid = get_server_pid();
             // block until receive ret_val
             // we might get interrupted during this, but keep faithful that
             // server will give us our return value
-            //do {
-            error = read_sock(jvmfd, &ret_val, sizeof(int));
-            if (error == -1) {
-                perror("[hottub][error][client run_hottub] read_sock");
-            } else if (error < sizeof(int)) {
-                fprintf(stderr, "[hottub][error][client run_hottub] read_sock "
-                        "read %d bytes for ret_val\n", error);
-            }
-            //} while (errno == EINTR);
+            while (error != to_read) {
+                error = read_sock(jvmfd, ret_val_ptr, to_read);
+                if (error == -1) {
+                    perror("[hottub][error][client run_hottub] read_sock");
+                    if (errno != EINTR) {
+                        fprintf(stderr, "[hottub][error][client run_hottub] exitting");
+                        ret_val = 255;
+                        break;
+                    }
+                } else if (error == 0) {
+                    fprintf(stderr, "[hottub][error][client run_hottub] read_sock 0 bytes for ret_val\n");
+                    // TODO: what
+                    ret_val = 0;
+                    break;
+                } else if (error < to_read) {
+                    fprintf(stderr, "[hottub][error][client run_hottub] read_sock "
+                            "read %d bytes for ret_val\n", error);
+                    ret_val_ptr += to_read;
+                }
+            };
             fprintf(stderr, "[hottub][info][client run_hottub] ret_val = %d\n", ret_val);
             shutdown(jvmfd, SHUT_RDWR);
             close(jvmfd);
@@ -743,6 +765,29 @@ pid_t get_server_pid()
     fscanf(file, "%d", &pid);
     fclose(file);
     return pid;
+}
+
+int is_process_dead(pid_t pid) {
+    int status;
+    int ret = waitpid(pid, &status, WNOHANG);
+    if (ret == -1) {
+        if (errno != ECHILD) {
+            perror("[hottub][error][client is_process_dead] (waitpid)");
+        }
+    } else {
+        fprintf(stderr, "info waitpid for %d returned %d\n", (int) pid, ret);
+    }
+    ret = (kill(pid, 0) == -1) && errno == ESRCH;
+    fprintf(stderr, "info kill for %d returned %d\n", (int) pid, ret);
+    return ret;
+}
+
+void exit_if_server_dead(char* where, pid_t pid) {
+    if (is_process_dead(pid)) {
+        remove_pid_file(CLIENT);
+        // TODO: right exit code?
+        exit(0);
+    }
 }
 
 int setup_server_logs()

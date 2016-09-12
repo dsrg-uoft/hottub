@@ -34,6 +34,8 @@ int create_datapath(char *datapath);
 int create_execpath(char *execpath);
 int create_pid_file(const char *name, pid_t pid);
 pid_t get_server_pid();
+int is_process_dead(pid_t pid);
+void exit_if_server_dead(char* where, pid_t pid);
 int remove_pid_file(const char *name);
 int setup_server_logs();
 void setup_signal_handling();

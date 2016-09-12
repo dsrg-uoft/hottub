@@ -3997,7 +3997,7 @@ void InstanceKlass::zero_init(Klass *k, TRAPS) {
   JavaValue result(T_VOID);
   KlassHandle kh(THREAD, mirror()->klass());
   _native_call_begin((JavaThread*) THREAD, NULL, 10);
-  JavaCalls::call_special(&result, mirror, kh, vmSymbols::cleanClass_name(),
+  JavaCalls::call_virtual(&result, mirror, kh, vmSymbols::cleanClass_name(),
       vmSymbols::void_method_signature(), THREAD);
   _native_call_end((JavaThread*) THREAD, NULL, 10);
 

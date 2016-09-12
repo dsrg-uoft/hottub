@@ -839,11 +839,18 @@ JavaMain(void * _args)
                 fprintf(stderr, "[hottub][warn][bin JavaMain] (write_sock) "
                    "problem writing return val errno = %s\n", strerror(errno));
             }
-            shutdown(clientfd, SHUT_WR);
+            //int shutdown_ret = shutdown(clientfd, SHUT_WR);
+            //fprintf(stderr, "[hottub][info][bin JavaMain] (shutdown) returned %d\n", shutdown_ret);
             // wait for client to finish
-            if (read_sock(clientfd, &ret_val, sizeof(int)) == -1) {
-                fprintf(stderr, "[hottub][warn][bin JavaMain] (read_sock) "
-                   "problem reading end errno = %s\n", strerror(errno));
+            int read_ret = read_sock(clientfd, &ret_val, sizeof(int));
+            if (read_ret != 0) {
+                if (read_ret == -1) {
+                    fprintf(stderr, "[hottub][warn][bin JavaMain] (read_sock) "
+                        "problem reading end errno = %s\n", strerror(errno));
+                } else {
+                    fprintf(stderr, "[hottub][warn][bin JavaMain] (read_sock) "
+                        "reading end got %d bytes (expected 0)\n", read_ret);
+                }
             }
 
             /* 4. clean up jvm */

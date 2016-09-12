@@ -5443,6 +5443,10 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanHotTubVM(char *hottubid) {
         "gc = %luns, total = %luns\n",
         t1 - t0, t3 - t1, (t1 - t0) + (t3 - t1));
 
+    VM_DeoptimizeTheWorld op;
+    VMThread::execute(&op);
+    tty->print("[hottub][info][JNI_CleanHotTubVM] deoptimized the world\n");
+
     // transition back to native to not confuse anything else
     ThreadStateTransition::transition(thread, _thread_in_vm, _thread_in_native);
   }
