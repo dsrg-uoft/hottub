@@ -172,7 +172,7 @@ public:
   bool is_private     () { return flags().is_private(); }
   bool is_protected   () { return flags().is_protected(); }
   bool is_static      () { return flags().is_static(); }
-  bool is_final       () { return flags().is_final(); }
+  bool is_final       () { return flags().is_final() && !flags().is_static(); } //flags().is_final(); }
   bool is_stable      () { return flags().is_stable(); }
   bool is_volatile    () { return flags().is_volatile(); }
   bool is_transient   () { return flags().is_transient(); }

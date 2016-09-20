@@ -928,10 +928,14 @@ void InstanceKlass::initialize_impl(instanceKlassHandle this_oop, TRAPS) {
                              PerfClassTraceTime::CLASS_CLINIT);
 
     this_oop->call_class_initializer(THREAD);
-    if (this_oop->class_loader()) {
+    if (this_oop->reinit_safe()) {
       MutexLocker(ClinitRecord_lock, THREAD);
       if (clinit_record == NULL) {
-        clinit_record = new (ResourceObj::C_HEAP, mtInternal) GrowableArray<InstanceKlass*>(0, true);
+        InstanceKlass::clinit_record_initialize();
+      }
+      if (TraceClassInitialization || HotTubLog) {
+        ResourceMark rm;
+        //tty->print_cr("Added %s to replay, thread %p, is %d", this_oop->name()->as_C_string(), jt, THREAD->is_Java_thread());
       }
       clinit_record->append(this_oop());
     }
@@ -1231,10 +1235,13 @@ void InstanceKlass::call_class_initializer_impl(instanceKlassHandle this_oop, TR
   methodHandle h_method(THREAD, this_oop->class_initializer());
   // HotTub makes this possible
   //assert(!this_oop->is_initialized(), "we cannot initialize twice");
-  if (TraceClassInitialization) {
+  if (TraceClassInitialization || HotTubLog) {
+      /*
     tty->print("%d Initializing ", call_class_initializer_impl_counter++);
     this_oop->name()->print_value();
+    tty->print(" (thread %p, is %d)", (JavaThread*) THREAD, THREAD->is_Java_thread());
     tty->print_cr("%s (" INTPTR_FORMAT ")", h_method() == NULL ? "(no method)" : "", (address)this_oop());
+    */
   }
   if (h_method() != NULL) {
     JavaCallArguments args; // No arguments
@@ -3957,42 +3964,53 @@ bool InstanceKlass::is_lame() {
   */
 }
 
+void InstanceKlass::zer0_init(TRAPS) {
+  for (int i = 0; i < clinit_record->length(); i++) {
+    InstanceKlass* ik = clinit_record->at(i);
+    if (!ik->reinit_safe()) {
+      continue;
+    }
+    if (HotTubLog) {
+      tty->print("[HotTub][trace][InstanceKlass::zer0_init] class: %s\n",
+          ik->name()->as_C_string());
+    }
+    Handle mirror(THREAD, ik->java_mirror());
+    ik->do_local_static_fields(&java_lang_Class::zero_static_field, mirror, CHECK);
+    ik->do_local_static_fields(&java_lang_Class::initialize_static_field, mirror, CHECK);
+  }
+}
+
 // zero the class' static fields
-// also set unsafe classes to reinit true
 void InstanceKlass::zero_init(Klass *k, TRAPS) {
   InstanceKlass *ik = cast(k);
+    {
+        ResourceMark rm;
+        if (strcmp(ik->name()->as_C_string(), "tachyon/Constants") == 0) {
+            tty->print_cr("[HotTub][trace][InstanceKlass::zeero_init] skipping %s", ik->name()->as_C_string());
+            return;
+        }
+    }
+
+  //TODO remove me
+  if (HotTubLog) {
+    ResourceMark rm;
+    tty->print("[HotTub][trace][InstanceKlass::zero_init] RECORD safe = %d, initialized = %d, class: %s\n",
+        ik->reinit_safe(), ik->is_initialized(), ik->name()->as_C_string());
+  }
+
   // TODO: double check resource mark cleans this...
-  ik->child_set = new GrowableArray<InstanceKlass*>();
-  if (!ik->reinit_safe()) {
-    ik->reinit = true;
+  //ik->child_set = new GrowableArray<InstanceKlass*>();
+  if (!ik->reinit_safe() || !ik->is_initialized()) {
     return;
   }
   if (HotTubLog) {
+    ResourceMark rm;
     tty->print("[HotTub][trace][InstanceKlass::zero_init] class: %s\n",
         ik->name()->as_C_string());
   }
-  // TODO: double check resource mark cleans this...
-  //ik->child_set = new GrowableArray<InstanceKlass*>();
-  ik->reinit = false;
   Handle mirror(THREAD, ik->java_mirror());
   ik->do_local_static_fields(&java_lang_Class::zero_static_field, mirror, CHECK);
   ik->do_local_static_fields(&java_lang_Class::initialize_static_field, mirror, CHECK);
-
-  // TODO: FIX THIS catch stupid exceptions from cleaning daemons...
-  if (HAS_PENDING_EXCEPTION) {
-    ResourceMark rm;
-    tty->print("[HotTub][info][InstanceKlass::zero_init] cleaning exception: class = %s, "
-        "exception = %s\n", ik->name()->as_C_string(), PENDING_EXCEPTION->print_string());
-    Handle e(THREAD, PENDING_EXCEPTION);
-    CLEAR_PENDING_EXCEPTION;
-    instanceKlassHandle klass(THREAD, SystemDictionary::Throwable_klass());
-    JavaValue result(T_VOID);
-    _native_call_begin((JavaThread*) THREAD, NULL, 10);
-    JavaCalls::call_static(&result, klass, vmSymbols::__debug_print_name(),
-        vmSymbols::throwable_void_signature(), e, THREAD);
-    _native_call_end((JavaThread*) THREAD, NULL, 10);
-  }
-  // TODO: FIX THIS catch stupid exceptions from cleaning daemons...
 
   JavaValue result(T_VOID);
   KlassHandle kh(THREAD, mirror()->klass());
@@ -4078,21 +4096,38 @@ bool InstanceKlass::should_reinit() {
 }
 
 bool InstanceKlass::reinit_safe() {
-  //if (cast(k)->is_initialized() && !cast(k)->is_createvm_initialized()
-  //if (!cast(k)->class_loader() || !cast(k)->is_lame()) {
-  if (!is_initialized() || !class_loader()) {
+  ResourceMark rm;
+  static const char* MUST_REINIT[] = {
+      "java/lang/Runtime",
+      "java/lang/ApplicationShutdownHooks",
+      NULL,
+  };
+  int i = 0;
+  while (MUST_REINIT[i] != NULL) {
+    if (strcmp(name()->as_C_string(), MUST_REINIT[i]) == 0) {
+      if (HotTubLog) {
+        tty->print("[HotTub][trace][InstanceKlass::reinit_safe] must reinit class: %s "
+          "class_loader = %p initialized = %d enum = %d array = %d\n",
+          name()->as_C_string(), class_loader(), is_initialized(), is_enum(), oop_is_array());
+      }
+      return true;
+    }
+    i++;
+  }
+  //if (!class_loader() || !is_initialized() || is_enum() || oop_is_array()) {
+  //if (!class_loader() || !is_initialized() || oop_is_array()) {
+  if (!class_loader() || oop_is_array()) {
     if (HotTubLog) {
-      tty->print("[HotTub][trace][InstanceKlass::reinit_safe] skipping "
-          "class: %s is_initialized = %s class_loader = %s\n",
-          name()->as_C_string(), is_initialized() ? "true" : "false",
-          class_loader() ? "not null" : "null");
+      ResourceMark rm;
+      tty->print("[HotTub][trace][InstanceKlass::reinit_safe] skipping class: %s "
+          "class_loader = %p initialized = %d enum = %d array = %d\n",
+          name()->as_C_string(), class_loader(), is_initialized(), is_enum(), oop_is_array());
     }
     return false;
   }
   return true;
 }
 
-// TODO call this in the correct place....
 void InstanceKlass::clinit_record_initialize() {
   clinit_record = new (ResourceObj::C_HEAP, mtInternal) GrowableArray<InstanceKlass*>(0, true);
 }
@@ -4100,34 +4135,34 @@ void InstanceKlass::clinit_record_initialize() {
 void InstanceKlass::clinit_replay(TRAPS) {
   for (int i = 0; i < clinit_record->length(); i++) {
     InstanceKlass* ik = clinit_record->at(i);
-    // TODO: pretty sure this check is redundant as it is checked when recording
-    if (!ik->class_loader()) {
-      continue;
-    }
+
+    //TODO remove me
     if (HotTubLog) {
       ResourceMark rm;
-      tty->print("[HotTub][info][InstanceKlass::clinit_replay] ik = %s\n",
+      tty->print("[HotTub][trace][InstanceKlass::clinit_replay] RECORD safe = %d class: %s\n",
+          ik->reinit_safe(), ik->name()->as_C_string());
+    }
+
+    /*
+    if (!ik->reinit_safe()) {
+      continue;
+    }
+    */
+    {
+        ResourceMark rm;
+        if (strcmp(ik->name()->as_C_string(), "tachyon/Constants") == 0) {
+            tty->print_cr("[HotTub][trace][InstanceKlass::clinit_replay] skipping %s", ik->name()->as_C_string());
+            continue;
+        }
+    }
+
+    //InstanceKlass::zero_init(ik, THREAD);
+    ik->call_class_initializer(THREAD);
+    if (HotTubLog) {
+      ResourceMark rm;
+      tty->print("[HotTub][trace][InstanceKlass::clinit_replay] class: %s\n",
           ik->name()->as_C_string());
     }
-
-    // TODO: FIX THIS catch stupid exceptions from cleaning daemons...
-    if (HAS_PENDING_EXCEPTION) {
-      ResourceMark rm;
-      tty->print("[HotTub][info][InstanceKlass::clinit_replay] "
-          "cleaning exception: class = %s, exception = %s\n",
-          ik->name()->as_C_string(), PENDING_EXCEPTION->print_string());
-      Handle e(THREAD, PENDING_EXCEPTION);
-      CLEAR_PENDING_EXCEPTION;
-      instanceKlassHandle klass(THREAD, SystemDictionary::Throwable_klass());
-      JavaValue result(T_VOID);
-      _native_call_begin((JavaThread*) THREAD, NULL, 10);
-      JavaCalls::call_static(&result, klass, vmSymbols::__debug_print_name(),
-          vmSymbols::throwable_void_signature(), e, THREAD);
-      _native_call_end((JavaThread*) THREAD, NULL, 10);
-    }
-    // TODO: FIX THIS catch stupid exceptions from cleaning daemons...
-
-    ik->call_class_initializer(THREAD);
 
     if (HAS_PENDING_EXCEPTION) {
       ResourceMark rm;

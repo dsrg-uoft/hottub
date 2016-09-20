@@ -553,6 +553,7 @@ protected:
   AccessFlags access_flags() const         { return _access_flags;  }
   void set_access_flags(AccessFlags flags) { _access_flags = flags; }
 
+  bool is_enum() const                  { return _access_flags.is_enum(); }
   bool is_public() const                { return _access_flags.is_public(); }
   bool is_final() const                 { return _access_flags.is_final(); }
   bool is_interface() const             { return _access_flags.is_interface(); }

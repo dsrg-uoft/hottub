@@ -1053,6 +1053,7 @@ public:
   GrowableArray<InstanceKlass*> *child_set;
 
   // hottub super new
+  static void zer0_init(TRAPS);
   static void zero_init(Klass *k, TRAPS);
   static void clinit_replay(TRAPS);
   static void clinit_record_initialize();

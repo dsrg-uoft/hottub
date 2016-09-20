@@ -787,9 +787,23 @@ JavaMain(void * _args)
             if (error)
                 continue;
 
+            /*
+            for (int i = 1; i < 3; i++) {
+                int fd = oldfd[i];
+                oldfd[i] = dup(i);
+                dup2(fd, i);
+            }
+            */
             // we want to run this before we switch to client fds to keep logs
             // this is inefficient if we fail setup later, but whatever
             ifn.InitHotTubVM(run_num);
+            /*
+            for (int i = 1; i < 3; i++) {
+                int fd = oldfd[i];
+                oldfd[i] = dup(i);
+                dup2(fd, i);
+            }
+            */
 
             /* Build platform specific argument array */
             mainArgs = CreateApplicationArgs(env, argv, argc);

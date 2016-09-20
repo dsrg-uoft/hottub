@@ -5357,7 +5357,13 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_InitHotTubVM(jint run_num) {
     JavaThread* thread = JavaThread::current();
     // transition to vm so that clinit can run
     ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
+    SystemDictionary::classes_do(InstanceKlass::zero_init, thread);
     InstanceKlass::clinit_replay(thread);
+
+    //VM_DeoptimizeTheWorld op;
+    //VMThread::execute(&op);
+    //tty->print("[hottub][info][JNI_InitHotTubVM] deoptimized the world\n");
+
     ThreadStateTransition::transition(thread, _thread_in_vm, _thread_in_native);
 
     jlong t1 = os::javaTimeNanos();
@@ -5417,7 +5423,8 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanHotTubVM(char *hottubid) {
     HandleMark hm;
 
     jlong t0 = os::javaTimeNanos();
-    SystemDictionary::classes_do(InstanceKlass::zero_init, thread);
+    //InstanceKlass::zer0_init(thread);
+    //SystemDictionary::classes_do(InstanceKlass::zero_init, thread);
     jlong t1 = os::javaTimeNanos();
 
     // run gc
@@ -5442,10 +5449,6 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_CleanHotTubVM(char *hottubid) {
     tty->print("[hottub][info][JNI_CleanHotTubVM] re_zero_init = %luns, "
         "gc = %luns, total = %luns\n",
         t1 - t0, t3 - t1, (t1 - t0) + (t3 - t1));
-
-    VM_DeoptimizeTheWorld op;
-    VMThread::execute(&op);
-    tty->print("[hottub][info][JNI_CleanHotTubVM] deoptimized the world\n");
 
     // transition back to native to not confuse anything else
     ThreadStateTransition::transition(thread, _thread_in_vm, _thread_in_native);

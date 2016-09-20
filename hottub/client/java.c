@@ -179,6 +179,7 @@ int run_hottub(char *id, args_info *args, char** envp)
             }
             // if we never connected go next
             if (jvmfd <= 0) {
+                fprintf(stderr, "[hottub][info][client run_hottub] failed id %s\n", id);
                 remove_pid_file(CLIENT);
                 continue;
             }
@@ -729,7 +730,7 @@ int create_pid_file(const char *filename, pid_t pid)
         }
         return 0;
     } else if (errno == EEXIST) {
-        // don't print an error as this is a valid/expected case
+        fprintf(stderr, "[hottub][trace][client create_pid_file] exists = %s\n", path);
         return 1;
     } else {
         fprintf(stderr, "[hottub][error][client create_pid_file] creat "
@@ -764,6 +765,7 @@ pid_t get_server_pid()
     pid_t pid = -1;
     fscanf(file, "%d", &pid);
     fclose(file);
+    fprintf(stderr, "[hottub][info][get_server_pid] for \"%s\", got pid %d\n", path, pid);
     return pid;
 }
 

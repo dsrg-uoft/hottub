@@ -136,6 +136,12 @@ class Shutdown {
      */
     static void halt(int status) {
         synchronized (haltLock) {
+            if (isHotTubVM()) {
+                saveRetVal(status);
+                runHooks();
+                // should never return
+                kill_threads();
+            }
             halt0(status);
         }
     }
@@ -183,20 +189,6 @@ class Shutdown {
     static void exit(int status) {
         boolean runMoreFinalizers = false;
         synchronized (lock) {
-            if (isHotTubVM()) {
-                final Thread self = Thread.currentThread();
-                saveRetVal(status);
-                for (Thread th : Thread.getAllStackTraces().keySet()) {
-                    /*
-                    // daemons 2, 3, 4 from JVM: reference handler, finalizer, signal dispatcher
-                    if (th != self && th.isDaemon() && th.getId() > 4) {
-                    */
-                    if (th != self && !th.isDaemon()) {
-                        th.stop();
-                    }
-                }
-                self.stop();
-            }
             if (status != 0) runFinalizersOnExit = false;
             switch (state) {
             case RUNNING:       /* Initiate shutdown */
@@ -251,15 +243,92 @@ class Shutdown {
         }
     }
 
+    static final Thread.UncaughtExceptionHandler UEH = new Thread.UncaughtExceptionHandler() {
+        @Override
+        public void uncaughtException(Thread t, Throwable e) {
+            // pass
+        }
+    };
     static void kill_daemon_threads() {
-        //int count = 0;
-        //for (Thread th : Thread.getAllStackTraces().keySet()) {
-        //    if (th.getId() > 4 && th.isDaemon()) {
-        //        th.stop();
-        //        count++;
-        //    }
-        //}
-        //System.err.print("[hottub][info][Shutdown::kill_daemon_threads] killed " + count + "\n");
+        if (Thread.currentThread().isDaemon()) {
+            throw new IllegalStateException("Shutdown.kill_daemon_threads running in a Daemon thread!");
+        }
+        int count = 0;
+        String buf0 = "";
+        for (int i = 1; i < 2; i++) {
+            for (Thread th : Thread.getAllStackTraces().keySet()) {
+                // daemons 2, 3, 4 from JVM: reference handler, finalizer, signal dispatcher
+                if (th.isDaemon() && th.getId() > 4) {
+                    buf0 += "[HotTub][info][Shutdown::kill_daemon_threads] killing daemon " + th + "\n";
+                    so_it_goes(th);
+                    count++;
+                }
+            }
+            if (i == 0) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ex) {}
+            }
+        }
+        System.err.print(buf0);
+        System.err.print("[HotTub][info][Shutdown::kill_daemon_threads] killed " + count + " daemons.\n");
     }
 
+    static void kill_threads() {
+        final Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                final Thread self = Thread.currentThread();
+                int count = 0;
+                int daemons = 0;
+                String buf0 = "";
+                String buf1 = "";
+                for (int i = 1; i < 2; i++) {
+                    for (Thread th : Thread.getAllStackTraces().keySet()) {
+                        if (th == self) {
+                            continue;
+                        }
+                        if (th.isDaemon()) {
+                            buf0 += "[HotTub][info][Shutdown::kill_threads] not killing daemon " + th + "\n";
+                            daemons++;
+                        } else {
+                            buf1 += "[HotTub][info][Shutdown::kill_threads] killing non-daemon " + th + "\n";
+                            so_it_goes(th);
+                            count++;
+                        }
+                    }
+                    if (i == 0) {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException ex) {}
+                    }
+                }
+                System.err.print(buf0 + buf1);
+                System.err.print("[HotTub][info][Shutdown::kill_threads] killed " + count + " (excluding self), there are " + daemons + " daemons.\n");
+                so_it_goes(self);
+            }
+        };
+        r.run();
+        /*
+        final Thread self = Thread.currentThread();
+        if (self.isDaemon()) {
+            Thread grim_reaper = new Thread(r);
+            grim_reaper.start();
+            try {
+                grim_reaper.join();
+            } catch (InterruptedException ex) {
+                so_it_goes(self);
+            }
+        } else {
+            r.run();
+        }
+        */
+    }
+
+    static void so_it_goes(Thread th) {
+        th.setUncaughtExceptionHandler(UEH);
+        try {
+            th.stop();
+        } catch (IllegalMonitorStateException ex) {}
+    }
 }
