@@ -1157,6 +1157,9 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
             }
             completedAbruptly = false;
         } finally {
+            if (Shutdown.hottub_death) {
+                this.shutdownNow();
+            }
             processWorkerExit(w, completedAbruptly);
         }
     }
@@ -1454,6 +1457,8 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
     public boolean awaitTermination(long timeout, TimeUnit unit)
         throws InterruptedException {
         long nanos = unit.toNanos(timeout);
+        //System.err.print("[HotTub] in ThreadPoolExecutor#awaitTermination with " + nanos + ", " + timeout + ", " + unit + "\n");
+        //Thread.dumpStack();
         final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {

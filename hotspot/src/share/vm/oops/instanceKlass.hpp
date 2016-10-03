@@ -1053,11 +1053,13 @@ public:
   GrowableArray<InstanceKlass*> *child_set;
 
   // hottub super new
-  static void zer0_init(TRAPS);
+  bool should_record();
   static void zero_init(Klass *k, TRAPS);
   static void clinit_replay(TRAPS);
   static void clinit_record_initialize();
   static GrowableArray<InstanceKlass*> *clinit_record;
+  static bool must_reinit(const char* name_c_str);
+  static bool tmp_skip_reinit(const char* name_c_str);
 
 private:
   // initialization state

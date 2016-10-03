@@ -34,7 +34,7 @@ package java.lang;
  * @since    1.3
  */
 
-class Shutdown {
+public class Shutdown {
 
     /* Shutdown state */
     private static final int RUNNING = 0;
@@ -137,8 +137,9 @@ class Shutdown {
     static void halt(int status) {
         synchronized (haltLock) {
             if (isHotTubVM()) {
+                System.err.print("[HotTub] in System.halt at " + System.currentTimeMillis() + "\n");
                 saveRetVal(status);
-                runHooks();
+                //runHooks();
                 // should never return
                 kill_threads();
             }
@@ -260,8 +261,11 @@ class Shutdown {
                 // daemons 2, 3, 4 from JVM: reference handler, finalizer, signal dispatcher
                 if (th.isDaemon() && th.getId() > 4) {
                     buf0 += "[HotTub][info][Shutdown::kill_daemon_threads] killing daemon " + th + "\n";
+                    System.err.print("[HotTub] in kill daemon threads, killing " + th + "\n");
                     so_it_goes(th);
                     count++;
+                } else {
+                    System.err.print("[HotTub][info][Shutdown::kill_daemon_threads] not killing non daemon " + th + "\n");
                 }
             }
             if (i == 0) {
@@ -274,7 +278,9 @@ class Shutdown {
         System.err.print("[HotTub][info][Shutdown::kill_daemon_threads] killed " + count + " daemons.\n");
     }
 
+    public static volatile boolean hottub_death = false;
     static void kill_threads() {
+        hottub_death = true;
         final Runnable r = new Runnable() {
             @Override
             public void run() {
@@ -283,8 +289,12 @@ class Shutdown {
                 int daemons = 0;
                 String buf0 = "";
                 String buf1 = "";
-                for (int i = 1; i < 2; i++) {
-                    for (Thread th : Thread.getAllStackTraces().keySet()) {
+                int round = 0;
+                while (true) {
+                    int alive = 0;
+                    System.err.print("[HotTub] kill_threads round " + round + " start\n");
+                    for (java.util.Map.Entry<Thread, StackTraceElement[]> pair : Thread.getAllStackTraces().entrySet()) {
+                        Thread th = pair.getKey();
                         if (th == self) {
                             continue;
                         }
@@ -293,42 +303,82 @@ class Shutdown {
                             daemons++;
                         } else {
                             buf1 += "[HotTub][info][Shutdown::kill_threads] killing non-daemon " + th + "\n";
+                            System.err.print("[HotTub][Shutdown::kill_threads killing " + th + "\n");
+                            if (round == 0) {
+                                for (StackTraceElement ste : pair.getValue()) {
+                                    System.err.print("- " + ste + "\n");
+                                }
+                            }
                             so_it_goes(th);
                             count++;
+                            alive++;
                         }
                     }
-                    if (i == 0) {
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException ex) {}
+                    break;
+                    /*
+                    if (alive == 0) {
+                        break;
                     }
+                    try {
+                        Thread.sleep(1000);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                    System.err.print("[HotTub] kill_threads round " + round + " end\n");
+                    round++;
+                    */
                 }
                 System.err.print(buf0 + buf1);
                 System.err.print("[HotTub][info][Shutdown::kill_threads] killed " + count + " (excluding self), there are " + daemons + " daemons.\n");
+                /*
+                Thread.yield();
+                for (java.util.Map.Entry<Thread, StackTraceElement[]> pair : Thread.getAllStackTraces().entrySet()) {
+                    Thread th = pair.getKey();
+                    if (th == self) {
+                        System.err.print("[HotTub] join skipping self " + th + "\n");
+                        continue;
+                    }
+                    if (th.isDaemon()) {
+                        System.err.print("[HotTub] join skipping daemon " + th + "\n");
+                    } else {
+                        long t0 = System.currentTimeMillis();
+                        System.err.print("[HotTub] join waiting for " + th + "\n");
+                        for (StackTraceElement ste : pair.getValue()) {
+                            System.err.print("- " + ste + "\n");
+                        }
+                        try {
+                            th.join();
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
+                        System.err.print("[HotTub] join done with " + th + " after " + (System.currentTimeMillis() - t0) + " ms\n");
+                    }
+                }
+                */
                 so_it_goes(self);
             }
         };
         r.run();
         /*
-        final Thread self = Thread.currentThread();
-        if (self.isDaemon()) {
-            Thread grim_reaper = new Thread(r);
-            grim_reaper.start();
-            try {
-                grim_reaper.join();
-            } catch (InterruptedException ex) {
-                so_it_goes(self);
-            }
-        } else {
-            r.run();
+        Thread grim_reaper = new Thread(r, "Grim Reaper");
+        grim_reaper.setDaemon(false);
+        grim_reaper.start();
+        try {
+            grim_reaper.join();
+        } catch (InterruptedException ex) {
+            so_it_goes(Thread.currentThread());
         }
         */
+        //hottub_death = false;
     }
 
     static void so_it_goes(Thread th) {
         th.setUncaughtExceptionHandler(UEH);
         try {
+            //th.interrupt();
+            //java.util.concurrent.locks.LockSupport.unpark(th);
             th.stop();
+            //th.stop_hottub();
         } catch (IllegalMonitorStateException ex) {}
     }
 }

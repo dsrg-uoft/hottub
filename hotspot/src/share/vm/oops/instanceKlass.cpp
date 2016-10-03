@@ -928,14 +928,10 @@ void InstanceKlass::initialize_impl(instanceKlassHandle this_oop, TRAPS) {
                              PerfClassTraceTime::CLASS_CLINIT);
 
     this_oop->call_class_initializer(THREAD);
-    if (this_oop->reinit_safe()) {
+    if (HotTubReinit && this_oop->should_record()) {
       MutexLocker(ClinitRecord_lock, THREAD);
       if (clinit_record == NULL) {
         InstanceKlass::clinit_record_initialize();
-      }
-      if (TraceClassInitialization || HotTubLog) {
-        ResourceMark rm;
-        //tty->print_cr("Added %s to replay, thread %p, is %d", this_oop->name()->as_C_string(), jt, THREAD->is_Java_thread());
       }
       clinit_record->append(this_oop());
     }
@@ -2494,6 +2490,30 @@ void InstanceKlass::notify_unload_class(InstanceKlass* ik) {
 
   // notify ClassLoadingService of class unload
   ClassLoadingService::notify_class_unloaded(ik);
+
+  if (HotTubReinit) {
+    if (clinit_record == NULL) {
+      tty->print_cr("[HotTub][warn][InstanceKlass::notify_unload_class] clinit_record is NULL");
+    } else {
+      bool found = false;
+      MutexLocker lock(ClinitRecord_lock);
+      for (int i = 0; i < clinit_record->length(); i++) {
+        InstanceKlass* ik2 = clinit_record->at(i);
+        if (ik2 == ik) {
+          clinit_record->at_put(i, NULL);
+          if (HotTubLog) {
+            ResourceMark rm;
+            tty->print_cr("[HotTub][trace][InstanceKlass::notify_unload_class] unloaded %s from clinit_record", ik->name()->as_C_string());
+          }
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        tty->print_cr("[HotTub][warn][InstanceKlass::notify_unload_class] could not unload %s from clinit record", ik->name()->as_C_string());
+      }
+    }
+  }
 }
 
 void InstanceKlass::release_C_heap_structures(InstanceKlass* ik) {
@@ -3964,50 +3984,23 @@ bool InstanceKlass::is_lame() {
   */
 }
 
-void InstanceKlass::zer0_init(TRAPS) {
-  for (int i = 0; i < clinit_record->length(); i++) {
-    InstanceKlass* ik = clinit_record->at(i);
-    if (!ik->reinit_safe()) {
-      continue;
-    }
-    if (HotTubLog) {
-      tty->print("[HotTub][trace][InstanceKlass::zer0_init] class: %s\n",
-          ik->name()->as_C_string());
-    }
-    Handle mirror(THREAD, ik->java_mirror());
-    ik->do_local_static_fields(&java_lang_Class::zero_static_field, mirror, CHECK);
-    ik->do_local_static_fields(&java_lang_Class::initialize_static_field, mirror, CHECK);
-  }
-}
-
 // zero the class' static fields
 void InstanceKlass::zero_init(Klass *k, TRAPS) {
   InstanceKlass *ik = cast(k);
-    {
-        ResourceMark rm;
-        if (strcmp(ik->name()->as_C_string(), "tachyon/Constants") == 0) {
-            tty->print_cr("[HotTub][trace][InstanceKlass::zeero_init] skipping %s", ik->name()->as_C_string());
-            return;
-        }
-    }
 
-  //TODO remove me
   if (HotTubLog) {
     ResourceMark rm;
-    tty->print("[HotTub][trace][InstanceKlass::zero_init] RECORD safe = %d, initialized = %d, class: %s\n",
-        ik->reinit_safe(), ik->is_initialized(), ik->name()->as_C_string());
+    //tty->print_cr("[HotTub][trace][InstanceKlass::zero_init] class: %s, %p", ik->name()->as_C_string(), ik->class_loader());
+    tty->print_cr("[HotTub][trace][InstanceKlass::zero_init] class: %s, safe = %d, initialized = %d, classloader = %p",
+      ik->name()->as_C_string(), ik->reinit_safe(), ik->is_initialized(), ik->class_loader());
   }
 
   // TODO: double check resource mark cleans this...
   //ik->child_set = new GrowableArray<InstanceKlass*>();
-  if (!ik->reinit_safe() || !ik->is_initialized()) {
+  if (!ik->reinit_safe()) {
     return;
   }
-  if (HotTubLog) {
-    ResourceMark rm;
-    tty->print("[HotTub][trace][InstanceKlass::zero_init] class: %s\n",
-        ik->name()->as_C_string());
-  }
+
   Handle mirror(THREAD, ik->java_mirror());
   ik->do_local_static_fields(&java_lang_Class::zero_static_field, mirror, CHECK);
   ik->do_local_static_fields(&java_lang_Class::initialize_static_field, mirror, CHECK);
@@ -4095,34 +4088,83 @@ bool InstanceKlass::should_reinit() {
   }
 }
 
-bool InstanceKlass::reinit_safe() {
-  ResourceMark rm;
+bool InstanceKlass::must_reinit(const char* name_c_str) {
   static const char* MUST_REINIT[] = {
-      "java/lang/Runtime",
-      "java/lang/ApplicationShutdownHooks",
-      NULL,
+    "java/lang/Shutdown",
+    "java/lang/ApplicationShutdownHooks",
+    "java/io/DeleteOnExitHook",
+    "java/lang/UNIXProcess",
+    NULL,
   };
-  int i = 0;
-  while (MUST_REINIT[i] != NULL) {
-    if (strcmp(name()->as_C_string(), MUST_REINIT[i]) == 0) {
-      if (HotTubLog) {
-        tty->print("[HotTub][trace][InstanceKlass::reinit_safe] must reinit class: %s "
-          "class_loader = %p initialized = %d enum = %d array = %d\n",
-          name()->as_C_string(), class_loader(), is_initialized(), is_enum(), oop_is_array());
-      }
+  for (int i = 0; MUST_REINIT[i] != NULL; i++) {
+    if (strcmp(name_c_str, MUST_REINIT[i]) == 0) {
       return true;
     }
-    i++;
   }
-  //if (!class_loader() || !is_initialized() || is_enum() || oop_is_array()) {
-  //if (!class_loader() || !is_initialized() || oop_is_array()) {
-  if (!class_loader() || oop_is_array()) {
-    if (HotTubLog) {
-      ResourceMark rm;
-      tty->print("[HotTub][trace][InstanceKlass::reinit_safe] skipping class: %s "
-          "class_loader = %p initialized = %d enum = %d array = %d\n",
-          name()->as_C_string(), class_loader(), is_initialized(), is_enum(), oop_is_array());
+  return false;
+}
+
+bool InstanceKlass::tmp_skip_reinit(const char* name_c_str) {
+  static const char* CANNOT_REINIT[] = {
+    "tachyon/Constants",
+    "tachyon/client/ClientContext",
+    "org/jboss/netty/logging/InternalLoggerFactory",
+    "org/apache/hadoop/hive/ql/parse/StorageFormat",
+    NULL,
+  };
+  static const char* PACKAGES[] = {
+    "com/mysql/jdbc",
+    NULL,
+  };
+  for (int i = 0; CANNOT_REINIT[i] != NULL; i++) {
+    if (strcmp(name_c_str, CANNOT_REINIT[i]) == 0) {
+      return true;
     }
+  }
+  for (int i = 0; PACKAGES[i] != NULL; i++) {
+    if (strstr(name_c_str, PACKAGES[i]) != NULL) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool InstanceKlass::reinit_safe() {
+  char buf[256];
+  if (name()) {
+    name()->as_C_string(buf, 256);
+  } else {
+    tty->print_cr("[HotTub][warn][InstanceKlass::reinit_safe] class with no name, class loader data %p", class_loader_data());
+    return false;
+  }
+  if (InstanceKlass::tmp_skip_reinit(buf)) {
+    return false;
+  }
+  if (class_loader()) {
+    class_loader()->klass()->name()->as_C_string(buf, 256);
+    if (strstr(buf, "sun/misc/Launcher") == NULL) {
+      return false;
+    }
+  }
+  return should_record() && is_initialized();
+}
+
+bool InstanceKlass::should_record() {
+  char buf[256];
+  if (name()) {
+    name()->as_C_string(buf, 256);
+  } else {
+    tty->print_cr("[HotTub][warn][InstanceKlass::should_record] class %p with no name, class loader data %p", p2i(this), class_loader_data());
+    return false;
+  }
+  if (!class_loader_data()) {
+      tty->print_cr("[HotTub][warn][InstanceKlass::should_record] class %p with no class loader data or name", p2i(this), buf);
+      return false;
+  }
+  if (InstanceKlass::must_reinit(buf)) {
+    return true;
+  }
+  if (!class_loader() || oop_is_array()) {
     return false;
   }
   return true;
@@ -4133,27 +4175,29 @@ void InstanceKlass::clinit_record_initialize() {
 }
 
 void InstanceKlass::clinit_replay(TRAPS) {
+  char name_c_str[256];
   for (int i = 0; i < clinit_record->length(); i++) {
     InstanceKlass* ik = clinit_record->at(i);
-
-    //TODO remove me
-    if (HotTubLog) {
-      ResourceMark rm;
-      tty->print("[HotTub][trace][InstanceKlass::clinit_replay] RECORD safe = %d class: %s\n",
-          ik->reinit_safe(), ik->name()->as_C_string());
-    }
-
-    /*
-    if (!ik->reinit_safe()) {
+    if (ik == NULL) {
       continue;
     }
-    */
-    {
-        ResourceMark rm;
-        if (strcmp(ik->name()->as_C_string(), "tachyon/Constants") == 0) {
-            tty->print_cr("[HotTub][trace][InstanceKlass::clinit_replay] skipping %s", ik->name()->as_C_string());
-            continue;
-        }
+
+    if (!ik->name()) {
+      tty->print_cr("[HotTub][warn][InstanceKlass::should_record] class %p with no name, class loader data is %p", p2i(ik), ik->class_loader_data());
+      continue;
+    }
+    if (HotTubLog) {
+      tty->print_cr("[HotTub][trace][InstanceKlass::clinit_replay] class %p, name %p, class loader data %p", p2i(ik), ik->name(), ik->class_loader_data());
+    }
+    ik->name()->as_C_string(name_c_str, 256);
+
+    if (HotTubLog) {
+      tty->print_cr("[HotTub][trace][InstanceKlass::clinit_replay] class: %s, safe = %d, classloader = %p, %s",
+        name_c_str, ik->reinit_safe(), ik->class_loader(), ik->class_loader() ? ik->class_loader()->klass()->name()->as_C_string() : "null");
+    }
+
+    if (!ik->reinit_safe()) {
+      continue;
     }
 
     //InstanceKlass::zero_init(ik, THREAD);
@@ -4161,7 +4205,7 @@ void InstanceKlass::clinit_replay(TRAPS) {
     if (HotTubLog) {
       ResourceMark rm;
       tty->print("[HotTub][trace][InstanceKlass::clinit_replay] class: %s\n",
-          ik->name()->as_C_string());
+        ik->name()->as_C_string());
     }
 
     if (HAS_PENDING_EXCEPTION) {

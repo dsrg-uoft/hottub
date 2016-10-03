@@ -5359,14 +5359,14 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_InitHotTubVM(jint run_num) {
     ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
     SystemDictionary::classes_do(InstanceKlass::zero_init, thread);
     InstanceKlass::clinit_replay(thread);
+    jlong t1 = os::javaTimeNanos();
 
-    //VM_DeoptimizeTheWorld op;
+    VM_DeoptimizeTheWorld op;
     //VMThread::execute(&op);
     //tty->print("[hottub][info][JNI_InitHotTubVM] deoptimized the world\n");
 
     ThreadStateTransition::transition(thread, _thread_in_vm, _thread_in_native);
 
-    jlong t1 = os::javaTimeNanos();
     tty->print("[hottub][info][JNI_InitHotTubVM] clinit_replay = %luns\n", t1 - t0);
   }
 }
@@ -5715,9 +5715,12 @@ jint JNICALL jni_DetachCurrentThread(JavaVM *vm)  {
 jint JNICALL JNI_WaitTillLastThread() {
   JavaThread* thread = JavaThread::current();
   ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
+  if (HotTubLog) {
+    tty->print_cr("[HotTub] in wait till last thread");
+  }
   // Wait until we are the last non-daemon thread to execute
   { MutexLocker nu(Threads_lock);
-    while (Threads::number_of_non_daemon_threads() > 1)
+    while (Threads::number_of_non_daemon_threads() > 1) {
       // This wait should make safepoint checks, wait without a timeout,
       // and wait as a suspend-equivalent condition.
       //
@@ -5730,6 +5733,10 @@ jint JNICALL JNI_WaitTillLastThread() {
       //
       Threads_lock->wait(!Mutex::_no_safepoint_check_flag, 0,
           Mutex::_as_suspend_equivalent_flag);
+      if (HotTubLog) {
+        tty->print_cr("[HotTub] in wait till last thread, remaining is %d", Threads::number_of_non_daemon_threads());
+      }
+      }
   }
   ThreadStateTransition::transition_and_fence(thread, _thread_in_vm, _thread_in_native);
   return 0;

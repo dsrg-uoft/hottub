@@ -826,10 +826,14 @@ JavaMain(void * _args)
             // call main and wait till everything finishes
             ifn.CallingJavaMain();
             (*env)->CallStaticVoidMethod(env, mainClass, mainID, mainArgs);
-            ifn.WaitTillLastThread();
-            ifn.FinishedJavaMain();
+            struct timespec t10, t11;
+            clock_gettime_func(CLOCK_MONOTONIC, &t10);
+            fprintf(stderr, "[hottub] after call static void main\n");
 
-            clock_gettime_func(CLOCK_MONOTONIC, &t1);
+            ifn.WaitTillLastThread();
+            clock_gettime_func(CLOCK_MONOTONIC, &t11);
+            fprintf(stderr, "[hottub] after wait for threads, %lu\n", t11.tv_sec - t10.tv_sec);
+            ifn.FinishedJavaMain();
 
             ret = (*env)->ExceptionOccurred(env) == NULL ? 0 : 1;
             (*env)->ExceptionClear(env);
@@ -846,6 +850,8 @@ JavaMain(void * _args)
                     "had exception\n");
             }
             (*env)->ExceptionClear(env);
+            fprintf(stderr, "[hottub] after kill daemons\n");
+            clock_gettime_func(CLOCK_MONOTONIC, &t1);
 
             int ret_val = ifn.GetRetVal();
             //TODO: broken pipe problem? (caused by client getting signalled I think)

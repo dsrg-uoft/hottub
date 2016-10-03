@@ -30,3 +30,5 @@ for d in "$HOTTUB_DATA"/*; do
         rm -r "$d"
     fi
 done
+
+ps aux | grep hottubid | awk '{ print $2; }' | xargs kill -9

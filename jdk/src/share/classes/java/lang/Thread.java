@@ -411,6 +411,16 @@ class Thread implements Runnable {
         this.inheritedAccessControlContext =
                 acc != null ? acc : AccessController.getContext();
         this.target = target;
+        /*
+        if (Shutdown.hottub_death) {
+            this.target = new Runnable() {
+                @Override
+                public void run() {
+                    return;
+                }
+            };
+        }
+        */
         setPriority(priority);
         if (parent.inheritableThreadLocals != null)
             this.inheritableThreadLocals =
@@ -874,6 +884,23 @@ class Thread implements Runnable {
 
         // The VM can handle all thread states
         stop0(new ThreadDeath());
+    }
+    public final void stop_hottub() {
+        SecurityManager security = System.getSecurityManager();
+        if (security != null) {
+            checkAccess();
+            if (this != Thread.currentThread()) {
+                security.checkPermission(SecurityConstants.STOP_THREAD_PERMISSION);
+            }
+        }
+        // A zero status value corresponds to "NEW", it can't change to
+        // not-NEW because we hold the lock.
+        if (threadStatus != 0) {
+            resume(); // Wake up thread if it was suspended; no-op otherwise
+        }
+
+        // The VM can handle all thread states
+        stop0(new Object());
     }
 
     /**

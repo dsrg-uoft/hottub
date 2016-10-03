@@ -433,6 +433,8 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
              * and don't wait at all, so are trapped in transfer
              * method rather than calling awaitFulfill.
              */
+            //System.err.print("[HotTub] in " + this.getClass().getName() + "#awaitFulfill with timed " + timed + " nanos " + nanos + "\n");
+            //Thread.dumpStack();
             final long deadline = timed ? System.nanoTime() + nanos : 0L;
             Thread w = Thread.currentThread();
             int spins = (shouldSpin(s) ?

@@ -97,7 +97,6 @@ class ApplicationShutdownHooks {
             threads = hooks.keySet();
             hooks = null;
         }
-
         for (Thread hook : threads) {
             hook.start();
         }

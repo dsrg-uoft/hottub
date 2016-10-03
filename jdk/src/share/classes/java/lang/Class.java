@@ -3069,10 +3069,33 @@ public final class Class<T> implements java.io.Serializable,
         return null;
     }
 
+    private static String apm384(Class c) {
+        return c.toString() + ":" + c.getClassLoader().hashCode() + ":" + c.getClassLoader().getClass().getName() + ":" + c.getClassLoader().hashCode();
+    }
+
     private Constructor<T> getConstructor0(Class<?>[] parameterTypes,
                                         int which) throws NoSuchMethodException
     {
         Constructor<T>[] constructors = privateGetDeclaredConstructors((which == Member.PUBLIC));
+        /*
+        if (getName().equals("org.apache.hadoop.hive.ql.metadata.SessionHiveMetaStoreClient")) {
+            System.err.print("[APM384]: for org.apache.hadoop.hive.ql.metadata.SessionHiveMetaStoreClient.<init>" + argumentTypesToString(parameterTypes) + "\n");
+            for (Constructor<T> c : constructors) {
+                Class[] pts = c.getParameterTypes();
+                String buf = apm384(pts[0]);
+                for (int i = 1; i < pts.length; i++) {
+                    buf += "," + apm384(pts[i]);
+                }
+                System.err.print("[APM384]: " + buf + "\n");
+            }
+            String buf = apm384(parameterTypes[0]);
+            for (int i = 1; i < parameterTypes.length; i++) {
+                buf += "," + apm384(parameterTypes[i]);
+            }
+            System.err.print("[APM384]: looking for " + buf + "\n");
+            System.err.print("[APM384]: done.\n");
+        }
+        */
         for (Constructor<T> constructor : constructors) {
             if (arrayContentsEq(parameterTypes,
                                 constructor.getParameterTypes())) {

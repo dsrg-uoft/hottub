@@ -1764,6 +1764,13 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
     get_thread_profiler()->print(get_thread_name());
   }
 
+  if (HotTubLog) {
+    tty->print_cr("[HotSpot] Thread exiting start dump");
+    this->print_on(tty);
+    this->print_stack_on(tty);
+    tty->print_cr("[HotSpot] Thread exiting done dump.");
+  }
+
 
   // FIXIT: This code should be moved into else part, when reliable 1.2/1.3 check is in place
   {
