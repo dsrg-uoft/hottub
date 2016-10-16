@@ -4094,6 +4094,7 @@ bool InstanceKlass::must_reinit(const char* name_c_str) {
     "java/lang/ApplicationShutdownHooks",
     "java/io/DeleteOnExitHook",
     "java/lang/UNIXProcess",
+    "java/io/File$TempDirectory",
     NULL,
   };
   for (int i = 0; MUST_REINIT[i] != NULL; i++) {
@@ -4114,6 +4115,7 @@ bool InstanceKlass::tmp_skip_reinit(const char* name_c_str) {
   };
   static const char* PACKAGES[] = {
     "com/mysql/jdbc",
+    "com/google/inject/internal/cglib",
     NULL,
   };
   for (int i = 0; CANNOT_REINIT[i] != NULL; i++) {

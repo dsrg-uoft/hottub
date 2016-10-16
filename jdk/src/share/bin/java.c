@@ -704,7 +704,7 @@ JavaMain(void * _args)
                                 (*env)->ExceptionDescribe(env);
                                 (*env)->ExceptionClear(env);
                             } else {
-                                fprintf(stderr, "[hottub][info][bin JavaMain] (System#_setProperty) for %s ok\n", d_arg + 2);
+                                fprintf(stderr, "[hottub][info][bin JavaMain] (System#_setProperty) for %s = %s ok\n", d_arg + 2, d_arg + pos + 1);
                             }
                             // TODO: free?
                             free(d_arg);
