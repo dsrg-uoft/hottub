@@ -19,8 +19,8 @@ and `freetype-config --cflags` which should give compiler flags - e.g. `-I/usr/i
 With these two paths from the `-L` and `-I` flags, you would configure like `bash ./configure --with-freetype-lib=/usr/lib/x86_64-linux-gnu --with-freetype-include=/usr/include/freetype2`.
 
 Examples:
-* bash ./configure --with-boot-jdk=/usr/lib/jvm/java-7-openjdk-amd64
-* bash ./configure --with-boot-jdk=/usr/lib/jvm/java-7-openjdk-amd64 --with-debug-level=slowdebug
+* `bash ./configure --with-boot-jdk=/usr/lib/jvm/java-7-openjdk-amd64`
+* `bash ./configure --with-boot-jdk=/usr/lib/jvm/java-7-openjdk-amd64 --with-debug-level=slowdebug`
 
 ### HotTub
 To build HotTub, run `./make_hottub.sh <image name> [<jvm build type>]`, where `<jvm build type>` is `release`, `fastdebug`, or `slowdebug`.
@@ -35,7 +35,11 @@ The script `make_hottub.sh` builds the static analysis files, "client" files, an
 
 ## Diffs
 Run `git diff vanilla master` to get a patch.
-If you pipe it to a file, you can apply them to an updated OpenJDK project source with `patch -p1 < hottub.patch`.
+To apply HotTub changes to another OpenJDK project (e.g. updated source), you can run `patch -p1 < hottub.patch` in the root of the other project.
+
+To apply OpenJDK changes to HotTub, clone a new OpenJDK project, and recursively copy the updated OpenJDK source to the `vanilla` branch of HotTub.
+Git will see all the changes (you should double check that things look right), and you can commit to the `vanilla` branch.
+You can then merge `vanilla` into `master`.
 
 ## Flags
 * -hottub                    : enable hottub
@@ -46,16 +50,17 @@ If you pipe it to a file, you can apply them to an updated OpenJDK project sourc
 * -XX:+ProfileIntCompJitOnly : only profile jitted code; native time included in interpreted time, rather than compiled time
 
 ## Interpreter, Compiled/Jit, Native code profiling
-With the exception of blocking compiled time, you must first enable profiling with the `-XX:+ProfileIntComp` flag to use the counters, or you will get that the interpreter is executing 100% of the time.
+With the exception of blocking compiled time (e.g. if Java is run with the `-comp` or `-XX:+CompileTheWorld` flag),
+you must first enable profiling with the `-XX:+ProfileIntComp` flag, or you will get that the interpreter is executing 100% of the time.
 The following instance methods are added to the `java.lang.Thread` class, as the counters are per-thread.
 
 ```
 /**
- * Reset the counters.
+ * Reset the counters
  */
 void Thread#resetIntCompTimes();
 /**
- * Get blocking compile time in nanoseconds - e.g. if Java is run with the `-comp` or `-XX:+CompileTheWorld` flag
+ * Get blocking compile time in nanoseconds
  */
 long Thread#getBlockingCompileTime();
 /**
@@ -71,12 +76,12 @@ long Thread#getCompTime();
 Examples:
 ```
 Thread th = Thread.currentThread();
-System.out.print(String.format("Thread has spent %.6f seconds running compiled code\n", th.getCompTime() / 1e9));
+System.out.format("Thread has spent %.6f seconds running compiled code\n", th.getCompTime() / 1e9);
 
 Thread th2 = new Thread(new MyRunnable());
 th2.start();
 th2.join();
-System.out.print(String.format("Thread 2 has spent %.6f seconds running interpreted code\n", th2.getIntTime() / 1e9));
+System.out.format("Thread 2 has spent %.6f seconds running interpreted code\n", th2.getIntTime() / 1e9);
 ```
 
 ## Implementation notes
