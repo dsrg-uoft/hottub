@@ -109,10 +109,10 @@ Notes will be added soon.
 	- TODO: implement another way of killing threads, or silence these backtraces if during a "HotTub shutdown"
 - Segfault in jitted code, related to `sun.misc.Unsafe`
 	- TODO: debug...
-	- Solution: disable jitting of methods with the [`-XX:CompileCommand`][2] flag (you can specify multiple)
+	- Workaround solution: disable jitting of methods with the [`-XX:CompileCommand`][2] flag (you can specify multiple)
 		- Example: `-XX:CompileCommand=exclude,akka/actor/RepointableActorRef.underlying`
 - Segfault in jitted `java.util.concurrent.LinkedBlockingQueue#take`, see trace below
-	- Solution: `-XX:CompileCommand=exclude,java/util/concurrent/LinkedBlockingQueue.take`
+	- Workaround solution: `-XX:CompileCommand=exclude,java/util/concurrent/LinkedBlockingQueue.take`
 
 ```
 Stack: [0x00007f325cee2000,0x00007f325cfe3000],  sp=0x00007f325cfe0aa0,  free space=1018k
