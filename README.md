@@ -2,7 +2,9 @@ HotTub
 ======
 HotTub is built on top of OpenJDK 8.
 OpenJDK 8 uses Mercurial and the "[trees][1]" extension for version control.
-We tried using their setup, but ultimately switched to git as it fit our work-flow better (whether this was the best choice is another discussion).
+We tried using their setup, but ultimately switched to git as it fit our work-flow better (whether this was the best choice is another discussion). 
+
+Please read our research paper: "[Don't Get Caught In the Cold, Warm-up Your JVM Understand and Eliminate JVM Warm-up Overhead in Data-parallel Systems][2]" for more details of HotTub.
 
 ## Building
 First configure OpenJDK normally - see `README.openjdk.txt` (renamed from `README`) and `README-builds.html`.
@@ -109,7 +111,7 @@ Notes will be added soon.
 	- TODO: implement another way of killing threads, or silence these backtraces if during a "HotTub shutdown"
 - Segfault in jitted code, related to `sun.misc.Unsafe`
 	- TODO: debug...
-	- Workaround solution: disable jitting of methods with the [`-XX:CompileCommand`][2] flag (you can specify multiple)
+	- Workaround solution: disable jitting of methods with the [`-XX:CompileCommand`][3] flag (you can specify multiple)
 		- Example: `-XX:CompileCommand=exclude,akka/actor/RepointableActorRef.underlying`
 - Segfault in jitted `java.util.concurrent.LinkedBlockingQueue#take`, see trace below
 	- Workaround solution: `-XX:CompileCommand=exclude,java/util/concurrent/LinkedBlockingQueue.take`
@@ -134,4 +136,5 @@ v  ~StubRoutines::call_stub
 ```
 
 [1]: http://openjdk.java.net/projects/code-tools/trees/
-[2]: http://docs.oracle.com/javase/8/docs/technotes/tools/unix/java.html
+[2]: https://www.usenix.org/system/files/conference/osdi16/osdi16-lion.pdf
+[3]: http://docs.oracle.com/javase/8/docs/technotes/tools/unix/java.html
