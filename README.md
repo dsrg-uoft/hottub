@@ -38,6 +38,13 @@ You can use `freetype-config --libs` which should give linker flags - e.g. `-L/u
 and `freetype-config --cflags` which should give compiler flags - e.g. `-I/usr/include/freetype2`.
 With these two paths from the `-L` and `-I` flags, you would configure like `bash ./configure --with-freetype-lib=/usr/lib/x86_64-linux-gnu --with-freetype-include=/usr/include/freetype2`.
 
+#### Common build errors on newer systems
+Note that using long term support distributions/packages should not have these issues.
+* gcc >= 6.1 defaults to c++ 14 (see: https://gcc.gnu.org/projects/cxx-status.html)
+	* solutions: change the c++ standard in the build or use an older version
+* glibc >= 2.24 deprecated `int readdir_r(DIR*, dirent*, dirent**)` (see: https://bugs.openjdk.java.net/browse/JDK-8179887)
+	* solutions: use an older version or patch [hotspot/src/os/linux/vm/os_linux.inline.hpp](hotspot/src/os/linux/vm/os_linux.inline.hpp) to use `struct dirent *readdir(DIR *dirp);`
+
 ### HotTub
 To build HotTub, run `./make_hottub.sh <image name> [<jvm build type>]`, where `<jvm build type>` is `release`, `fastdebug`, or `slowdebug`.
 See the OpenJDK readmes for more information.
