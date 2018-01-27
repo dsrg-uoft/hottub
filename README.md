@@ -65,6 +65,7 @@ You can then merge `vanilla` into `master`.
 * -XX:HotTubReinitSkip       : TODO add me
 * -XX:+ProfileIntComp        : enable profiling of interpretered, and compiled (jitted + native) code
 * -XX:+ProfileIntCompJitOnly : only profile jitted code; native time included in interpreted time, rather than compiled time
+* -DPrintClassLoading=true   : (property) on thread exit output class loading statistics for the thread
 
 ## Interpreter, Compiled/Jit, Native code profiling
 With the exception of blocking compiled time (e.g. if Java is run with the `-comp` or `-XX:+CompileTheWorld` flag),
@@ -99,6 +100,42 @@ Thread th2 = new Thread(new MyRunnable());
 th2.start();
 th2.join();
 System.out.format("Thread 2 has spent %.6f seconds running interpreted code\n", th2.getIntTime() / 1e9);
+```
+
+## Class loading profiling
+OpenJDK comes with many class loading performance counters from the `sun.misc.PerfCounter` class. HotTub adds in some additional counters with a focus per-thread counters. HotTub also adds the property `PrintClassLoading` that can be used to print out the per-thread class loading counters on thread exit (add `-DPrintClassLoading=true`).
+
+For all available counters and their usage see the source file [jdk/src/share/classes/sun/misc/PerfCounter.java](jdk/src/share/classes/sun/misc/PerfCounter.java).
+Some example methods to get the counters:
+```
+/**
+ * Number of findClass calls
+ */
+public static PerfCounter getFindClasses()
+public static PerfCounter tl_FindClasses() // thread-local version
+/**
+ * Time (ns) spent in finding classes that includes
+ * lookup and read class bytes and defineClass
+ */
+public static PerfCounter getFindClassTime()
+public static PerfCounter tl_FindClassTime() // thread-local version
+/**
+ * Time (ns) spent in the parent delegation to
+ * the parent of the defining class loader
+ */
+public static PerfCounter getParentDelegationTime()
+public static PerfCounter tl_ParentDelegationTime() // thread-local vesion
+```
+
+Usage example:
+```
+/**
+ * Returns the current value of the perf counter.
+ */
+public synchronized long get()
+
+long class_count = sun.misc.PerfCounter.getFindClasses().get();
+long tl_class_count = sun.misc.PerfCounter.tl_FindClasses().get();
 ```
 
 ## Implementation notes
