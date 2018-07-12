@@ -3992,7 +3992,7 @@ void InstanceKlass::zero_init(Klass *k, TRAPS) {
     ResourceMark rm;
     //tty->print_cr("[HotTub][trace][InstanceKlass::zero_init] class: %s, %p", ik->name()->as_C_string(), ik->class_loader());
     tty->print_cr("[HotTub][trace][InstanceKlass::zero_init] class: %s, safe = %d, initialized = %d, classloader = %p",
-      ik->name()->as_C_string(), ik->reinit_safe(), ik->is_initialized(), ik->class_loader());
+      ik->name()->as_C_string(), ik->reinit_safe(), ik->is_initialized(), (intptr_t *)ik->class_loader());
   }
 
   // TODO: double check resource mark cleans this...
@@ -4142,7 +4142,7 @@ bool InstanceKlass::reinit_safe() {
   if (InstanceKlass::tmp_skip_reinit(buf)) {
     return false;
   }
-  if (class_loader()) {
+  if (class_loader() != NULL) {
     class_loader()->klass()->name()->as_C_string(buf, 256);
     if (strstr(buf, "sun/misc/Launcher") == NULL) {
       return false;
@@ -4160,7 +4160,7 @@ bool InstanceKlass::should_record() {
     return false;
   }
   if (!class_loader_data()) {
-      tty->print_cr("[HotTub][warn][InstanceKlass::should_record] class %p with no class loader data or name", p2i(this), buf);
+      tty->print_cr("[HotTub][warn][InstanceKlass::should_record] class %p (%s) with no class loader data or name", p2i(this), buf);
       return false;
   }
   if (InstanceKlass::must_reinit(buf)) {
@@ -4195,7 +4195,7 @@ void InstanceKlass::clinit_replay(TRAPS) {
 
     if (HotTubLog) {
       tty->print_cr("[HotTub][trace][InstanceKlass::clinit_replay] class: %s, safe = %d, classloader = %p, %s",
-        name_c_str, ik->reinit_safe(), ik->class_loader(), ik->class_loader() ? ik->class_loader()->klass()->name()->as_C_string() : "null");
+        name_c_str, ik->reinit_safe(), (intptr_t *)ik->class_loader(), ik->class_loader() != NULL ? ik->class_loader()->klass()->name()->as_C_string() : "null");
     }
 
     if (!ik->reinit_safe()) {
