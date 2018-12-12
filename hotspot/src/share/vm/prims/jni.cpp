@@ -5351,7 +5351,7 @@ _JNI_IMPORT_OR_EXPORT_ void JNICALL JNI_SetRetVal(jint code) {
 _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_InitHotTubVM(jint run_num) {
   hottub = true;
 
-  if (run_num) {
+  if (HotTubReinit && run_num) {
     jlong t0 = os::javaTimeNanos();
 
     JavaThread* thread = JavaThread::current();
@@ -5361,7 +5361,7 @@ _JNI_IMPORT_OR_EXPORT_ jint JNICALL JNI_InitHotTubVM(jint run_num) {
     InstanceKlass::clinit_replay(thread);
     jlong t1 = os::javaTimeNanos();
 
-    VM_DeoptimizeTheWorld op;
+    //VM_DeoptimizeTheWorld op;
     //VMThread::execute(&op);
     //tty->print("[hottub][info][JNI_InitHotTubVM] deoptimized the world\n");
 
