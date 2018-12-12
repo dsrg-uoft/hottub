@@ -4178,7 +4178,6 @@ void InstanceKlass::clinit_record_initialize() {
 }
 
 void InstanceKlass::clinit_replay(TRAPS) {
-  char name_c_str[256];
   for (int i = 0; i < clinit_record->length(); i++) {
     InstanceKlass* ik = clinit_record->at(i);
     if (ik == NULL) {
@@ -4190,26 +4189,16 @@ void InstanceKlass::clinit_replay(TRAPS) {
       continue;
     }
     if (HotTubLog) {
-      tty->print_cr("[HotTub][trace][InstanceKlass::clinit_replay] class %p, name %p, class loader data %p", p2i(ik), ik->name(), ik->class_loader_data());
-    }
-    ik->name()->as_C_string(name_c_str, 256);
-
-    if (HotTubLog) {
-      tty->print_cr("[HotTub][trace][InstanceKlass::clinit_replay] class: %s, safe = %d, classloader = %p, %s",
-        name_c_str, ik->reinit_safe(), (intptr_t *)ik->class_loader(), ik->class_loader() != NULL ? ik->class_loader()->klass()->name()->as_C_string() : "null");
+      ResourceMark rm;
+      tty->print_cr("[HotTub][trace][InstanceKlass::clinit_replay] class: %s (%p), safe: %d, classloader: %s (%p), classloader data: %p",
+        ik->name()->as_C_string(), p2i(ik), ik->reinit_safe(), ik->class_loader() != NULL ? ik->class_loader()->klass()->name()->as_C_string() : "null", (intptr_t *)ik->class_loader(), ik->class_loader_data());
     }
 
     if (!ik->reinit_safe()) {
       continue;
     }
 
-    //InstanceKlass::zero_init(ik, THREAD);
     ik->call_class_initializer(THREAD);
-    if (HotTubLog) {
-      ResourceMark rm;
-      tty->print("[HotTub][trace][InstanceKlass::clinit_replay] class: %s\n",
-        ik->name()->as_C_string());
-    }
 
     if (HAS_PENDING_EXCEPTION) {
       ResourceMark rm;
