@@ -4001,6 +4001,7 @@ void InstanceKlass::zero_init(Klass *k, TRAPS) {
     return;
   }
 
+  HandleMark hm;
   Handle mirror(THREAD, ik->java_mirror());
   ik->do_local_static_fields(&java_lang_Class::zero_static_field, mirror, CHECK);
   ik->do_local_static_fields(&java_lang_Class::initialize_static_field, mirror, CHECK);
