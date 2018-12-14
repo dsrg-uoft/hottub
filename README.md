@@ -43,7 +43,8 @@ Note that using long term support distributions/packages should not have these i
 * gcc >= 6.1 defaults to c++ 14 (see: https://gcc.gnu.org/projects/cxx-status.html)
 	* solutions: change the c++ standard in the build or use an older version
 * glibc >= 2.24 deprecated `int readdir_r(DIR*, dirent*, dirent**)` (see: https://bugs.openjdk.java.net/browse/JDK-8179887)
-	* solutions: use an older version or patch [hotspot/src/os/linux/vm/os_linux.inline.hpp](hotspot/src/os/linux/vm/os_linux.inline.hpp) to use `struct dirent *readdir(DIR *dirp);`
+	* workaround: ignore/disable deprecation warning (see: https://bugs.openjdk.java.net/browse/JDK-8187667)
+	* alternative: use an older version or patch [hotspot/src/os/linux/vm/os_linux.inline.hpp](hotspot/src/os/linux/vm/os_linux.inline.hpp) to use `struct dirent *readdir(DIR *dirp);`
 
 ### HotTub
 To build HotTub, run `./make_hottub.sh <image name> [<jvm build type>]`, where `<jvm build type>` is `release`, `fastdebug`, or `slowdebug`.
