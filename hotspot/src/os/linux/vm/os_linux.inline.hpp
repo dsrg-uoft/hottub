@@ -116,11 +116,6 @@ inline int os::ftruncate(int fd, jlong length) {
 
 inline struct dirent* os::readdir(DIR* dirp, dirent *dbuf)
 {
-// hotspot quickfix see: http://hg.openjdk.java.net/jdk10/master/rev/f5f2a2d13775
-// readdir_r has been deprecated since glibc 2.24.
-// See https://sourceware.org/bugzilla/show_bug.cgi?id=19056 for more details.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   dirent* p;
   int status;
   assert(dirp != NULL, "just checking");
@@ -134,7 +129,6 @@ inline struct dirent* os::readdir(DIR* dirp, dirent *dbuf)
     return NULL;
   } else
     return p;
-#pragma GCC diagnostic pop
 }
 
 inline int os::closedir(DIR *dirp) {
